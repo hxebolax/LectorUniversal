@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ventana principal: barra superior, pestaña visible y pestañas abajo (el menú lateral se añade en código) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:fitsSystemWindows="true"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/barra"
+		android:layout_width="match_parent"
+		android:layout_height="?attr/actionBarSize"
+		app:title="@string/app_name" />
+
+	<FrameLayout
+		android:id="@+id/contenedor_pestanas"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1" />
+
+	<com.google.android.material.bottomnavigation.BottomNavigationView
+		android:id="@+id/navegacion"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		app:labelVisibilityMode="labeled"
+		app:menu="@menu/navegacion" />
+</LinearLayout>

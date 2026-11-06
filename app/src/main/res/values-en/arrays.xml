@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings option lists (only the names are translated; the values stay in res/values/arrays.xml) -->
+<resources>
+	<string-array name="idiomas_nombres">
+		<item>System default</item>
+		<item>Español</item>
+		<item>English</item>
+	</string-array>
+
+	<string-array name="tema_app_nombres">
+		<item>System default</item>
+		<item>Light</item>
+		<item>Dark</item>
+	</string-array>
+
+	<string-array name="tema_lectura_nombres">
+		<item>Same as the app</item>
+		<item>Light</item>
+		<item>Dark</item>
+		<item>Sepia</item>
+		<item>Yellow on black (high contrast)</item>
+		<item>Black on white (high contrast)</item>
+		<item>White on black</item>
+		<item>Black screen (saves battery, for listening)</item>
+	</string-array>
+
+	<string-array name="fuentes_nombres">
+		<item>System default</item>
+		<item>Serif</item>
+		<item>Sans serif</item>
+		<item>Monospace</item>
+		<item>Condensed</item>
+		<item>Light</item>
+	</string-array>
+
+	<string-array name="orientacion_nombres">
+		<item>System default</item>
+		<item>Always portrait</item>
+		<item>Always landscape</item>
+	</string-array>
+
+	<string-array name="toque_nombres">
+		<item>Show paragraph actions</item>
+		<item>Read aloud from that paragraph</item>
+		<item>Open its first link (if any)</item>
+		<item>Nothing</item>
+	</string-array>
+
+	<string-array name="volumen_nombres">
+		<item>Change volume (normal)</item>
+		<item>Go to previous or next element</item>
+		<item>Go to previous or next paragraph</item>
+		<item>Scroll screen</item>
+	</string-array>
+
+	<string-array name="acciones_nombres">
+		<item>Read aloud from here</item>
+		<item>Add or remove bookmark</item>
+		<item>Add note</item>
+		<item>Copy paragraph</item>
+		<item>Look up a word (dictionary, translate, spell)</item>
+		<item>Next heading</item>
+		<item>Previous heading</item>
+		<item>Next element (the one chosen in the bar)</item>
+		<item>Previous element (the one chosen in the bar)</item>
+		<item>Table of contents</item>
+		<item>Search in book</item>
+		<item>Go to</item>
+		<item>Where am I</item>
+		<item>Select chapter text</item>
+		<item>Share paragraph</item>
+			<item>Explain the paragraph with AI</item>
+		<item>Translate the paragraph</item>
+		<item>Highlight a passage</item>
+		<item>Leave the table, list or quote</item>
+		<item>Copy several paragraphs (mark the start and copy up to here)</item>
+		<item>Quick mark (set it and go to it)</item>
+	</string-array>
+
+	<string-array name="auriculares_nombres">
+		<item>Previous or next chapter</item>
+		<item>Skip back or forward a few seconds</item>
+	</string-array>
+
+	<string-array name="dividir_nombres">
+		<item>Don\'t split</item>
+		<item>Over 300 characters</item>
+		<item>Over 600 characters</item>
+		<item>Over 1000 characters</item>
+	</string-array>
+
+	<string-array name="filtros_biblioteca">
+		<item>By folder</item>
+		<item>All books</item>
+		<item>Favorites</item>
+		<item>Reading</item>
+		<item>Not started</item>
+		<item>Finished</item>
+		<item>Audiobooks</item>
+		<item>Text documents</item>
+		<item>Want to read</item>
+		<item>Abandoned</item>
+		<item>Authors</item>
+		<item>Series</item>
+		<item>Collections</item>
+	</string-array>
+
+	<string-array name="ordenes">
+		<item>Recently opened</item>
+		<item>Title</item>
+		<item>Author</item>
+		<item>Recently added</item>
+		<item>Progress</item>
+		<item>Format</item>
+		<item>Size</item>
+	</string-array>
+	<string-array name="talkback_nombres">
+		<item>Lower the book volume while TalkBack speaks</item>
+		<item>Pause the book and resume when TalkBack stops</item>
+		<item>Keep playing as is (TalkBack speaks over it)</item>
+	</string-array>
+	<string-array name="filas_botonera_nombres">
+		<item>One row (the rest in the More menu)</item>
+		<item>Two rows</item>
+		<item>Three rows</item>
+		<item>As many as needed</item>
+	</string-array>
+	<string-array name="volumen_talkback_nombres">
+		<item>5 % (almost nothing)</item>
+		<item>15 %</item>
+		<item>25 %</item>
+		<item>40 %</item>
+		<item>60 %</item>
+	</string-array>
+	<string-array name="sonidos_elementos_nombres">
+		<item>Chapter</item>
+		<item>Heading</item>
+		<item>Link</item>
+		<item>Table</item>
+		<item>List</item>
+		<item>Image</item>
+		<item>Quote</item>
+		<item>Footnote</item>
+	</string-array>
+	<string-array name="detalle_parrafos_nombres">
+		<item>Paragraph type (list, table, quote, image...)</item>
+		<item>Page</item>
+		<item>Bookmark or note</item>
+		<item>Matches the search</item>
+	</string-array>
+	<string-array name="ia_proveedor_nombres">
+		<item>Automatic: the downloaded one, else the phone’s, else the first key</item>
+		<item>Gemma downloaded in the app (offline)</item>
+		<item>Only the phone’s AI (Gemini Nano, offline)</item>
+		<item>Gemini, with my key</item>
+		<item>OpenAI (ChatGPT), with my key</item>
+		<item>Claude, with my key</item>
+		<item>None</item>
+	</string-array>
+	<string-array name="botones_nombres">
+		<item>Contents</item>
+		<item>Search</item>
+		<item>Go to</item>
+		<item>Bookmarks</item>
+		<item>Voice</item>
+		<item>Where am I</item>
+		<item>Artificial intelligence</item>
+		<item>List of elements</item>
+		<item>Sleep timer</item>
+		<item>Appearance</item>
+		<item>Voice and speed for this book</item>
+		<item>Information</item>
+		<item>Copy text</item>
+		<item>Export</item>
+		<item>Settings</item>
+	</string-array>
+	<string-array name="pod_auto_descargar_nombres">
+		<item>As in Settings</item>
+		<item>Yes</item>
+		<item>No</item>
+	</string-array>
+	<string-array name="pod_nuevos_podcast_nombres">
+		<item>As in Settings</item>
+		<item>Inbox</item>
+		<item>The queue</item>
+		<item>Nowhere</item>
+	</string-array>
+	<string-array name="rss_frecuencia_nombres">
+		<item>Manually only</item>
+		<item>Every hour</item>
+		<item>Every 3 hours</item>
+		<item>Every 6 hours</item>
+		<item>Every 12 hours</item>
+		<item>Once a day</item>
+	</string-array>
+	<string-array name="rss_dias_nombres">
+		<item>One week</item>
+		<item>Two weeks</item>
+		<item>One month</item>
+		<item>Three months</item>
+		<item>Never</item>
+	</string-array>
+	<string-array name="pod_nuevos_nombres">
+		<item>Inbox</item>
+		<item>The queue</item>
+		<item>Nowhere</item>
+	</string-array>
+	<string-array name="pod_marcar_nombres">
+		<item>Only when finished</item>
+		<item>15 seconds</item>
+		<item>30 seconds</item>
+		<item>1 minute</item>
+		<item>2 minutes</item>
+		<item>5 minutes</item>
+	</string-array>
+	<string-array name="pod_velocidad_nombres">
+		<item>The audiobook speed</item>
+		<item>80 %</item>
+		<item>100 %</item>
+		<item>120 %</item>
+		<item>140 %</item>
+		<item>160 %</item>
+		<item>180 %</item>
+		<item>200 %</item>
+	</string-array>
+	<string-array name="rss_sinc_nombres">
+		<item>None</item>
+		<item>FreshRSS, The Old Reader (Google Reader API)</item>
+		<item>Miniflux</item>
+		<item>Nextcloud News</item>
+	</string-array>
+	<string-array name="pod_sinc_nombres">
+		<item>None</item>
+		<item>gpodder.net</item>
+		<item>Nextcloud (gPodder Sync)</item>
+	</string-array>
+	<string-array name="pod_conservar_nombres">
+		<item>All</item>
+		<item>The latest</item>
+		<item>The 2 latest</item>
+		<item>The 3 latest</item>
+		<item>The 5 latest</item>
+		<item>The 10 latest</item>
+	</string-array>
+	<string-array name="categorias_subrayado">
+		<item>Important</item>
+		<item>Question</item>
+		<item>Quote</item>
+		<item>Idea</item>
+		<item>To review</item>
+	</string-array>
+	<string-array name="pod_ordenes">
+		<item>Manual</item>
+		<item>By name</item>
+		<item>Most unplayed episodes</item>
+		<item>Latest published</item>
+	</string-array>
+	<string-array name="temporizador_auto_nombres">
+		<item>15 minutes</item>
+		<item>30 minutes</item>
+		<item>45 minutes</item>
+		<item>60 minutes</item>
+		<item>At the end of the chapter</item>
+	</string-array>
+</resources>

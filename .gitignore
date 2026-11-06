@@ -1,0 +1,36 @@
+# --- Entorno de compilación portátil (lo descarga compilar.bat, opción 9) ---
+entorno/
+
+# --- Resultados de Gradle y del IDE ---
+.gradle/
+.kotlin/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.vscode/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# --- APK compilados y versiones publicadas (se regeneran) ---
+*.apk
+*.aab
+dist/
+
+# --- Firma de la app: NUNCA se sube a ningún sitio (guarda una copia segura aparte) ---
+firma/
+*.jks
+*.keystore
+
+# --- Material de referencia de terceros y borradores privados ---
+adjuntos/
+
+# --- Archivos del sistema y temporales ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+*.bak

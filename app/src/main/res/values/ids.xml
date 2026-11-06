@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<item name="acciones_accesibles" type="id" />
+	<item name="menu_lateral_cajon" type="id" />
+	<item name="menu_lateral_navegacion" type="id" />
+</resources>

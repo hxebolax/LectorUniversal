@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<smil><head><meta name="dc:title" content="Libro DAISY de prueba"/></head><body><seq>
+<par id="p1"><text src="texto.html#t1"/><audio src="audio.mp3" clip-begin="npt=0.000s" clip-end="npt=4.000s" id="a1"/></par>
+<par id="p2"><text src="texto.html#t2"/><audio src="audio.mp3" clip-begin="npt=4.000s" clip-end="npt=9.000s" id="a2"/></par>
+<par id="p3"><text src="texto.html#t3"/><audio src="audio.mp3" clip-begin="npt=9.000s" clip-end="npt=15.000s" id="a3"/></par>
+</seq></body></smil>

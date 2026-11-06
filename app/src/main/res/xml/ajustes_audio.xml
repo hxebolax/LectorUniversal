@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference
+		android:key="talkback_al_hablar"
+		android:title="@string/aj_talkback_al_hablar"
+		android:entries="@array/talkback_nombres"
+		android:entryValues="@array/talkback_valores"
+		android:defaultValue="bajar"
+		app:useSimpleSummaryProvider="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="velocidad_audio"
+		android:title="@string/velocidad"
+		android:defaultValue="100"
+		android:max="400"
+		app:min="25"
+		app:seekBarIncrement="5"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="salto_atras"
+		android:title="@string/aj_salto_atras"
+		android:defaultValue="10"
+		android:max="120"
+		app:min="5"
+		app:seekBarIncrement="5"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="salto_adelante"
+		android:title="@string/aj_salto_adelante"
+		android:defaultValue="30"
+		android:max="300"
+		app:min="5"
+		app:seekBarIncrement="5"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="retroceso_reanudar"
+		android:title="@string/aj_retroceso_reanudar"
+		android:summary="@string/aj_retroceso_reanudar_desc"
+		android:defaultValue="2"
+		android:max="30"
+		app:min="0"
+		app:seekBarIncrement="1"
+		app:showSeekBarValue="true" />
+	<ListPreference
+		android:key="botones_auriculares"
+		android:title="@string/aj_botones_auriculares"
+		android:entries="@array/auriculares_nombres"
+		android:entryValues="@array/auriculares_valores"
+		android:defaultValue="capitulo"
+		app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat
+		android:key="saltar_silencios"
+		android:title="@string/saltar_silencios"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="reproducir_al_abrir"
+		android:title="@string/aj_reproducir_al_abrir"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="agitar_temporizador"
+		android:title="@string/aj_agitar_temporizador"
+		android:summary="@string/aj_agitar_temporizador_desc"
+		android:defaultValue="true" />
+	<PreferenceCategory android:title="@string/aj_temporizador_auto_cat">
+		<SwitchPreferenceCompat android:key="temporizador_auto" android:title="@string/aj_temporizador_auto" android:summary="@string/aj_temporizador_auto_desc" android:defaultValue="false" />
+		<EditTextPreference android:key="temporizador_auto_desde" android:title="@string/aj_temporizador_desde" android:defaultValue="23:00" app:useSimpleSummaryProvider="true" />
+		<EditTextPreference android:key="temporizador_auto_hasta" android:title="@string/aj_temporizador_hasta" android:defaultValue="07:00" app:useSimpleSummaryProvider="true" />
+		<ListPreference android:key="temporizador_auto_minutos" android:title="@string/aj_temporizador_minutos" android:entries="@array/temporizador_auto_nombres" android:entryValues="@array/temporizador_auto_valores" android:defaultValue="30" app:useSimpleSummaryProvider="true" />
+	</PreferenceCategory>
+	<SwitchPreferenceCompat android:key="reanudar_al_conectar" android:title="@string/aj_reanudar_conectar" android:summary="@string/aj_reanudar_conectar_desc" android:defaultValue="true" />
+</PreferenceScreen>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference
+		android:key="idioma_app"
+		android:title="@string/aj_idioma"
+		android:entries="@array/idiomas_nombres"
+		android:entryValues="@array/idiomas_valores"
+		android:defaultValue=""
+		app:useSimpleSummaryProvider="true" />
+	<ListPreference
+		android:key="tema_app"
+		android:title="@string/aj_tema_app"
+		android:entries="@array/tema_app_nombres"
+		android:entryValues="@array/tema_app_valores"
+		android:defaultValue="sistema"
+		app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat
+		android:key="abrir_ultimo"
+		android:title="@string/aj_abrir_ultimo"
+		android:summary="@string/aj_abrir_ultimo_desc"
+		android:defaultValue="false" />
+	<Preference
+		android:key="optimizacion_bateria"
+		android:title="@string/aj_bateria" />
+	<SwitchPreferenceCompat
+		android:key="sonidos"
+		android:title="@string/aj_sonidos"
+		android:summary="@string/aj_sonidos_desc"
+		android:defaultValue="true" />
+	<PreferenceCategory android:title="@string/aj_actualizaciones">
+		<SwitchPreferenceCompat
+			android:key="buscar_actualizaciones"
+			android:title="@string/aj_buscar_actualizaciones"
+			android:summary="@string/aj_buscar_actualizaciones_desc"
+			android:defaultValue="true" />
+		<EditTextPreference
+			android:key="url_actualizaciones"
+			android:title="@string/aj_url_actualizaciones"
+			app:useSimpleSummaryProvider="true" />
+		<Preference
+			android:key="comprobar_ahora"
+			android:title="@string/buscar_actualizaciones" />
+	</PreferenceCategory>
+</PreferenceScreen>

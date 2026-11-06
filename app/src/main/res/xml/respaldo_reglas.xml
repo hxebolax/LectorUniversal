@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copia de seguridad de Android: biblioteca y ajustes (no la caché de documentos) -->
+<data-extraction-rules>
+	<cloud-backup>
+		<include domain="database" path="biblioteca.db" />
+		<include domain="sharedpref" path="." />
+	</cloud-backup>
+	<device-transfer>
+		<include domain="database" path="biblioteca.db" />
+		<include domain="sharedpref" path="." />
+		<include domain="file" path="." />
+	</device-transfer>
+</data-extraction-rules>

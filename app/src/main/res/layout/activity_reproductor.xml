@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	Reproductor de audiolibros, DAISY, podcasts y audio de noticias. De arriba abajo:
+	dónde vas (capítulo, tiempo y barra de posición), el reproductor (retroceder,
+	reproducir o pausar, avanzar), moverse por capítulos u otra unidad, y
+	velocidad, capítulos, marcas, ir a, temporizador y texto.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:fitsSystemWindows="true"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/barra"
+		android:layout_width="match_parent"
+		android:layout_height="?attr/actionBarSize" />
+
+	<ScrollView
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1">
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical"
+			android:padding="16dp">
+
+			<TextView
+				android:id="@+id/autor"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+			<TextView
+				android:id="@+id/capitulo"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="16dp"
+				android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+			<TextView
+				android:id="@+id/tiempo"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:focusable="true"
+				android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+			<TextView
+				android:id="@+id/tiempo_capitulo"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:focusable="true"
+				android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+			<com.xebolax.lector.audio.DeslizadorPosicion
+				android:id="@+id/barra_posicion"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:minHeight="48dp" />
+
+			<!-- Texto sincronizado (DAISY con texto y audio) -->
+			<TextView
+				android:id="@+id/texto_sincronizado"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="12dp"
+				android:background="?attr/colorSurfaceVariant"
+				android:focusable="true"
+				android:padding="12dp"
+				android:textAppearance="?attr/textAppearanceBodyLarge"
+				android:visibility="gone" />
+		</LinearLayout>
+	</ScrollView>
+
+	<!-- El reproductor: retroceder, reproducir o pausar y avanzar -->
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center"
+		android:orientation="horizontal"
+		android:padding="8dp">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_retroceder"
+			style="@style/Boton.Icono.Grande"
+			app:icon="@drawable/ic_retroceder" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_reproducir"
+			style="@style/Boton.Icono.Grande.Principal"
+			app:icon="@drawable/ic_reproducir" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_avanzar"
+			style="@style/Boton.Icono.Grande"
+			app:icon="@drawable/ic_avanzar" />
+	</LinearLayout>
+
+	<!-- Moverse por capítulos (u otra unidad): anterior, cuál, siguiente -->
+	<LinearLayout
+		android:id="@+id/fila_navegacion"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingHorizontal="8dp">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_anterior"
+			style="@style/Boton.Icono.Grande"
+			app:icon="@drawable/ic_anterior_largo" />
+
+		<com.xebolax.lector.lectura.ControlAjustable
+			android:id="@+id/selector_unidad"
+			style="@style/Widget.Material3.Button.TonalButton"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="8dp"
+			android:layout_weight="1"
+			android:minHeight="48dp" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_siguiente"
+			style="@style/Boton.Icono.Grande"
+			app:icon="@drawable/ic_siguiente_largo" />
+	</LinearLayout>
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="horizontal"
+		android:paddingHorizontal="4dp"
+		android:paddingBottom="4dp">
+
+		<com.xebolax.lector.lectura.ControlAjustable
+			android:id="@+id/selector_velocidad"
+			style="@style/Boton.Barra"
+			app:icon="@drawable/ic_avanzar" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_capitulos"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/capitulos"
+			android:text="@string/capitulos_corto"
+			app:icon="@drawable/ic_indice" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_marcadores"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/marcadores_y_notas"
+			android:text="@string/marcadores_corto"
+			app:icon="@drawable/ic_marcador" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_ir"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/ir_a_tiempo"
+			android:text="@string/ir_a_corto"
+			app:icon="@drawable/ic_ir" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_temporizador"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/temporizador"
+			android:text="@string/temporizador_corto"
+			app:icon="@drawable/ic_temporizador" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_texto"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/abrir_texto"
+			android:text="@string/texto_corto"
+			android:visibility="gone"
+			app:icon="@drawable/ic_libro" />
+	</LinearLayout>
+</LinearLayout>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Más opciones del reproductor -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+	<item
+		android:id="@+id/menu_saltar_silencios"
+		android:checkable="true"
+		android:title="@string/saltar_silencios" />
+	<item android:id="@+id/menu_refuerzo" android:title="@string/refuerzo_volumen" />
+	<item android:id="@+id/menu_informacion" android:title="@string/informacion" />
+	<item android:id="@+id/menu_detener" android:title="@string/detener_y_cerrar" />
+</menu>

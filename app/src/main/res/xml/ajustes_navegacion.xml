@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<SwitchPreferenceCompat
+		android:key="barra_navegacion"
+		android:title="@string/aj_barra_navegacion"
+		android:summary="@string/aj_barra_navegacion_desc"
+		android:defaultValue="true" />
+	<ListPreference
+		android:key="toque_parrafo"
+		android:title="@string/aj_toque_parrafo"
+		android:entries="@array/toque_nombres"
+		android:entryValues="@array/toque_valores"
+		android:defaultValue="menu"
+		app:useSimpleSummaryProvider="true" />
+	<Preference
+		android:key="ir_acciones_parrafo"
+		android:title="@string/aj_acciones_parrafo"
+		android:summary="@string/aj_acciones_parrafo_desc" />
+	<ListPreference
+		android:key="filas_botonera"
+		android:title="@string/aj_filas_botonera"
+		android:entries="@array/filas_botonera_nombres"
+		android:entryValues="@array/filas_botonera_valores"
+		android:defaultValue="2"
+		app:useSimpleSummaryProvider="true" />
+	<MultiSelectListPreference
+		android:key="botones_ocultos"
+		android:title="@string/aj_botones_ocultos"
+		android:summary="@string/aj_botones_ocultos_desc"
+		android:entries="@array/botones_nombres"
+		android:entryValues="@array/botones_valores" />
+	<ListPreference
+		android:key="teclas_volumen"
+		android:title="@string/aj_teclas_volumen"
+		android:entries="@array/volumen_nombres"
+		android:entryValues="@array/volumen_valores"
+		android:defaultValue="nada"
+		app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat
+		android:key="anunciar_nivel"
+		android:title="@string/aj_anunciar_nivel"
+		android:summary="@string/aj_anunciar_nivel_desc"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="anunciar_saltos"
+		android:title="@string/aj_anunciar_saltos"
+		android:summary="@string/aj_anunciar_saltos_desc"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="navegacion_circular"
+		android:title="@string/aj_navegacion_circular"
+		android:summary="@string/aj_navegacion_circular_desc"
+		android:defaultValue="false" />
+	<MultiSelectListPreference
+		android:key="sonidos_elementos"
+		android:title="@string/aj_sonidos_elementos"
+		android:summary="@string/aj_sonidos_elementos_desc"
+		android:entries="@array/sonidos_elementos_nombres"
+		android:entryValues="@array/sonidos_elementos_valores" />
+	<MultiSelectListPreference
+		android:key="detalle_parrafos"
+		android:title="@string/aj_detalle_parrafos"
+		android:summary="@string/aj_detalle_parrafos_desc"
+		android:entries="@array/detalle_parrafos_nombres"
+		android:entryValues="@array/detalle_parrafos_valores"
+		android:defaultValue="@array/detalle_parrafos_valores" />
+	<SwitchPreferenceCompat
+		android:key="sonido_marcadores"
+		android:title="@string/aj_sonido_marcadores"
+		android:summary="@string/aj_sonido_marcadores_desc"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="texto_seleccionable"
+		android:title="@string/aj_texto_seleccionable"
+		android:summary="@string/aj_texto_seleccionable_desc"
+		android:defaultValue="false" />
+</PreferenceScreen>

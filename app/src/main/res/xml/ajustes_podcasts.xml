@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference android:key="pod_nuevos" android:title="@string/aj_pod_nuevos" android:entries="@array/pod_nuevos_nombres" android:entryValues="@array/pod_nuevos_valores" android:defaultValue="1" app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat android:key="pod_auto_descargar" android:title="@string/aj_pod_auto" android:summary="@string/aj_pod_auto_desc" android:defaultValue="false" />
+	<SwitchPreferenceCompat android:key="pod_solo_wifi" android:title="@string/aj_pod_wifi" android:defaultValue="true" />
+	<ListPreference android:key="pod_conservar" android:title="@string/aj_pod_conservar" android:entries="@array/pod_conservar_nombres" android:entryValues="@array/pod_conservar_valores" android:defaultValue="0" app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat android:key="pod_borrar_al_terminar" android:title="@string/aj_pod_borrar" android:defaultValue="false" />
+	<SwitchPreferenceCompat android:key="pod_seguir_cola" android:title="@string/aj_pod_seguir" android:defaultValue="true" />
+	<ListPreference android:key="pod_marcar_escuchado" android:title="@string/aj_pod_marcar" android:entries="@array/pod_marcar_nombres" android:entryValues="@array/pod_marcar_valores" android:defaultValue="30" app:useSimpleSummaryProvider="true" />
+	<ListPreference android:key="pod_velocidad_lista" android:title="@string/aj_pod_velocidad" android:entries="@array/pod_velocidad_nombres" android:entryValues="@array/pod_velocidad_valores" android:defaultValue="0" app:useSimpleSummaryProvider="true" />
+	<ListPreference android:key="rss_frecuencia" android:title="@string/aj_rss_frecuencia" android:entries="@array/rss_frecuencia_nombres" android:entryValues="@array/rss_frecuencia_valores" android:defaultValue="180" app:useSimpleSummaryProvider="true" />
+	<PreferenceCategory android:title="@string/aj_pod_sinc">
+		<Preference android:key="pod_sinc_aviso" android:selectable="false" android:summary="@string/aj_pod_sinc_desc" />
+		<ListPreference android:key="pod_sinc_tipo" android:title="@string/aj_sinc_servicio" android:entries="@array/pod_sinc_nombres" android:entryValues="@array/pod_sinc_valores" android:defaultValue="ninguno" app:useSimpleSummaryProvider="true" />
+		<EditTextPreference android:key="pod_sinc_url" android:title="@string/aj_cuenta_url" />
+		<EditTextPreference android:key="pod_sinc_usuario" android:title="@string/aj_sinc_usuario" />
+		<EditTextPreference android:key="pod_sinc_clave" android:title="@string/aj_sinc_clave" />
+		<Preference android:key="pod_sinc_ahora" android:title="@string/aj_sinc_ahora" />
+	</PreferenceCategory>
+</PreferenceScreen>

@@ -1,0 +1,31 @@
+# Texto: se guarda tal cual (los fuentes usan LF; los .bat y .ps1, CRLF para Windows)
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binarios: nunca se tocan los finales de línea
+*.pdf binary
+*.epub binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.odt binary
+*.ods binary
+*.odp binary
+*.doc binary
+*.azw binary
+*.azw3 binary
+*.mobi binary
+*.chm binary
+*.zip binary
+*.m4b binary
+*.mp3 binary
+*.ogg binary
+*.wav binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.ttf binary
+*.jar binary
+*.so binary

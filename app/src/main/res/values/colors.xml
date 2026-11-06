@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<color name="primario">#1B5E8C</color>
+	<color name="sobre_primario">#FFFFFF</color>
+	<color name="primario_contenedor">#CFE5FF</color>
+	<color name="sobre_primario_contenedor">#001D33</color>
+	<color name="secundario">#526070</color>
+	<color name="fondo">#FCFCFF</color>
+	<color name="sobre_fondo">#1A1C1E</color>
+	<color name="superficie_variante">#DEE3EB</color>
+	<color name="sobre_superficie_variante">#42474E</color>
+	<color name="icono_fondo">#1B5E8C</color>
+</resources>

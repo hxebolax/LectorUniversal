@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	Menú lateral. Arriba, las secciones de la app (como apps dentro de la app,
+	todas con sus pestañas abajo): Biblioteca (con los catálogos en línea en una
+	pestaña), Podcasts y Noticias. Abajo, lo general.
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+	<group
+		android:id="@+id/grupo_secciones"
+		android:checkableBehavior="single">
+		<item
+			android:id="@+id/lateral_biblioteca"
+			android:icon="@drawable/ic_biblioteca"
+			android:title="@string/seccion_biblioteca" />
+		<item android:id="@+id/lateral_podcasts" android:icon="@drawable/ic_voz" android:title="@string/podcasts" />
+		<item android:id="@+id/lateral_noticias" android:icon="@drawable/ic_rss" android:title="@string/noticias" />
+	</group>
+	<group android:id="@+id/grupo_general">
+		<item android:id="@+id/lateral_estadisticas" android:icon="@drawable/ic_recientes" android:title="@string/estadisticas" />
+		<item android:id="@+id/lateral_ajustes" android:icon="@drawable/ic_ajustes" android:title="@string/ajustes" />
+		<item android:id="@+id/lateral_manual" android:icon="@drawable/ic_libro" android:title="@string/manual" />
+		<item android:id="@+id/lateral_acerca" android:icon="@drawable/ic_info" android:title="@string/acerca_de" />
+	</group>
+</menu>

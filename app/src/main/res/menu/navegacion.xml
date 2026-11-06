@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pestañas de la Biblioteca (Catálogos: bibliotecas de libros en línea) -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+	<item
+		android:id="@+id/pestana_recientes"
+		android:icon="@drawable/ic_recientes"
+		android:title="@string/pestana_leyendo" />
+	<item
+		android:id="@+id/pestana_biblioteca"
+		android:icon="@drawable/ic_biblioteca"
+		android:title="@string/pestana_biblioteca" />
+	<item
+		android:id="@+id/pestana_marcadores"
+		android:icon="@drawable/ic_marcador"
+		android:title="@string/pestana_marcadores" />
+	<item
+		android:id="@+id/pestana_catalogos"
+		android:icon="@drawable/ic_globo"
+		android:title="@string/pestana_catalogos" />
+</menu>

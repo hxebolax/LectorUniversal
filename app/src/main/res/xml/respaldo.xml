@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copia de seguridad de Android (versiones hasta la 11) -->
+<full-backup-content>
+	<include domain="database" path="biblioteca.db" />
+	<include domain="sharedpref" path="." />
+</full-backup-content>

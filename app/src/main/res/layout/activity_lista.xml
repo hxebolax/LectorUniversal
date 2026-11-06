@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lista para elegir: índice, marcadores, resultados, capítulos... con filtro -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:fitsSystemWindows="true"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/barra"
+		android:layout_width="match_parent"
+		android:layout_height="?attr/actionBarSize" />
+
+	<com.google.android.material.textfield.TextInputLayout
+		android:id="@+id/filtro_contenedor"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginHorizontal="16dp"
+		android:hint="@string/filtrar"
+		android:textColorHint="?attr/colorOnSurfaceVariant">
+
+		<com.google.android.material.textfield.TextInputEditText
+			android:id="@+id/filtro"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:imeOptions="actionDone"
+			android:inputType="text" />
+	</com.google.android.material.textfield.TextInputLayout>
+
+	<TextView
+		android:id="@+id/estado"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:accessibilityLiveRegion="polite"
+		android:paddingHorizontal="16dp"
+		android:paddingVertical="4dp"
+		android:textAppearance="?attr/textAppearanceBodySmall" />
+
+	<androidx.recyclerview.widget.RecyclerView
+		android:id="@+id/recycler"
+		android:focusable="false"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:clipToPadding="false"
+		android:paddingBottom="16dp"
+		android:scrollbars="vertical" />
+</LinearLayout>

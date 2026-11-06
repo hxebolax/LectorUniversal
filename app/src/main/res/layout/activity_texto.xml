@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texto de un capítulo para mover el cursor, seleccionar y copiar -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:fitsSystemWindows="true"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/barra"
+		android:layout_width="match_parent"
+		android:layout_height="?attr/actionBarSize" />
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="horizontal"
+		android:paddingHorizontal="8dp">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_copiar_seleccion"
+			style="@style/Boton.Accion.Repartido"
+			android:text="@string/copiar_seleccion" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_copiar_todo"
+			style="@style/Boton.Accion.Repartido"
+			android:text="@string/copiar_todo" />
+	</LinearLayout>
+
+	<EditText
+		android:id="@+id/texto"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:background="@null"
+		android:gravity="top|start"
+		android:importantForAutofill="no"
+		android:inputType="textMultiLine|textNoSuggestions"
+		android:labelFor="@id/texto"
+		android:padding="16dp"
+		android:scrollbars="vertical"
+		android:textAppearance="?attr/textAppearanceBodyLarge"
+		tools:ignore="LabelFor"
+		xmlns:tools="http://schemas.android.com/tools" />
+</LinearLayout>

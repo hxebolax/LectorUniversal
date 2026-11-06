@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Diálogo de búsqueda en el libro -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:orientation="vertical"
+	android:paddingHorizontal="20dp"
+	android:paddingTop="8dp">
+
+	<com.google.android.material.textfield.TextInputLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:hint="@string/texto_a_buscar">
+
+		<com.google.android.material.textfield.MaterialAutoCompleteTextView
+			android:id="@+id/campo_buscar"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:completionThreshold="1"
+			android:imeOptions="actionSearch"
+			android:inputType="text"
+			android:padding="16dp" />
+	</com.google.android.material.textfield.TextInputLayout>
+
+	<com.google.android.material.checkbox.MaterialCheckBox
+		android:id="@+id/opcion_mayusculas"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:minHeight="48dp"
+		android:text="@string/distinguir_mayusculas" />
+
+	<com.google.android.material.checkbox.MaterialCheckBox
+		android:id="@+id/opcion_palabra"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:minHeight="48dp"
+		android:text="@string/palabra_completa" />
+
+	<com.google.android.material.checkbox.MaterialCheckBox
+		android:id="@+id/opcion_regex"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:minHeight="48dp"
+		android:text="@string/expresion_regular" />
+</LinearLayout>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+	<SwitchPreferenceCompat
+		android:key="tablas_encabezados"
+		android:title="@string/aj_tablas_encabezados"
+		android:summary="@string/aj_tablas_encabezados_desc"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="leer_imagenes"
+		android:title="@string/aj_leer_imagenes"
+		android:summary="@string/aj_leer_imagenes_desc"
+		android:defaultValue="true" />
+	<ListPreference
+		android:key="dividir_parrafos"
+		android:title="@string/aj_dividir_parrafos"
+		android:summary="@string/aj_dividir_parrafos_desc"
+		android:entries="@array/dividir_nombres"
+		android:entryValues="@array/dividir_valores"
+		android:defaultValue="0" />
+	<SwitchPreferenceCompat
+		android:key="pdf_unir_lineas"
+		android:title="@string/aj_pdf_unir_lineas"
+		android:summary="@string/aj_pdf_unir_lineas_desc"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="txt_linea_parrafo"
+		android:title="@string/aj_txt_linea_parrafo"
+		android:summary="@string/aj_txt_linea_parrafo_desc"
+		android:defaultValue="false" />
+	<Preference
+		android:key="vaciar_cache"
+		android:title="@string/aj_vaciar_cache" />
+</PreferenceScreen>

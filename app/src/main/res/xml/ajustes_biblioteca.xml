@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+	<Preference
+		android:key="carpetas_vigiladas"
+		android:title="@string/carpetas_vigiladas"
+		android:summary="@string/aj_carpetas_vigiladas_desc" />
+	<PreferenceCategory android:title="@string/aj_sinc">
+		<Preference
+			android:key="sinc_aviso"
+			android:selectable="false"
+			android:summary="@string/aj_sinc_desc" />
+		<EditTextPreference
+			android:key="sinc_url"
+			android:title="@string/aj_sinc_url"
+			android:summary="@string/aj_sinc_url_desc" />
+		<EditTextPreference
+			android:key="sinc_usuario"
+			android:title="@string/aj_sinc_usuario" />
+		<EditTextPreference
+			android:key="sinc_clave"
+			android:title="@string/aj_sinc_clave" />
+		<Preference
+			android:key="sinc_ahora"
+			android:title="@string/aj_sinc_ahora" />
+	</PreferenceCategory>
+	<PreferenceCategory android:title="@string/aj_copia">
+		<Preference
+			android:key="exportar_copia"
+			android:title="@string/aj_exportar_copia"
+			android:summary="@string/aj_exportar_copia_desc" />
+		<Preference
+			android:key="importar_copia"
+			android:title="@string/aj_importar_copia"
+			android:summary="@string/aj_importar_copia_desc" />
+	</PreferenceCategory>
+</PreferenceScreen>

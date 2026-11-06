@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Opciones de la barra de la ventana principal -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<item
+		android:id="@+id/menu_anadir"
+		android:icon="@drawable/ic_anadir"
+		android:title="@string/anadir_libros"
+		app:showAsAction="always" />
+	<item
+		android:id="@+id/menu_orden"
+		android:icon="@drawable/ic_orden"
+		android:title="@string/ordenar"
+		app:showAsAction="ifRoom" />
+	<item
+		android:id="@+id/menu_revisar"
+		android:title="@string/revisar_carpetas" />
+	<item
+		android:id="@+id/menu_vaciar_recientes"
+		android:title="@string/vaciar_leyendo" />
+</menu>

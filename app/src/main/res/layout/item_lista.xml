@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fila de una lista: texto y detalle (TalkBack lo lee como un solo elemento) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:background="?attr/selectableItemBackground"
+	android:focusable="true"
+	android:minHeight="56dp"
+	android:orientation="vertical"
+	android:paddingHorizontal="16dp"
+	android:paddingVertical="10dp">
+
+	<TextView
+		android:id="@+id/texto"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:importantForAccessibility="no"
+		android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+	<TextView
+		android:id="@+id/detalle"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:importantForAccessibility="no"
+		android:textAppearance="?attr/textAppearanceBodySmall"
+		android:textColor="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Archivos de la app que se pueden compartir o instalar (actualizaciones) -->
+<paths>
+	<files-path name="archivos" path="." />
+	<cache-path name="cache" path="." />
+</paths>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<smil><head/><body><seq>
+<par id="q1"><text src="texto.html#t4"/><audio src="audio.mp3" clip-begin="npt=15.000s" clip-end="npt=20.000s" id="b1"/></par>
+<par id="q2"><text src="texto.html#t5"/><audio src="audio.mp3" clip-begin="npt=20.000s" clip-end="npt=30.000s" id="b2"/></par>
+</seq></body></smil>

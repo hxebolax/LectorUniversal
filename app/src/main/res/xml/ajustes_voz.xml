@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference
+		android:key="talkback_al_hablar"
+		android:title="@string/aj_talkback_al_hablar"
+		android:entries="@array/talkback_nombres"
+		android:entryValues="@array/talkback_valores"
+		android:defaultValue="bajar"
+		app:useSimpleSummaryProvider="true" />
+	<ListPreference
+		android:key="volumen_talkback"
+		android:title="@string/aj_volumen_talkback"
+		android:entries="@array/volumen_talkback_nombres"
+		android:entryValues="@array/volumen_talkback_valores"
+		android:defaultValue="25"
+		app:useSimpleSummaryProvider="true" />
+	<ListPreference
+		android:key="motor_voz"
+		android:title="@string/aj_motor_voz"
+		android:defaultValue="" />
+	<ListPreference
+		android:key="idioma_voces"
+		android:title="@string/aj_idioma_voces"
+		android:summary="@string/aj_idioma_voces_desc"
+		android:defaultValue="" />
+	<ListPreference
+		android:key="voz"
+		android:title="@string/aj_voz_elegida"
+		android:defaultValue="" />
+	<Preference
+		android:key="probar_voz"
+		android:title="@string/aj_probar_voz" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="velocidad_voz"
+		android:title="@string/velocidad_voz"
+		android:defaultValue="100"
+		android:max="400"
+		app:min="10"
+		app:seekBarIncrement="5"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="tono_voz"
+		android:title="@string/aj_tono_voz"
+		android:defaultValue="100"
+		android:max="200"
+		app:min="25"
+		app:seekBarIncrement="5"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="pausa_parrafos"
+		android:title="@string/aj_pausa_parrafos"
+		android:defaultValue="0"
+		android:max="2000"
+		app:min="0"
+		app:seekBarIncrement="100"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="pausa_frases"
+		android:title="@string/aj_pausa_frases"
+		android:defaultValue="0"
+		android:max="1500"
+		app:min="0"
+		app:seekBarIncrement="100"
+		app:showSeekBarValue="true" />
+	<SwitchPreferenceCompat
+		android:key="resaltar_frase"
+		android:title="@string/aj_resaltar_frase"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="seguir_lectura"
+		android:title="@string/aj_seguir_lectura"
+		android:summary="@string/aj_seguir_lectura_desc"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="voz_segun_idioma"
+		android:title="@string/aj_voz_segun_idioma"
+		android:summary="@string/aj_voz_segun_idioma_desc"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="detectar_idioma"
+		android:dependency="voz_segun_idioma"
+		android:title="@string/aj_detectar_idioma"
+		android:summary="@string/aj_detectar_idioma_desc"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="destacar_encabezados"
+		android:title="@string/aj_destacar_encabezados"
+		android:summary="@string/aj_destacar_encabezados_desc"
+		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="leer_paginas"
+		android:title="@string/aj_leer_paginas"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="saltar_notas"
+		android:title="@string/aj_saltar_notas"
+		android:summary="@string/aj_saltar_notas_desc"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="saltar_urls"
+		android:title="@string/aj_saltar_urls"
+		android:summary="@string/aj_saltar_urls_desc"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="saltar_parentesis"
+		android:title="@string/aj_saltar_parentesis"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="saltar_corchetes"
+		android:title="@string/aj_saltar_corchetes"
+		android:summary="@string/aj_saltar_corchetes_desc"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="pronunciacion_activa"
+		android:title="@string/aj_pronunciacion_activa"
+		android:defaultValue="true" />
+	<Preference
+		android:key="ir_pronunciacion"
+		android:title="@string/diccionario_pronunciacion" />
+	<Preference
+		android:key="ajustes_sistema_voz"
+		android:title="@string/aj_ajustes_sistema_voz"
+		android:summary="@string/aj_ajustes_sistema_voz_desc" />
+	<SwitchPreferenceCompat
+		android:key="agitar_temporizador"
+		android:title="@string/aj_agitar_temporizador"
+		android:summary="@string/aj_agitar_temporizador_desc"
+		android:defaultValue="true" />
+</PreferenceScreen>

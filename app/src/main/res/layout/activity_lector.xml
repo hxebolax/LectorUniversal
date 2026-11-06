@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pantalla de lectura: barra superior, botones principales, texto (un párrafo por fila),
+     controles de la voz y barra de navegación por elementos -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:id="@+id/raiz"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:fitsSystemWindows="true"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/barra"
+		android:layout_width="match_parent"
+		android:layout_height="?attr/actionBarSize" />
+
+	<!-- Botones principales, por orden de importancia. La app los reparte en filas según el
+	     ancho (Ajustes, Lectura: filas de botones); los que no caben van al menú Más. -->
+	<LinearLayout
+		android:id="@+id/botonera"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="vertical"
+		android:paddingHorizontal="4dp">
+
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="horizontal">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_indice"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/indice"
+			android:text="@string/indice_corto"
+			app:icon="@drawable/ic_indice" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_buscar"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/buscar_en_libro"
+			android:text="@string/buscar_corto"
+			app:icon="@drawable/ic_buscar" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_ir"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/ir_a"
+			android:text="@string/ir_a_corto"
+			app:icon="@drawable/ic_ir" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_marcadores"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/marcadores_y_notas"
+			android:text="@string/marcadores_corto"
+			app:icon="@drawable/ic_marcador" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_voz"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/leer_en_voz_alta"
+			android:text="@string/voz_corto"
+			app:icon="@drawable/ic_voz" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_donde"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/donde_estoy"
+			android:text="@string/donde_corto"
+			app:icon="@drawable/ic_donde" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_ia"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/ia_menu"
+			android:text="@string/ia_corto"
+			app:icon="@drawable/ic_ia" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_elementos"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/lista_elementos"
+			android:text="@string/elementos_corto"
+			app:icon="@drawable/ic_lista" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_temporizador"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/temporizador"
+			android:text="@string/temporizador_corto"
+			app:icon="@drawable/ic_temporizador" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_aspecto"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/aspecto"
+			android:text="@string/aspecto"
+			app:icon="@drawable/ic_aspecto" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_ajustes_libro"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/ajustes_del_libro"
+			android:text="@string/ajustes_libro_corto"
+			app:icon="@drawable/ic_ajustes_libro" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_informacion"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/informacion"
+			android:text="@string/informacion_corto"
+			app:icon="@drawable/ic_info" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_seleccionar"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/seleccionar_texto"
+			android:text="@string/seleccionar_corto"
+			app:icon="@drawable/ic_seleccionar" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_exportar"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/exportar"
+			android:text="@string/exportar_corto"
+			app:icon="@drawable/ic_exportar" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_ajustes"
+			style="@style/Boton.Barra"
+			android:contentDescription="@string/ajustes"
+			android:text="@string/ajustes"
+			app:icon="@drawable/ic_ajustes" />
+		</LinearLayout>
+	</LinearLayout>
+
+	<FrameLayout
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1">
+
+		<androidx.recyclerview.widget.RecyclerView
+			android:id="@+id/lista"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:clipToPadding="false"
+			android:paddingBottom="24dp"
+			android:scrollbars="vertical" />
+
+		<LinearLayout
+			android:id="@+id/carga"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:gravity="center"
+			android:orientation="vertical"
+			android:padding="24dp">
+
+			<com.google.android.material.progressindicator.CircularProgressIndicator
+				android:id="@+id/indicador"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:importantForAccessibility="no"
+				android:indeterminate="true" />
+
+			<TextView
+				android:id="@+id/estado_carga"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="16dp"
+				android:accessibilityLiveRegion="polite"
+				android:gravity="center"
+				android:text="@string/abriendo"
+				android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+			<com.google.android.material.button.MaterialButton
+				android:id="@+id/boton_cancelar_carga"
+				style="@style/Widget.Material3.Button.TextButton"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:minHeight="48dp"
+				android:text="@string/cancelar" />
+		</LinearLayout>
+	</FrameLayout>
+
+	<!-- Controles de la lectura en voz alta (solo mientras hay una lectura) -->
+	<LinearLayout
+		android:id="@+id/panel_voz"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingHorizontal="4dp"
+		android:visibility="gone">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/voz_parrafo_anterior"
+			style="@style/Boton.Icono"
+			android:contentDescription="@string/parrafo_anterior"
+			app:icon="@drawable/ic_anterior_largo" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/voz_frase_anterior"
+			style="@style/Boton.Icono"
+			android:contentDescription="@string/frase_anterior"
+			app:icon="@drawable/ic_anterior" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/voz_pausa"
+			style="@style/Boton.Icono"
+			android:contentDescription="@string/pausar"
+			app:icon="@drawable/ic_pausa" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/voz_frase_siguiente"
+			style="@style/Boton.Icono"
+			android:contentDescription="@string/frase_siguiente"
+			app:icon="@drawable/ic_siguiente" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/voz_parrafo_siguiente"
+			style="@style/Boton.Icono"
+			android:contentDescription="@string/parrafo_siguiente"
+			app:icon="@drawable/ic_siguiente_largo" />
+
+		<com.xebolax.lector.lectura.ControlAjustable
+			android:id="@+id/voz_velocidad"
+			style="@style/Widget.Material3.Button.TonalButton"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:minHeight="48dp"
+			android:paddingHorizontal="4dp" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/voz_detener"
+			style="@style/Boton.Icono"
+			android:contentDescription="@string/detener_lectura"
+			app:icon="@drawable/ic_detener" />
+	</LinearLayout>
+
+	<!-- Navegación por elementos: anterior, elemento elegido (ajustable) y siguiente -->
+	<LinearLayout
+		android:id="@+id/barra_navegacion"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:padding="4dp">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_anterior"
+			style="@style/Boton.Icono"
+			app:icon="@drawable/ic_anterior" />
+
+		<com.xebolax.lector.lectura.ControlAjustable
+			android:id="@+id/selector_elemento"
+			style="@style/Widget.Material3.Button.TonalButton"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginHorizontal="4dp"
+			android:layout_weight="1"
+			android:minHeight="48dp" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/boton_siguiente"
+			style="@style/Boton.Icono"
+			app:icon="@drawable/ic_siguiente" />
+	</LinearLayout>
+</LinearLayout>

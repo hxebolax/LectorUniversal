@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ajustes: una entrada por apartado -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+	<Preference android:key="ir_general" android:title="@string/aj_general" android:summary="@string/aj_general_desc" />
+	<Preference android:key="ir_aspecto" android:title="@string/aj_aspecto" android:summary="@string/aj_aspecto_desc" />
+	<Preference android:key="ir_acciones" android:title="@string/aj_acciones_talkback" android:summary="@string/aj_acciones_talkback_desc" />
+	<Preference android:key="ir_navegacion" android:title="@string/aj_navegacion" android:summary="@string/aj_navegacion_desc" />
+	<Preference android:key="ir_voz" android:title="@string/aj_voz" android:summary="@string/aj_voz_desc" />
+	<Preference android:key="ir_audio" android:title="@string/aj_audio" android:summary="@string/aj_audio_desc" />
+	<Preference android:key="ir_podcasts" android:title="@string/aj_podcasts" android:summary="@string/aj_podcasts_desc" />
+	<Preference android:key="ir_rss" android:title="@string/aj_rss" android:summary="@string/aj_rss_desc" />
+	<Preference android:key="ir_ia" android:title="@string/aj_ia" android:summary="@string/aj_ia_desc" />
+	<Preference android:key="ir_documentos" android:title="@string/aj_documentos" android:summary="@string/aj_documentos_desc" />
+	<Preference android:key="ir_biblioteca" android:title="@string/aj_biblioteca" android:summary="@string/aj_biblioteca_desc" />
+</PreferenceScreen>

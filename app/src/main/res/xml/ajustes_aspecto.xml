@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference
+		android:key="tema_lectura"
+		android:title="@string/tema_lectura"
+		android:entries="@array/tema_lectura_nombres"
+		android:entryValues="@array/tema_lectura_valores"
+		android:defaultValue="app"
+		app:useSimpleSummaryProvider="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="tamano_letra"
+		android:title="@string/aj_tamano_letra"
+		android:defaultValue="20"
+		android:max="60"
+		app:min="10"
+		app:showSeekBarValue="true" />
+	<ListPreference
+		android:key="fuente"
+		android:title="@string/aj_fuente"
+		android:entries="@array/fuentes_nombres"
+		android:entryValues="@array/fuentes_valores"
+		android:defaultValue="sistema"
+		app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat
+		android:key="negrita"
+		android:title="@string/aj_negrita"
+		android:defaultValue="false" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="interlineado"
+		android:title="@string/aj_interlineado"
+		android:defaultValue="130"
+		android:max="250"
+		app:min="100"
+		app:seekBarIncrement="10"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="espacio_letras"
+		android:title="@string/aj_espacio_letras"
+		android:summary="@string/aj_espacio_letras_desc"
+		android:defaultValue="0"
+		android:max="30"
+		app:min="0"
+		app:seekBarIncrement="2"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="margen"
+		android:title="@string/aj_margen"
+		android:defaultValue="16"
+		android:max="64"
+		app:min="0"
+		app:seekBarIncrement="4"
+		app:showSeekBarValue="true" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="espacio_parrafos"
+		android:title="@string/aj_espacio_parrafos"
+		android:defaultValue="8"
+		android:max="40"
+		app:min="0"
+		app:seekBarIncrement="2"
+		app:showSeekBarValue="true" />
+	<SwitchPreferenceCompat
+		android:key="justificar"
+		android:title="@string/aj_justificar"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
+		android:key="mantener_pantalla"
+		android:title="@string/aj_mantener_pantalla"
+		android:summary="@string/aj_mantener_pantalla_desc"
+		android:defaultValue="true" />
+	<ListPreference
+		android:key="orientacion"
+		android:title="@string/aj_orientacion"
+		android:entries="@array/orientacion_nombres"
+		android:entryValues="@array/orientacion_valores"
+		android:defaultValue="sistema"
+		app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat
+		android:key="ocultar_barras"
+		android:title="@string/aj_ocultar_barras"
+		android:summary="@string/aj_ocultar_barras_desc"
+		android:defaultValue="false" />
+</PreferenceScreen>

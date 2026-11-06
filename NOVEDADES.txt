@@ -1,0 +1,111 @@
+Novedades de Lector Universal (una sección por versión: "== versión").
+El texto de la versión que se publica se muestra en la app al ofrecer la actualización.
+Para una versión nueva: sube versionCode y versionName en app\build.gradle.kts,
+añade aquí su sección y usa la opción 8 de compilar.bat.
+
+== 1.0.7
+- Bibliotecas web propias: en Catálogos, «Añadir catálogo o biblioteca web» con la dirección de cualquier biblioteca en línea. La app averigua si es un catálogo OPDS (se lista en la app) o una página web (se abre en el navegador de la app, como Tiflolibros y la ONCE: entras con tu usuario en su página y lo que descargues, libros, documentos o ZIP, se añade a tu biblioteca con su nombre). Si no se puede comprobar, pregunta qué es. El nombre, si no se escribe, se toma de la página.
+- Arreglado: al editar Tiflolibros o la Biblioteca Digital ONCE se perdía que son webs y dejaban de abrirse.
+- Acerca de: el nombre del autor, Héctor J. Benítez Corredera, y las secciones y formatos actuales (Podcasts, Noticias, Word 97-2003 y cómics).
+
+== 1.0.6
+- Nueva sección Podcasts (menú lateral), un cliente completo inspirado en AntennaPod: pestañas Cola, Novedades, Suscripciones, Descargas, Favoritos, Historial y Descubrir.
+- Podcasts: buscar en Apple Podcasts, los más escuchados por categoría, añadir por dirección e importar o exportar OPML. Cola que se puede ordenar y que sigue sola al terminar cada episodio. Descargas (solo con wifi si quieres), descarga automática de los nuevos y borrado de los escuchados. Recuerda por dónde ibas; velocidad propia, saltar la intro y el final de cada podcast; capítulos; notas del episodio y transcripciones leídas como texto. Avisos de episodios nuevos.
+- Nueva sección Noticias (menú lateral), un lector RSS completo con pestañas Sin leer, Fuentes (por categorías), Favoritos, Más tarde y Buscar. Los artículos ya no se guardan en la biblioteca: se leen en el lector con los botones Siguiente, Anterior, Favorito, Guardar y Web, y solo pasan a la biblioteca con «Guardar en la biblioteca».
+- Noticias: buscar fuentes por tema, añadir por dirección de la fuente o de su web, fuentes recomendadas en español (RTVE, El País, elDiario.es, Xataka, ONCE, Discapnet...), OPML, artículo completo descargado de la web, leer todos los no leídos seguidos en voz alta, marcar como leídos los de debajo, ocultar artículos por palabras, avisos por fuente y borrado automático de los leídos antiguos.
+- Noticias y podcasts se actualizan solos cada cierto tiempo aunque la app esté cerrada (Ajustes, Noticias y Podcasts).
+- Sincronización con tu cuenta: las noticias con FreshRSS, The Old Reader, Miniflux o Nextcloud News (fuentes, leídos y favoritos, en los dos sentidos); los podcasts con gpodder.net o Nextcloud (suscripciones y por dónde vas en cada episodio, como AntennaPod). En Ajustes, Noticias y Podcasts, «Cuenta».
+- Capítulos que vienen dentro del propio audio del episodio (MP3 y M4A), también sin descargarlo.
+- Las transcripciones dicen quién habla. Al descargar con datos móviles y la opción «solo con wifi», pregunta si descargar ya o esperar al wifi, y el episodio dice «Esperando al wifi».
+- Fuentes y podcasts con dirección http (sin s) funcionan.
+- Biblioteca, Podcasts y Noticias funcionan igual, como tres aplicaciones en una: «Abrir menú» arriba y sus pestañas abajo, todas a la vista. Los catálogos de libros en línea pasan a ser una pestaña de la Biblioteca. En Podcasts, la pestaña Episodios reúne Descargas, Favoritos e Historial.
+- Al leer un artículo, Voz es el primer botón y lleva a los controles del reproductor; los botones y la IA hablan de «artículo», no de libro. Podcasts empieza por Suscripciones.
+- Podcasts: ficha completa de cada podcast antes de suscribirte (información, descripción y todos los episodios, que puedes escuchar sin suscribirte), resultados de búsqueda con acciones, buscar episodios de cualquier podcast, ver capítulos sin reproducir, escuchar seguido desde un episodio, marcar los anteriores o los más nuevos, buscador dentro de cada podcast y conservar solo los N últimos descargados.
+- Noticias: ver los de hoy, todos o los leídos; búsquedas guardadas; reglas y alertas por palabras; papelera; estado de las fuentes; resumen de los no leídos con IA; exportar artículos; elegir qué se dice de cada artículo.
+- Las listas ya no pierden el sitio de TalkBack al actualizarse. Ajustes solo en el menú lateral. La copia de seguridad incluye las fuentes de noticias y los podcasts. Arreglado el cierre al buscar podcasts.
+- Reproductor de audio rehecho y coherente: retroceder, reproducir y avanzar en el centro; anterior y siguiente solo para capítulos, marcas o saltos largos, y cada botón dice exactamente qué hace; barra de posición accesible que dice el tiempo y avanza de 5 en 5 por ciento; velocidad siempre de 5 en 5 (100, 105, 95); Información completa como documento con encabezados; notas, transcripción y siguiente de la cola en Más. Los deslizadores de Ajustes dicen su valor con unidad y avanzan su paso exacto.
+- Artículo completo mejorado: busca el texto de varias formas y elige el más completo, quita «noticias relacionadas», junta las noticias en varias páginas, puede descargarlos ya al actualizar para leer sin conexión y avisa si es solo para suscriptores. Nuevo: entrar con tu cuenta en los medios en los que estás suscrito (Ajustes, Noticias).
+- Coherencia en toda la app: al cerrar cualquier ventana, menú o diálogo, el foco de TalkBack vuelve al elemento desde el que se abrió (también tras una ventana de espera y su resultado). Todo lo que tarda (suscribirse a un podcast o una fuente, buscar, actualizar, buscar actualizaciones, descargar, reconocer texto, importar) muestra una ventana de espera con Cancelar y el resultado aparece ahí mismo, no después en otra pantalla. Las acciones de TalkBack y los botones cambian según el estado: un resultado al que ya estás suscrito ofrece «Ver en Suscripciones» en vez de «Suscribirse», Favorito dice «Quitar de favoritos» si ya lo es, «Guardar en la biblioteca» pasa a «Ya está en tu biblioteca: abrirlo» y un libro del catálogo ya descargado se abre en vez de descargarse otra vez. Buscar actualizaciones responde antes y, sin conexión, lo dice claro.
+- Acciones de TalkBack personalizables en cada sitio de la app (Ajustes, Acciones de TalkBack): libros y carpetas de la biblioteca, párrafos del lector, marcadores, catálogos, artículos, fuentes y categorías de noticias, podcasts y episodios. Cada acción es un interruptor (sale o no) y las que salen se ordenan con Subir, Bajar, Poner la primera y Poner la última. Lo que se quita sigue en el menú de cada elemento.
+- Menú lateral rehecho siguiendo Material 3: solo la sección actual dice «seleccionado» (antes decía «marcado» y «no seleccionado» en todo), al abrirlo el foco va a ella y cada opción se abre con un doble toque.
+- Al volver de un diálogo, como describir una imagen con la IA, ya no se repite el título del libro y TalkBack sigue moviéndose por las acciones en vez de deletrear.
+- Leer en voz alta un artículo (o un libro) ya no se queda en «Pausar» sin sonar: si el motor de voz (MultiTTS, por ejemplo) no entrega la frase, se vuelve a pedir y, si hace falta, se reinicia el motor.
+- Carpetas en Noticias y en Podcasts (como en la biblioteca): crear con «Nueva carpeta», renombrar, ordenarlas con Subir, Bajar, Poner la primera y Poner la última, y borrarlas eligiendo si se borra también lo que contienen o queda sin carpeta. Las carpetas pueden estar vacías. «Mover a una carpeta» en cada fuente y podcast (y en Editar fuente y Ajustes del podcast) con «Nueva carpeta…» para crear una escribiendo su nombre. Al suscribirte, si tienes carpetas, se pregunta en cuál. Las carpetas y su orden van en el OPML y en la copia de seguridad.
+- Importar OPML con revisión previa, para Noticias y Podcasts a la vez: comprueba cada fuente (si trae audio, es un podcast; si no se puede comprobar, se decide por pistas y lo dice) y muestra la lista para elegir cuáles importar (las que ya tienes salen sin marcar), llevar cada una a Noticias o a Podcasts, cambiar su carpeta o su nombre, y hacerlo con todas las elegidas a la vez.
+- Podcasts: filtro por carpeta en Novedades, Cola y Episodios; vista «En curso» (empezados sin terminar); la cola dice cuánto queda; las marcas de tiempo de las notas del episodio («12:34») llevan a ese momento.
+- Noticias: suscribirte desde Compartir de otra app («Añadir a Noticias» y «Añadir a Podcasts»); al pegar la dirección de un canal de YouTube, un subreddit, una cuenta de Mastodon o de Bluesky se encuentra su fuente; ajuste «Leer en voz alta al abrir un artículo»; marcar como leída una carpeta o una fuente entera pide confirmación. La sincronización ya no vuelve a poner en una fuente la carpeta del servidor si la cambiaste o la quitaste en el móvil.
+- Leer en voz alta: saltar direcciones web, lo que va entre paréntesis y entre corchetes (Ajustes, Lectura en voz alta). Nuevo catálogo de libros: Internet Archive, solo con sus libros libres (también los de español), en su nuevo formato OPDS 2; la descarga elige el mejor archivo (EPUB, PDF con texto o el texto reconocido). Los catálogos OPDS 2 también funcionan al añadirlos a mano.
+- Material 3 también en los diálogos de editar fuente y ajustes del podcast: casillas del tema y botones «Opción: valor» en lugar de desplegables.
+- Escáner con guía de voz, sin servicios de Google (también en móviles sin ellos): mira lo que ve la cámara y dice si el texto se sale por un lado, si hay que acercar o alejar el móvil o si no se ve texto; cuando la hoja está entera y quieta hace la foto sola (con un pitido) y no repite la misma hoja. Botones Capturar ahora, Linterna y Terminar. Si el móvil tiene los servicios de Google, se puede elegir también su escáner.
+- Biblioteca: nuevos estados «Quiero leer» y «Abandonado» (acción «Estado de lectura…», también para varios libros); vistas por Autores, Series y Colecciones, en las que se entra como en una carpeta; colecciones (un libro en varias) con «Nueva colección», renombrar y borrar; la serie se lee de los datos del libro (EPUB de calibre o EPUB 3, FB2) o se escribe con «Serie…».
+- Lector: subrayar el párrafo entero o una frase con una categoría (Importante, Duda, Cita, Idea, Para repasar u otra); TalkBack dice «subrayado: categoría» tras el párrafo y se ve subrayado; en Marcadores, ver los subrayados (editar categoría, borrar) y exportarlos agrupados por categoría. Las fórmulas matemáticas (MathML) se leen con palabras: «x al cuadrado más 1», «fracción, a entre b».
+- Noticias: «Leer titulares» (solo los títulos, cada uno lleva a su artículo); «Leer todo» ya no marca todo como leído al empezar, sino los artículos que se han llegado a escuchar; tras marcar en bloque sale «Deshacer».
+- Podcasts: en la transcripción, la hora de cada párrafo es un enlace a ese momento; abierta desde el reproductor, empieza en lo que está sonando.
+- Se quita Android Auto.
+- Tiflolibros y la Biblioteca Digital ONCE (por el ClubONCE) en Catálogos: se abre su web oficial dentro de la app, entras tú con tu usuario y contraseña (la app no los ve ni los guarda) y lo que descargas se añade solo a tu biblioteca con su título real; la app pregunta si abrirlo. Los ZIP con texto se abren como documento y los de audio o DAISY como audiolibro. Cada archivo descargado conserva su nombre: el que da la biblioteca (también con tildes) o, si no da ninguno, el título del libro y la clase de descarga («Marianela - DAISY.zip»).
+- Podcasts: temporizador «Al final del episodio» o «Tras N episodios»; temporizador automático (Ajustes, Audiolibros y DAISY) que se pone solo si empiezas a escuchar entre las horas elegidas y lo dice; el audio se pausa al quitar los auriculares y, con «Seguir al conectar los auriculares», sigue si los vuelves a conectar en 15 minutos.
+- Podcasts: en Ajustes del podcast, filtros (solo episodios con unas palabras, sin los que tengan otras y duración mínima) y escuchar del más antiguo al más nuevo; ordenar las suscripciones (a mano, por nombre, por sin escuchar o por lo último publicado) y la cola (por fecha, por lo que queda, por podcast, al revés o al azar); podcasts privados que piden usuario y contraseña; las descargas fallidas se reintentan solas hasta tres veces, el episodio dice «descarga fallida» y tiene «Reintentar la descarga».
+- Noticias: si llegan pocos artículos nuevos, cada uno tiene su aviso con «Marcar como leído» y «Añadir a favoritos», y al tocarlo se abre; en Editar fuente, cambiar la dirección, guardar solo los artículos con unas palabras y no guardar lo que ya llegó por otra fuente; las webs que rechazaban la app se reintentan como un navegador; si la fuente dice su idioma, la voz lee sus artículos en ese idioma; cada artículo dice cuánto se tarda en leerlo (se puede quitar en Ajustes, Noticias).
+- Lector: navegar por fórmulas (M), bloques de código (X) y separadores (S); acción «Salir de la tabla», «de la lista» o «de la cita»; «Copiar varios párrafos» (marcar el inicio y copiar hasta aquí); «Marca rápida» para volver a un sitio sin crear un marcador. Las tres se pueden poner en Acciones de TalkBack.
+- Formatos: Word 97-2003 (.doc), también con tablas; cómics CBZ (o ZIP de imágenes), una página por imagen con «Describir la imagen» y «Reconocer el texto de todas las páginas», usando su ComicInfo.xml si lo trae; los TXT antiguos de MS-DOS se leen con sus tildes y eñes. «Abrir una página web» con la dirección de un documento (PDF, EPUB...) lo guarda en la biblioteca con su nombre.
+
+== 1.0.5
+- Inteligencia artificial (Ajustes, Inteligencia artificial), de tres formas: una IA que se descarga en la app (Gemma 4, 2,6 GB, como en la app de Windows; sin internet), la IA del propio móvil si la tiene (Gemini Nano) o tu clave de Gemini, OpenAI o Claude.
+- Con la IA: describir una imagen aquí mismo y seguir preguntando sobre ella; resumir el capítulo o lo leído hasta ahora (sin destripes); preguntar sobre el capítulo; explicar o traducir un párrafo. Nuevo botón IA en la lectura.
+- Imágenes también en Word, OpenDocument, PowerPoint, FB2 y CHM. En los PDF, «Describir la página» (la dibuja y la describe, la lee con OCR, la envía o la abre).
+- Reconocimiento de texto (OCR) sin internet: al abrir un PDF escaneado ofrece reconocer todo el texto y lo guarda como documento nuevo con sus páginas; también el texto de una imagen o de una página.
+- Escanear un documento con la cámara (botón Añadir): fotografía las hojas, reconoce el texto y lo abre.
+- Catálogos de libros (OPDS) en el menú lateral: Project Gutenberg (también en español) y los tuyos (Calibre-Web, COPS del Synology, con usuario y contraseña). Buscar, descargar y leer.
+- Noticias (RSS) en el menú lateral: El País, Europa Press, 20minutos y las que añadas; el artículo se abre limpio, empezando por el titular.
+- Exportar un libro a audio: un archivo M4A por capítulo con la voz del libro, en segundo plano.
+- Sincronizar posición, progreso y marcadores con tu servidor WebDAV (por ejemplo el Synology): Ajustes, Biblioteca.
+- Los relojes muestran los controles de la lectura.
+- Widget «Seguir leyendo» en la pantalla de inicio, con Leer en voz alta / Pausar.
+- Seleccionar varios libros en la biblioteca para moverlos, marcarlos o quitarlos a la vez.
+- Detectar el idioma de cada párrafo y leerlo con la voz de su idioma (Ajustes, Lectura en voz alta).
+- Sonidos al llegar a capítulos, encabezados, enlaces, tablas, listas, imágenes, citas o notas, y elegir qué se anuncia de cada párrafo (Ajustes, Navegación y TalkBack).
+- Volumen del libro mientras habla TalkBack configurable, espacio entre letras, elegir qué botones de lectura van al menú Más y traducir con Google Traductor.
+
+== 1.0.4
+- Cuando habla TalkBack, el libro baja el volumen en lugar de callarse, y vuelve a su volumen cuando TalkBack termina (funciona aunque TalkBack no tenga activado su "atenuar audio"). Se puede cambiar en Ajustes, "Cuando habla TalkBack".
+- "Voz y velocidad de este libro" funciona: se aplica al momento, también mientras lee, dice la voz y la velocidad elegidas y tiene "Probar la voz de este libro".
+- "Dónde estoy" y otros avisos ya no se repiten dos veces con TalkBack.
+- Botones de lectura sin repetir nada: todas las acciones están en los botones de arriba, en dos filas, y solo lo que no cabe pasa al menú Más. Se elige en Ajustes, Navegación y TalkBack, "Filas de botones al leer".
+- Describir imágenes: en una imagen, la acción "Describir la imagen" la envía a otra app (Be My Eyes, Gemini, Lookout, Seeing AI...) o la abre para verla. Las imágenes sin descripción de los libros EPUB ya aparecen.
+
+== 1.0.3
+- Reproducir y Pausar de la lectura en voz alta son ahora siempre coherentes: la app lleva ella misma el turno de audio con reglas fijas. Pausar deja el libro en pausa aunque luego hable TalkBack; Reproducir lo deja sonando.
+- Cuando habla TalkBack (al desbloquear, al tocar la pantalla, una notificación) el libro se calla y vuelve a sonar solo cuando TalkBack termina, solo si estaba en reproducción.
+- Al pausar, TalkBack ya no lee el párrafo entero (la app ya no mueve el foco a ese párrafo). Para ir a él, usa la acción de TalkBack «Ir al párrafo que se está leyendo» en el botón Voz o Pausa.
+- Con TalkBack activo no se resalta la frase en pantalla (cambiar el texto hacía que TalkBack lo volviera a leer).
+- La notificación muestra el mismo estado que la app.
+
+== 1.0.2
+- Nueva lectura en voz alta, más estable: la app genera el audio de las frases por adelantado y lo reproduce ella misma, como los lectores profesionales. Ya no se bloquea TalkBack al desbloquear la pantalla, el botón Reproducir/Pausar dice siempre el estado real, y la pausa se queda a mitad de frase.
+- Cuando habla TalkBack, el libro se calla y sigue solo cuando TalkBack termina. En Ajustes (Lectura en voz alta y Audiolibros), «Cuando habla TalkBack» permite elegir: pausar y seguir después, bajar el volumen o seguir sonando igual.
+- Nueva opción en Ajustes, General: «Que el ahorro de batería no corte la lectura» (recomendado en Samsung, Xiaomi y otros).
+- Pausa configurable entre frases, además de la pausa entre párrafos.
+- Frase anterior: si lleva un rato sonando, vuelve a su principio; siguiente frase salta al momento.
+
+== 1.0.1
+- La lectura en voz alta ya no se calla al apagar la pantalla con TalkBack activo (TalkBack pedía el audio para hablar y la lectura se pausaba sin volver).
+- Con TalkBack, la frase que se lee ya no hace que TalkBack vuelva a leer el párrafo encima de la voz.
+- Biblioteca y Carpetas son ahora una sola pestaña, Biblioteca: se ven tus carpetas y los libros de la carpeta en la que estás. Al buscar o filtrar se ven los libros de todas las carpetas. Los libros que añades van a la carpeta abierta.
+- Mantener pulsado Voz o Reproducir (con TalkBack: toca dos veces y mantén) abre la lista de tiempos (o «Otro tiempo» para escribir los minutos); al elegir, empieza a leer con el temporizador en marcha.
+- Agitar el móvil prolonga el temporizador; si acaba de parar, agitar sigue leyendo.
+- Consultar una palabra desde un párrafo: diccionario de la RAE, Wikcionario, Wikipedia, traducir, deletrear u otras apps.
+- Cada audiolibro recuerda su velocidad, y el reproductor dice cuánto queda del libro.
+- Los audiolibros solo bajan el volumen mientras habla TalkBack (antes se pausaban).
+- Menú lateral más limpio: Biblioteca, Estadísticas, Ajustes, Manual y Acerca de (con Novedades y Buscar actualizaciones). Las carpetas vigiladas están en Ajustes, Biblioteca.
+- Quitar libros de la lista Leyendo o vaciarla.
+
+== 1.0.0
+Primera versión.
+- Biblioteca con pestañas Leyendo, Biblioteca, Carpetas y Marcadores, y menú lateral.
+- Carpetas anidadas para ordenar los libros y carpetas vigiladas.
+- Lectura pensada para TalkBack: un párrafo por elemento, encabezados con nivel, enlaces, notas al pie y posición guardada.
+- Barra de navegación ajustable por encabezados, niveles, capítulos, páginas, enlaces, listas, tablas, marcadores y más.
+- Búsqueda, marcadores y notas, índice, ir a y dónde estoy.
+- Lectura en voz alta con las voces del dispositivo, velocidad, tono, diccionario de pronunciación y temporizador.
+- Reproductor de audiolibros (M4B, MP3...) y DAISY 2.02 y 3 con capítulos, niveles y velocidad.
+- EPUB, PDF, Word, OpenDocument, RTF, texto, HTML, Markdown, FB2, Kindle, CHM, PowerPoint, Excel y más.

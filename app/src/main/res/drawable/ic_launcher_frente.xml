@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono: libro abierto con ondas de sonido -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+	android:width="108dp"
+	android:height="108dp"
+	android:viewportWidth="108"
+	android:viewportHeight="108">
+	<group android:translateX="27" android:translateY="27">
+		<path
+			android:fillColor="#FFFFFF"
+			android:pathData="M27,10c-4,-3 -10,-4 -16,-4c-3,0 -6,0.4 -8,1.2v32c2,-0.8 5,-1.2 8,-1.2c6,0 12,1 16,4c4,-3 10,-4 16,-4c3,0 6,0.4 8,1.2v-32c-2,-0.8 -5,-1.2 -8,-1.2c-6,0 -12,1 -16,4zM25,39c-4,-2 -9,-2.6 -14,-2.6c-2,0 -4,0.2 -5,0.4v-27c1,-0.3 3,-0.4 5,-0.4c5,0 10,0.8 14,3zM48,36.8c-1,-0.2 -3,-0.4 -5,-0.4c-5,0 -10,0.6 -14,2.6v-26.6c4,-2.2 9,-3 14,-3c2,0 4,0.1 5,0.4z" />
+		<path
+			android:fillColor="#FFD54F"
+			android:pathData="M33,20h3v10h-3zM38,16h3v18h-3zM43,22h3v6h-3z" />
+	</group>
+</vector>

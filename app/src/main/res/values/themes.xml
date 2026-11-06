@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+	<style name="Tema.Lector" parent="Theme.Material3.DayNight.NoActionBar">
+		<!-- Texto de ayuda de los campos con más contraste (4,5:1 como mínimo) -->
+		<item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
+		<item name="colorPrimary">@color/primario</item>
+		<item name="colorOnPrimary">@color/sobre_primario</item>
+		<item name="colorPrimaryContainer">@color/primario_contenedor</item>
+		<item name="colorOnPrimaryContainer">@color/sobre_primario_contenedor</item>
+		<item name="colorSecondary">@color/secundario</item>
+		<item name="android:colorBackground">@color/fondo</item>
+		<item name="colorOnBackground">@color/sobre_fondo</item>
+		<item name="colorSurfaceVariant">@color/superficie_variante</item>
+		<item name="colorOnSurfaceVariant">@color/sobre_superficie_variante</item>
+		<item name="android:windowLightStatusBar" tools:targetApi="m">?attr/isLightTheme</item>
+		<item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+	</style>
+
+	<!-- Botones con área táctil cómoda (mínimo 48 dp) -->
+	<style name="Boton.Accion" parent="Widget.Material3.Button.TonalButton">
+		<item name="android:minHeight">48dp</item>
+		<item name="android:layout_marginEnd">8dp</item>
+	</style>
+
+	<style name="Boton.Accion.Repartido">
+		<item name="android:layout_width">0dp</item>
+		<item name="android:layout_height">wrap_content</item>
+		<item name="android:layout_weight">1</item>
+		<item name="android:maxLines">2</item>
+		<item name="android:paddingStart">8dp</item>
+		<item name="android:paddingEnd">8dp</item>
+	</style>
+
+	<!-- Botones de la botonera: icono arriba y nombre corto debajo, todos del mismo ancho -->
+	<style name="Boton.Barra" parent="Widget.Material3.Button.TextButton.Icon">
+		<item name="android:layout_width">0dp</item>
+		<item name="android:layout_height">wrap_content</item>
+		<item name="android:layout_weight">1</item>
+		<item name="android:minHeight">56dp</item>
+		<item name="android:paddingStart">2dp</item>
+		<item name="android:paddingEnd">2dp</item>
+		<item name="android:insetTop">0dp</item>
+		<item name="android:insetBottom">0dp</item>
+		<item name="android:maxLines">1</item>
+		<item name="android:ellipsize">end</item>
+		<item name="android:textSize">12sp</item>
+		<item name="iconGravity">top</item>
+		<item name="iconPadding">2dp</item>
+	</style>
+
+	<!-- Botones solo con icono (48 dp) -->
+	<style name="Boton.Icono" parent="Widget.Material3.Button.IconButton">
+		<item name="android:layout_width">48dp</item>
+		<item name="android:layout_height">48dp</item>
+		<item name="android:minWidth">48dp</item>
+		<item name="android:minHeight">48dp</item>
+		<item name="android:padding">12dp</item>
+		<item name="android:insetTop">0dp</item>
+		<item name="android:insetBottom">0dp</item>
+	</style>
+
+	<!-- Botones grandes del reproductor -->
+	<style name="Boton.Icono.Grande">
+		<item name="android:layout_width">56dp</item>
+		<item name="android:layout_height">56dp</item>
+		<item name="android:layout_marginHorizontal">4dp</item>
+		<item name="android:padding">14dp</item>
+		<item name="iconSize">28dp</item>
+	</style>
+
+	<style name="Boton.Icono.Grande.Principal" parent="Widget.Material3.Button.IconButton.Filled">
+		<item name="android:layout_width">72dp</item>
+		<item name="android:layout_height">72dp</item>
+		<item name="android:layout_marginHorizontal">8dp</item>
+		<item name="android:padding">18dp</item>
+		<item name="android:insetTop">0dp</item>
+		<item name="android:insetBottom">0dp</item>
+		<item name="iconSize">36dp</item>
+	</style>
+</resources>

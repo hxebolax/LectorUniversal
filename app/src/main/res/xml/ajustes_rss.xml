@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference android:key="rss_frecuencia" android:title="@string/aj_rss_frecuencia" android:entries="@array/rss_frecuencia_nombres" android:entryValues="@array/rss_frecuencia_valores" android:defaultValue="180" app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat android:key="rss_solo_wifi" android:title="@string/aj_rss_solo_wifi" android:defaultValue="false" />
+	<SwitchPreferenceCompat android:key="rss_avisos" android:title="@string/aj_rss_avisos" android:summary="@string/aj_rss_avisos_desc" android:defaultValue="true" />
+	<SwitchPreferenceCompat android:key="rss_marcar_al_abrir" android:title="@string/aj_rss_marcar" android:defaultValue="true" />
+	<SwitchPreferenceCompat android:key="rss_antiguos_primero" android:title="@string/aj_rss_antiguos" android:defaultValue="false" />
+	<SwitchPreferenceCompat android:key="rss_ocultar_leidos" android:title="@string/aj_rss_ocultar" android:defaultValue="true" />
+	<ListPreference android:key="rss_dias" android:title="@string/aj_rss_dias" android:entries="@array/rss_dias_nombres" android:entryValues="@array/rss_dias_valores" android:defaultValue="30" app:useSimpleSummaryProvider="true" />
+	<PreferenceCategory android:title="@string/aj_rss_lista">
+		<SwitchPreferenceCompat android:key="rss_decir_fuente" android:title="@string/aj_rss_decir_fuente" android:defaultValue="true" />
+		<SwitchPreferenceCompat android:key="rss_decir_fecha" android:title="@string/aj_rss_decir_fecha" android:defaultValue="true" />
+		<SwitchPreferenceCompat android:key="rss_decir_duracion" android:title="@string/aj_rss_decir_duracion" android:defaultValue="true" />
+		<SwitchPreferenceCompat android:key="rss_decir_resumen" android:title="@string/aj_rss_decir_resumen" android:summary="@string/aj_rss_decir_resumen_desc" android:defaultValue="false" />
+	</PreferenceCategory>
+	<PreferenceCategory android:title="@string/aj_rss_articulo">
+		<SwitchPreferenceCompat android:key="rss_leer_al_abrir" android:title="@string/aj_rss_leer_al_abrir" android:summary="@string/aj_rss_leer_al_abrir_desc" android:defaultValue="false" />
+		<SwitchPreferenceCompat android:key="rss_texto_completo" android:title="@string/aj_rss_completo" android:summary="@string/aj_rss_completo_desc" android:defaultValue="false" />
+		<SwitchPreferenceCompat android:key="rss_completo_al_actualizar" android:title="@string/aj_rss_completo_actualizar" android:summary="@string/aj_rss_completo_actualizar_desc" android:defaultValue="false" />
+		<Preference android:key="rss_medios" android:title="@string/aj_rss_medios" android:summary="@string/aj_rss_medios_desc" />
+	</PreferenceCategory>
+	<PreferenceCategory android:title="@string/aj_rss_sinc">
+		<Preference android:key="rss_sinc_aviso" android:selectable="false" android:summary="@string/aj_rss_sinc_desc" />
+		<ListPreference android:key="rss_sinc_tipo" android:title="@string/aj_sinc_servicio" android:entries="@array/rss_sinc_nombres" android:entryValues="@array/rss_sinc_valores" android:defaultValue="ninguno" app:useSimpleSummaryProvider="true" />
+		<EditTextPreference android:key="rss_sinc_url" android:title="@string/aj_cuenta_url" />
+		<EditTextPreference android:key="rss_sinc_usuario" android:title="@string/aj_sinc_usuario" />
+		<EditTextPreference android:key="rss_sinc_clave" android:title="@string/aj_sinc_clave" />
+		<Preference android:key="rss_sinc_ahora" android:title="@string/aj_sinc_ahora" />
+	</PreferenceCategory>
+</PreferenceScreen>

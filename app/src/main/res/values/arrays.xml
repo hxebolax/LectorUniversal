@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Listas de opciones de los ajustes (los valores no se traducen, solo los nombres) -->
+<resources>
+	<string-array name="idiomas_nombres">
+		<item>El del sistema</item>
+		<item>Español</item>
+		<item>English</item>
+	</string-array>
+	<string-array name="idiomas_valores" translatable="false">
+		<item />
+		<item>es</item>
+		<item>en</item>
+	</string-array>
+
+	<string-array name="tema_app_nombres">
+		<item>El del sistema</item>
+		<item>Claro</item>
+		<item>Oscuro</item>
+	</string-array>
+	<string-array name="tema_app_valores" translatable="false">
+		<item>sistema</item>
+		<item>claro</item>
+		<item>oscuro</item>
+	</string-array>
+
+	<string-array name="tema_lectura_nombres">
+		<item>Los de la aplicación</item>
+		<item>Claro</item>
+		<item>Oscuro</item>
+		<item>Sepia</item>
+		<item>Amarillo sobre negro (alto contraste)</item>
+		<item>Negro sobre blanco (alto contraste)</item>
+		<item>Blanco sobre negro</item>
+		<item>Pantalla negra (ahorra batería, para escuchar)</item>
+	</string-array>
+	<string-array name="tema_lectura_valores" translatable="false">
+		<item>app</item>
+		<item>claro</item>
+		<item>oscuro</item>
+		<item>sepia</item>
+		<item>amarillo</item>
+		<item>contraste</item>
+		<item>blanco_negro</item>
+		<item>negro</item>
+	</string-array>
+
+	<string-array name="fuentes_nombres">
+		<item>La del sistema</item>
+		<item>Con serifa</item>
+		<item>Sin serifa</item>
+		<item>Monoespaciada</item>
+		<item>Estrecha</item>
+		<item>Ligera</item>
+	</string-array>
+	<string-array name="fuentes_valores" translatable="false">
+		<item>sistema</item>
+		<item>serif</item>
+		<item>sans</item>
+		<item>mono</item>
+		<item>condensada</item>
+		<item>ligera</item>
+	</string-array>
+
+	<string-array name="orientacion_nombres">
+		<item>La del sistema</item>
+		<item>Siempre vertical</item>
+		<item>Siempre horizontal</item>
+	</string-array>
+	<string-array name="orientacion_valores" translatable="false">
+		<item>sistema</item>
+		<item>vertical</item>
+		<item>horizontal</item>
+	</string-array>
+
+	<string-array name="toque_nombres">
+		<item>Mostrar las acciones del párrafo</item>
+		<item>Leer en voz alta desde ese párrafo</item>
+		<item>Abrir su primer enlace (si tiene)</item>
+		<item>Nada</item>
+	</string-array>
+	<string-array name="toque_valores" translatable="false">
+		<item>menu</item>
+		<item>voz</item>
+		<item>enlace</item>
+		<item>nada</item>
+	</string-array>
+
+	<string-array name="volumen_nombres">
+		<item>Cambiar el volumen (normal)</item>
+		<item>Ir al elemento anterior o siguiente</item>
+		<item>Ir al párrafo anterior o siguiente</item>
+		<item>Pasar pantalla</item>
+	</string-array>
+	<string-array name="volumen_valores" translatable="false">
+		<item>nada</item>
+		<item>elemento</item>
+		<item>parrafo</item>
+		<item>pantalla</item>
+	</string-array>
+
+	<string-array name="acciones_nombres">
+		<item>Leer en voz alta desde aquí</item>
+		<item>Añadir o quitar marcador</item>
+		<item>Añadir nota</item>
+		<item>Copiar párrafo</item>
+		<item>Consultar una palabra (diccionario, traducir, deletrear)</item>
+		<item>Siguiente encabezado</item>
+		<item>Encabezado anterior</item>
+		<item>Siguiente elemento (el elegido en la barra)</item>
+		<item>Elemento anterior (el elegido en la barra)</item>
+		<item>Índice</item>
+		<item>Buscar en el libro</item>
+		<item>Ir a</item>
+		<item>Dónde estoy</item>
+		<item>Seleccionar texto del capítulo</item>
+		<item>Compartir párrafo</item>
+			<item>Explicar el párrafo con IA</item>
+		<item>Traducir el párrafo</item>
+		<item>Subrayar un fragmento</item>
+		<item>Salir de la tabla, lista o cita</item>
+		<item>Copiar varios párrafos (marcar el inicio y copiar hasta aquí)</item>
+		<item>Marca rápida (ponerla e ir a ella)</item>
+	</string-array>
+	<string-array name="acciones_valores" translatable="false">
+		<item>leer_aqui</item>
+		<item>marcador</item>
+		<item>nota</item>
+		<item>copiar</item>
+		<item>consultar</item>
+		<item>siguiente_encabezado</item>
+		<item>anterior_encabezado</item>
+		<item>siguiente_elemento</item>
+		<item>anterior_elemento</item>
+		<item>indice</item>
+		<item>buscar</item>
+		<item>ir_a</item>
+		<item>donde_estoy</item>
+		<item>seleccionar</item>
+		<item>compartir</item>
+			<item>explicar</item>
+		<item>traducir</item>
+		<item>subrayar</item>
+		<item>salir</item>
+		<item>copiar_tramo</item>
+		<item>marca_rapida</item>
+	</string-array>
+	<string-array name="acciones_defecto" translatable="false">
+		<item>leer_aqui</item>
+		<item>marcador</item>
+		<item>nota</item>
+		<item>copiar</item>
+		<item>siguiente_encabezado</item>
+		<item>anterior_encabezado</item>
+		<item>indice</item>
+		<item>buscar</item>
+		<item>ir_a</item>
+	</string-array>
+
+	<string-array name="auriculares_nombres">
+		<item>Capítulo anterior o siguiente</item>
+		<item>Retroceder o avanzar unos segundos</item>
+	</string-array>
+	<string-array name="auriculares_valores" translatable="false">
+		<item>capitulo</item>
+		<item>salto</item>
+	</string-array>
+
+	<string-array name="dividir_nombres">
+		<item>No dividir</item>
+		<item>Más de 300 caracteres</item>
+		<item>Más de 600 caracteres</item>
+		<item>Más de 1000 caracteres</item>
+	</string-array>
+	<string-array name="dividir_valores" translatable="false">
+		<item>0</item>
+		<item>300</item>
+		<item>600</item>
+		<item>1000</item>
+	</string-array>
+
+	<string-array name="filtros_biblioteca">
+		<item>Por carpetas</item>
+		<item>Todos los libros</item>
+		<item>Favoritos</item>
+		<item>Leyendo</item>
+		<item>Sin empezar</item>
+		<item>Terminados</item>
+		<item>Audiolibros</item>
+		<item>Documentos de texto</item>
+		<item>Quiero leer</item>
+		<item>Abandonados</item>
+		<item>Autores</item>
+		<item>Series</item>
+		<item>Colecciones</item>
+	</string-array>
+
+	<string-array name="ordenes">
+		<item>Abiertos recientemente</item>
+		<item>Título</item>
+		<item>Autor</item>
+		<item>Añadidos recientemente</item>
+		<item>Progreso</item>
+		<item>Formato</item>
+		<item>Tamaño</item>
+	</string-array>
+	<string-array name="talkback_nombres">
+		<item>Bajar el volumen del libro mientras habla TalkBack</item>
+		<item>Pausar el libro y seguir cuando calle TalkBack</item>
+		<item>Seguir sonando igual (TalkBack habla encima)</item>
+	</string-array>
+	<string-array name="talkback_valores" translatable="false">
+		<item>bajar</item>
+		<item>pausar</item>
+		<item>seguir</item>
+	</string-array>
+	<string-array name="filas_botonera_nombres">
+		<item>Una fila (el resto en el menú Más)</item>
+		<item>Dos filas</item>
+		<item>Tres filas</item>
+		<item>Todas las que hagan falta</item>
+	</string-array>
+	<string-array name="filas_botonera_valores" translatable="false">
+		<item>1</item>
+		<item>2</item>
+		<item>3</item>
+		<item>4</item>
+	</string-array>
+	<string-array name="volumen_talkback_nombres">
+		<item>5 % (casi nada)</item>
+		<item>15 %</item>
+		<item>25 %</item>
+		<item>40 %</item>
+		<item>60 %</item>
+	</string-array>
+	<string-array name="sonidos_elementos_nombres">
+		<item>Capítulo</item>
+		<item>Encabezado</item>
+		<item>Enlace</item>
+		<item>Tabla</item>
+		<item>Lista</item>
+		<item>Imagen</item>
+		<item>Cita</item>
+		<item>Nota al pie</item>
+	</string-array>
+	<string-array name="detalle_parrafos_nombres">
+		<item>Tipo de párrafo (lista, tabla, cita, imagen...)</item>
+		<item>Página</item>
+		<item>Marcador o nota</item>
+		<item>Coincide con la búsqueda</item>
+	</string-array>
+	<string-array name="volumen_talkback_valores" translatable="false">
+		<item>5</item>
+		<item>15</item>
+		<item>25</item>
+		<item>40</item>
+		<item>60</item>
+	</string-array>
+	<string-array name="sonidos_elementos_valores" translatable="false">
+		<item>capitulo</item>
+		<item>encabezado</item>
+		<item>enlace</item>
+		<item>tabla</item>
+		<item>lista</item>
+		<item>imagen</item>
+		<item>cita</item>
+		<item>nota</item>
+	</string-array>
+	<string-array name="detalle_parrafos_valores" translatable="false">
+		<item>tipo</item>
+		<item>pagina</item>
+		<item>marcador</item>
+		<item>busqueda</item>
+	</string-array>
+	<string-array name="ia_proveedor_nombres">
+		<item>Automático: la descargada, si no la del móvil, si no la primera clave</item>
+		<item>Gemma descargada en la app (sin internet)</item>
+		<item>Solo la IA del móvil (Gemini Nano, sin internet)</item>
+		<item>Gemini, con mi clave</item>
+		<item>OpenAI (ChatGPT), con mi clave</item>
+		<item>Claude, con mi clave</item>
+		<item>Ninguna</item>
+	</string-array>
+	<string-array name="ia_proveedor_valores" translatable="false">
+		<item>auto</item>
+		<item>local</item>
+		<item>dispositivo</item>
+		<item>gemini</item>
+		<item>openai</item>
+		<item>claude</item>
+		<item>ninguno</item>
+	</string-array>
+	<string-array name="botones_nombres">
+		<item>Índice</item>
+		<item>Buscar</item>
+		<item>Ir a</item>
+		<item>Marcadores</item>
+		<item>Voz</item>
+		<item>Dónde estoy</item>
+		<item>Inteligencia artificial</item>
+		<item>Lista de elementos</item>
+		<item>Temporizador</item>
+		<item>Aspecto</item>
+		<item>Voz y velocidad de este libro</item>
+		<item>Información</item>
+		<item>Copiar texto</item>
+		<item>Exportar</item>
+		<item>Ajustes</item>
+	</string-array>
+	<string-array name="botones_valores" translatable="false">
+		<item>boton_indice</item>
+		<item>boton_buscar</item>
+		<item>boton_ir</item>
+		<item>boton_marcadores</item>
+		<item>boton_voz</item>
+		<item>boton_donde</item>
+		<item>boton_ia</item>
+		<item>boton_elementos</item>
+		<item>boton_temporizador</item>
+		<item>boton_aspecto</item>
+		<item>boton_ajustes_libro</item>
+		<item>boton_informacion</item>
+		<item>boton_seleccionar</item>
+		<item>boton_exportar</item>
+		<item>boton_ajustes</item>
+	</string-array>
+	<string-array name="pod_auto_descargar_nombres">
+		<item>Lo de Ajustes</item>
+		<item>Sí</item>
+		<item>No</item>
+	</string-array>
+	<string-array name="pod_nuevos_podcast_nombres">
+		<item>Lo de Ajustes</item>
+		<item>Novedades</item>
+		<item>La cola</item>
+		<item>Ningún sitio</item>
+	</string-array>
+	<string-array name="rss_frecuencia_nombres">
+		<item>Solo a mano</item>
+		<item>Cada hora</item>
+		<item>Cada 3 horas</item>
+		<item>Cada 6 horas</item>
+		<item>Cada 12 horas</item>
+		<item>Una vez al día</item>
+	</string-array>
+	<string-array name="rss_dias_nombres">
+		<item>Una semana</item>
+		<item>Dos semanas</item>
+		<item>Un mes</item>
+		<item>Tres meses</item>
+		<item>Nunca</item>
+	</string-array>
+	<string-array name="pod_nuevos_nombres">
+		<item>Novedades</item>
+		<item>La cola</item>
+		<item>Ningún sitio</item>
+	</string-array>
+	<string-array name="pod_marcar_nombres">
+		<item>Solo al terminar</item>
+		<item>15 segundos</item>
+		<item>30 segundos</item>
+		<item>1 minuto</item>
+		<item>2 minutos</item>
+		<item>5 minutos</item>
+	</string-array>
+	<string-array name="pod_velocidad_nombres">
+		<item>La de los audiolibros</item>
+		<item>80 %</item>
+		<item>100 %</item>
+		<item>120 %</item>
+		<item>140 %</item>
+		<item>160 %</item>
+		<item>180 %</item>
+		<item>200 %</item>
+	</string-array>
+	<string-array name="rss_frecuencia_valores" translatable="false">
+		<item>0</item>
+		<item>60</item>
+		<item>180</item>
+		<item>360</item>
+		<item>720</item>
+		<item>1440</item>
+	</string-array>
+	<string-array name="rss_dias_valores" translatable="false">
+		<item>7</item>
+		<item>14</item>
+		<item>30</item>
+		<item>90</item>
+		<item>0</item>
+	</string-array>
+	<string-array name="pod_nuevos_valores" translatable="false">
+		<item>1</item>
+		<item>2</item>
+		<item>3</item>
+	</string-array>
+	<string-array name="pod_marcar_valores" translatable="false">
+		<item>0</item>
+		<item>15</item>
+		<item>30</item>
+		<item>60</item>
+		<item>120</item>
+		<item>300</item>
+	</string-array>
+	<string-array name="pod_velocidad_valores" translatable="false">
+		<item>0</item>
+		<item>80</item>
+		<item>100</item>
+		<item>120</item>
+		<item>140</item>
+		<item>160</item>
+		<item>180</item>
+		<item>200</item>
+	</string-array>
+	<string-array name="rss_sinc_nombres">
+		<item>Ninguno</item>
+		<item>FreshRSS, The Old Reader (API de Google Reader)</item>
+		<item>Miniflux</item>
+		<item>Nextcloud News</item>
+	</string-array>
+	<string-array name="rss_sinc_valores" translatable="false">
+		<item>ninguno</item>
+		<item>greader</item>
+		<item>miniflux</item>
+		<item>nextcloud</item>
+	</string-array>
+	<string-array name="pod_sinc_nombres">
+		<item>Ninguno</item>
+		<item>gpodder.net</item>
+		<item>Nextcloud (gPodder Sync)</item>
+	</string-array>
+	<string-array name="pod_sinc_valores" translatable="false">
+		<item>ninguno</item>
+		<item>gpodder</item>
+		<item>nextcloud</item>
+	</string-array>
+	<string-array name="pod_conservar_nombres">
+		<item>Todos</item>
+		<item>El último</item>
+		<item>Los 2 últimos</item>
+		<item>Los 3 últimos</item>
+		<item>Los 5 últimos</item>
+		<item>Los 10 últimos</item>
+	</string-array>
+	<string-array name="pod_conservar_valores" translatable="false">
+		<item>0</item>
+		<item>1</item>
+		<item>2</item>
+		<item>3</item>
+		<item>5</item>
+		<item>10</item>
+	</string-array>
+	<string-array name="categorias_subrayado">
+		<item>Importante</item>
+		<item>Duda</item>
+		<item>Cita</item>
+		<item>Idea</item>
+		<item>Para repasar</item>
+	</string-array>
+	<string-array name="pod_ordenes">
+		<item>A mano</item>
+		<item>Por nombre</item>
+		<item>Más episodios sin escuchar</item>
+		<item>Lo último publicado</item>
+	</string-array>
+	<string-array name="temporizador_auto_nombres">
+		<item>15 minutos</item>
+		<item>30 minutos</item>
+		<item>45 minutos</item>
+		<item>60 minutos</item>
+		<item>Al final del capítulo</item>
+	</string-array>
+	<string-array name="temporizador_auto_valores" translatable="false">
+		<item>15</item>
+		<item>30</item>
+		<item>45</item>
+		<item>60</item>
+		<item>-1</item>
+	</string-array>
+</resources>

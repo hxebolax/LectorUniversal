@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inteligencia artificial: describir imágenes, resumir y preguntar sobre el libro -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference
+		android:key="ia_proveedor"
+		android:title="@string/aj_ia_proveedor"
+		android:entries="@array/ia_proveedor_nombres"
+		android:entryValues="@array/ia_proveedor_valores"
+		android:defaultValue="auto"
+		app:useSimpleSummaryProvider="true" />
+	<Preference
+		android:key="ia_modelo_local"
+		android:title="@string/aj_ia_modelo_local" />
+	<SwitchPreferenceCompat
+		android:key="ia_local_gpu"
+		android:title="@string/aj_ia_local_gpu"
+		android:summary="@string/aj_ia_local_gpu_desc"
+		android:defaultValue="false" />
+	<Preference
+		android:key="ia_comprobar"
+		android:title="@string/aj_ia_comprobar"
+		android:summary="@string/aj_ia_comprobar_desc" />
+	<PreferenceCategory android:title="@string/aj_ia_internet">
+		<Preference
+			android:key="ia_aviso"
+			android:selectable="false"
+			android:summary="@string/aj_ia_aviso" />
+		<EditTextPreference
+			android:key="ia_clave_gemini"
+			android:title="@string/aj_ia_clave_gemini"
+			android:summary="@string/aj_ia_clave_gemini_desc" />
+		<EditTextPreference
+			android:key="ia_modelo_gemini"
+			android:title="@string/aj_ia_modelo_gemini"
+			app:useSimpleSummaryProvider="true" />
+		<EditTextPreference
+			android:key="ia_clave_openai"
+			android:title="@string/aj_ia_clave_openai"
+			android:summary="@string/aj_ia_clave_openai_desc" />
+		<EditTextPreference
+			android:key="ia_modelo_openai"
+			android:title="@string/aj_ia_modelo_openai"
+			app:useSimpleSummaryProvider="true" />
+		<EditTextPreference
+			android:key="ia_clave_claude"
+			android:title="@string/aj_ia_clave_claude"
+			android:summary="@string/aj_ia_clave_claude_desc" />
+		<EditTextPreference
+			android:key="ia_modelo_claude"
+			android:title="@string/aj_ia_modelo_claude"
+			app:useSimpleSummaryProvider="true" />
+	</PreferenceCategory>
+</PreferenceScreen>
