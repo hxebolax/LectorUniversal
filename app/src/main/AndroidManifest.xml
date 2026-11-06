@@ -19,6 +19,14 @@
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 	<!-- Instalar las actualizaciones descargadas del servidor (lo confirma el usuario) -->
 	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+	<!-- Radio: despertador (alarmas exactas, como un reloj despertador) y volver a ponerlas al reiniciar -->
+	<uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+	<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+	<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+	<!-- Radio: el despertador se ve aunque el móvil esté bloqueado -->
+	<uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+	<!-- Radio: avisar antes de escuchar con datos móviles -->
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<!-- Pedir que el ahorro de batería no corte la lectura con la pantalla apagada (lo confirma el usuario) -->
 	<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
@@ -26,6 +34,14 @@
 	<queries>
 		<intent>
 			<action android:name="android.intent.action.TTS_SERVICE" />
+		</intent>
+		<!-- Radio: ecualizador del sistema -->
+		<intent>
+			<action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
+		</intent>
+		<!-- Radio: buscar una canción en internet -->
+		<intent>
+			<action android:name="android.intent.action.WEB_SEARCH" />
 		</intent>
 	</queries>
 
@@ -163,6 +179,31 @@
 			android:exported="false"
 			android:label="@string/podcasts" />
 		<activity
+			android:name=".radio.RadioActivity"
+			android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard"
+			android:exported="false"
+			android:label="@string/radio"
+			android:launchMode="singleTop"
+			android:windowSoftInputMode="adjustResize" />
+		<!-- Compartir la dirección de una emisora desde otra app: añadirla a la Radio -->
+		<activity-alias
+			android:name=".radio.AnadirARadio"
+			android:exported="true"
+			android:label="@string/anadir_a_radio"
+			android:targetActivity=".radio.RadioActivity">
+			<intent-filter>
+				<action android:name="android.intent.action.SEND" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<data android:mimeType="text/plain" />
+			</intent-filter>
+		</activity-alias>
+		<activity
+			android:name=".radio.RadioReproductorActivity"
+			android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard"
+			android:exported="false"
+			android:launchMode="singleTop"
+			android:parentActivityName=".radio.RadioActivity" />
+		<activity
 			android:name=".podcast.PodcastFichaActivity"
 			android:exported="false" />
 		<activity
@@ -230,6 +271,27 @@
 				<action android:name="androidx.media3.session.MediaSessionService" />
 			</intent-filter>
 		</service>
+
+		<!-- Radio: grabar una emisora en segundo plano -->
+		<service
+			android:name=".radio.ServicioGrabacion"
+			android:exported="false"
+			android:foregroundServiceType="dataSync" />
+
+		<!-- Radio: despertador, grabaciones programadas y sus botones (Apagar, Posponer) -->
+		<receiver
+			android:name=".radio.RadioReceptorAlarma"
+			android:exported="false" />
+		<receiver
+			android:name=".radio.RadioReceptorArranque"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="android.intent.action.BOOT_COMPLETED" />
+				<action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+				<action android:name="android.intent.action.TIME_SET" />
+				<action android:name="android.intent.action.TIMEZONE_CHANGED" />
+			</intent-filter>
+		</receiver>
 
 		<!-- Exportar a audio -->
 		<service

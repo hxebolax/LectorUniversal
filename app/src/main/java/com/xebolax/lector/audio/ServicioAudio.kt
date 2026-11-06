@@ -12,7 +12,6 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.xebolax.lector.R
 import com.xebolax.lector.datos.Preferencias
-import com.xebolax.lector.lectura.LectorActivity
 
 /**
  * Reproducción de audiolibros y DAISY en segundo plano: notificación con
@@ -79,6 +78,8 @@ class ServicioAudio : MediaSessionService() {
 			override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
 
 			private fun mover(delante: Boolean) {
+				// Radio: emisora siguiente o anterior
+				ControlAudio.externo?.alPasar?.let { return it(delante) }
 				val pr = Preferencias(this@ServicioAudio)
 				if (pr.botonesAuriculares == "salto") ControlAudio.saltarSegundos(if (delante) pr.saltoAdelante else -pr.saltoAtras)
 				else ControlAudio.saltar(UnidadAudio.CAPITULO, delante)
@@ -91,19 +92,29 @@ class ServicioAudio : MediaSessionService() {
 			override fun play() = ControlAudio.reproducir()
 			override fun pause() = ControlAudio.pausar()
 		}
-		val abrir = PendingIntent.getActivity(
-			this, 1,
-			Intent(this, ReproductorActivity::class.java).putExtra(LectorActivity.EXTRA_LIBRO, ControlAudio.idLibro)
-				.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-			PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-		)
-		sesion = MediaSession.Builder(this, envoltorio).setId("audio").setSessionActivity(abrir).build()
+		sesion = MediaSession.Builder(this, envoltorio).setId("audio").also { s -> abrir()?.let { s.setSessionActivity(it) } }.build()
+		ControlAudio.registrar(alCambiar)
 		setMediaNotificationProvider(
 			DefaultMediaNotificationProvider.Builder(this)
 				.setChannelId("audiolibros")
 				.setChannelName(R.string.canal_audio)
 				.build()
 		)
+	}
+
+	/** Tocar la notificación o la pantalla de bloqueo abre lo que suena ahora (libro, episodio o radio). */
+	private fun abrir(): PendingIntent? {
+		val i = Sonando.pantalla(this, Sonando.Fuente.AUDIO) ?: return null
+		return PendingIntent.getActivity(this, 1, i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+	}
+
+	private var ultimoAbrir = ""
+	private val alCambiar = ControlAudio.Oyente {
+		val clave = "${ControlAudio.idLibro}:${Sonando.esRadio()}"
+		if (clave != ultimoAbrir) {
+			ultimoAbrir = clave
+			abrir()?.let { sesion?.setSessionActivity(it) }
+		}
 	}
 
 	override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = sesion
@@ -114,6 +125,7 @@ class ServicioAudio : MediaSessionService() {
 	}
 
 	override fun onDestroy() {
+		ControlAudio.desregistrar(alCambiar)
 		ControlAudio.guardar(forzar = true)
 		sesion?.run {
 			player.release()

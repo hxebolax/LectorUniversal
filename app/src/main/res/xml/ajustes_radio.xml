@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ajustes de la Radio -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<SwitchPreferenceCompat android:key="radio_abrir_reproductor" android:title="@string/aj_radio_abrir" android:summary="@string/aj_radio_abrir_desc" android:defaultValue="false" />
+	<SwitchPreferenceCompat android:key="radio_decir_cancion" android:title="@string/aj_radio_decir_cancion" android:summary="@string/aj_radio_decir_cancion_desc" android:defaultValue="true" />
+	<SwitchPreferenceCompat android:key="radio_guardar_canciones" android:title="@string/aj_radio_guardar_canciones" android:summary="@string/aj_radio_guardar_canciones_desc" android:defaultValue="true" />
+	<SwitchPreferenceCompat android:key="radio_ocultar_rotas" android:title="@string/aj_radio_ocultar_rotas" android:summary="@string/aj_radio_ocultar_rotas_desc" android:defaultValue="true" />
+	<SwitchPreferenceCompat android:key="radio_avisar_datos" android:title="@string/aj_radio_avisar_datos" android:summary="@string/aj_radio_avisar_datos_desc" android:defaultValue="false" />
+	<ListPreference android:key="radio_reintentos" android:title="@string/aj_radio_reintentos" android:entries="@array/radio_reintentos_nombres" android:entryValues="@array/radio_reintentos_valores" android:defaultValue="5" app:useSimpleSummaryProvider="true" />
+	<PreferenceCategory android:title="@string/radio_despertador">
+		<SwitchPreferenceCompat android:key="radio_despertador_gradual" android:title="@string/aj_radio_gradual" android:summary="@string/aj_radio_gradual_desc" android:defaultValue="true" />
+		<ListPreference android:key="radio_posponer" android:title="@string/aj_radio_posponer" android:entries="@array/radio_posponer_nombres" android:entryValues="@array/radio_posponer_valores" android:defaultValue="10" app:useSimpleSummaryProvider="true" />
+	</PreferenceCategory>
+</PreferenceScreen>

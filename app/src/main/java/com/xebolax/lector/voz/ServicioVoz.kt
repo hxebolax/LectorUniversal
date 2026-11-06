@@ -60,19 +60,29 @@ class ServicioVoz : MediaSessionService() {
 			override fun addMediaItems(index: Int, mediaItems: MutableList<MediaItem>) = Unit
 			override fun prepare() = Unit
 		}
-		val abrir = PendingIntent.getActivity(
-			this, 0,
-			Intent(this, LectorActivity::class.java).putExtra(LectorActivity.EXTRA_LIBRO, LectorVoz.libro)
-				.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-			PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-		)
-		sesion = MediaSession.Builder(this, envoltorio).setId("voz").setSessionActivity(abrir).build()
+		sesion = MediaSession.Builder(this, envoltorio).setId("voz").also { s -> abrir()?.let { s.setSessionActivity(it) } }.build()
+		LectorVoz.registrar(alCambiar)
 		setMediaNotificationProvider(
 			DefaultMediaNotificationProvider.Builder(this)
 				.setChannelId("lectura_voz")
 				.setChannelName(R.string.canal_voz)
 				.build()
 		)
+	}
+
+	/** Tocar la notificación vuelve a lo que se lee (un libro o una noticia). */
+	private fun abrir(): PendingIntent? {
+		val i = com.xebolax.lector.audio.Sonando.pantalla(this, com.xebolax.lector.audio.Sonando.Fuente.VOZ) ?: return null
+		return PendingIntent.getActivity(this, 0, i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+	}
+
+	private var ultimoAbrir: Any? = null
+	private val alCambiar = LectorVoz.Oyente {
+		val clave = LectorVoz.volver?.toUri(0) ?: LectorVoz.libro
+		if (clave != ultimoAbrir) {
+			ultimoAbrir = clave
+			abrir()?.let { sesion?.setSessionActivity(it) }
+		}
 	}
 
 	override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = sesion
@@ -83,6 +93,7 @@ class ServicioVoz : MediaSessionService() {
 	}
 
 	override fun onDestroy() {
+		LectorVoz.desregistrar(alCambiar)
 		// El reproductor es de LectorVoz: solo se suelta la sesión
 		sesion?.release()
 		sesion = null

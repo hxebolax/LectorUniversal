@@ -853,7 +853,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		val d = doc ?: return
 		val opciones = mutableListOf<Accion>(
 			getString(R.string.ir_a_porcentaje) to {
-				pedirTexto(getString(R.string.ir_a_porcentaje), getString(R.string.porcentaje_ayuda), numerico = true) { t ->
+				pedirTexto(getString(R.string.ir_a_porcentaje), getString(R.string.porcentaje_ayuda), teclado = com.xebolax.lector.ui.Teclado.NUMERO) { t ->
 					val relativo = t.startsWith("+") || t.startsWith("-")
 					val n = t.replace("%", "").replace(",", ".").toDoubleOrNull() ?: return@pedirTexto
 					val objetivo = if (relativo) d.porcentaje(actual) + n else n
@@ -863,14 +863,14 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		)
 		if (d.paginas.isNotEmpty()) opciones += getString(R.string.ir_a_pagina) to {
 			val actualPag = d.paginaDe(actual)?.etiqueta.orEmpty()
-			pedirTexto(getString(R.string.ir_a_pagina), getString(R.string.pagina_ayuda, d.paginas.first().etiqueta, d.paginas.last().etiqueta, actualPag), numerico = true) { t ->
+			pedirTexto(getString(R.string.ir_a_pagina), getString(R.string.pagina_ayuda, d.paginas.first().etiqueta, d.paginas.last().etiqueta, actualPag)) { t ->
 				val pagina = d.paginas.firstOrNull { it.etiqueta.equals(t, ignoreCase = true) }
 					?: t.toIntOrNull()?.let { n -> d.paginas.getOrNull(n - 1) }
 				if (pagina != null) irA(pagina.bloque, desdeSalto = true) else avisar(getString(R.string.pagina_no_existe))
 			}
 		}
 		opciones += getString(R.string.ir_a_parrafo) to {
-			pedirTexto(getString(R.string.ir_a_parrafo), getString(R.string.parrafo_ayuda, actual + 1, d.bloques.size), numerico = true) { t ->
+			pedirTexto(getString(R.string.ir_a_parrafo), getString(R.string.parrafo_ayuda, actual + 1, d.bloques.size), teclado = com.xebolax.lector.ui.Teclado.NUMERO) { t ->
 				val n = t.toIntOrNull() ?: return@pedirTexto
 				val destino = if (t.startsWith("+") || t.startsWith("-")) actual + n else n - 1
 				irA(destino, desdeSalto = true)
@@ -1235,6 +1235,8 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		val l = libro ?: return
 		moverActual(bloque)
 		LectorVoz.leerDesde(d, l.id, d.titulo.ifBlank { l.tituloVisible }, bloque)
+		// El mini reproductor y la notificación vuelven aquí (una noticia no tiene id de libro)
+		LectorVoz.volver = Intent(this, LectorActivity::class.java).putExtras(intent).apply { removeExtra(EXTRA_LEER_AL_ABRIR) }
 	}
 
 	private fun alternarVoz() {

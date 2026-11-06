@@ -475,4 +475,37 @@
 		<item>60</item>
 		<item>-1</item>
 	</string-array>
+
+	<!-- Radio y mini reproductor (1.0.8) -->
+	<string-array name="radio_ordenes_favoritas">
+		<item>A mano</item>
+		<item>Por nombre</item>
+		<item>Las que más escuchas</item>
+	</string-array>
+	<string-array name="radio_reintentos_nombres">
+		<item>No volver a conectar</item>
+		<item>Reintentar 3 veces</item>
+		<item>Reintentar 5 veces</item>
+		<item>Reintentar 10 veces</item>
+		<item>Reintentar siempre</item>
+	</string-array>
+	<string-array name="radio_reintentos_valores" translatable="false">
+		<item>0</item>
+		<item>3</item>
+		<item>5</item>
+		<item>10</item>
+		<item>-1</item>
+	</string-array>
+	<string-array name="radio_posponer_nombres">
+		<item>5 minutos</item>
+		<item>10 minutos</item>
+		<item>15 minutos</item>
+		<item>20 minutos</item>
+	</string-array>
+	<string-array name="radio_posponer_valores" translatable="false">
+		<item>5</item>
+		<item>10</item>
+		<item>15</item>
+		<item>20</item>
+	</string-array>
 </resources>

@@ -3,4 +3,6 @@
 <paths>
 	<files-path name="archivos" path="." />
 	<cache-path name="cache" path="." />
+	<!-- Grabaciones de la Radio (Android/data/…/files/Music/Radio) -->
+	<external-files-path name="musica" path="Music/" />
 </paths>

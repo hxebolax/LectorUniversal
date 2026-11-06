@@ -532,7 +532,7 @@ class ReproductorActivity : AppCompatActivity() {
 
 	private fun irATiempo() {
 		val l = libro ?: return
-		pedirTexto(getString(R.string.ir_a_tiempo), getString(R.string.tiempo_ayuda), numerico = true) { texto ->
+		pedirTexto(getString(R.string.ir_a_tiempo), getString(R.string.tiempo_ayuda), teclado = com.xebolax.lector.ui.Teclado.TIEMPO) { texto ->
 			val ms = textoATiempo(texto) ?: return@pedirTexto avisar(getString(R.string.tiempo_no_valido))
 			if (l.duracionTotal > 0) {
 				// Tiempo del libro entero: se busca la pista

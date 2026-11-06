@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reproductor de radio: emisora, lo que suena, controles y acciones -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:background="?android:attr/colorBackground"
+	android:fitsSystemWindows="true"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/barra"
+		android:layout_width="match_parent"
+		android:layout_height="?attr/actionBarSize" />
+
+	<ScrollView
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1">
+
+		<LinearLayout
+			android:id="@+id/contenido"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:orientation="vertical"
+			android:padding="16dp">
+
+			<!-- Despertador sonando: Apagar y Posponer, lo primero -->
+			<LinearLayout
+				android:id="@+id/panelDespertador"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:orientation="vertical"
+				android:visibility="gone">
+
+				<com.google.android.material.button.MaterialButton
+					android:id="@+id/botonApagar"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:minHeight="64dp"
+					android:text="@string/radio_apagar_despertador"
+					android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+				<com.google.android.material.button.MaterialButton
+					android:id="@+id/botonPosponer"
+					style="?attr/materialButtonOutlinedStyle"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:minHeight="56dp" />
+			</LinearLayout>
+
+			<TextView
+				android:id="@+id/nombre"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+			<!-- Reproduciendo, en pausa, reconectando… (lo dice TalkBack al cambiar) -->
+			<TextView
+				android:id="@+id/estado"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="4dp"
+				android:accessibilityLiveRegion="polite"
+				android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+			<!-- La canción que dice la emisora -->
+			<TextView
+				android:id="@+id/cancion"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="4dp"
+				android:accessibilityLiveRegion="polite"
+				android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+			<TextView
+				android:id="@+id/datos"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="4dp"
+				android:textAppearance="?attr/textAppearanceBodyMedium"
+				android:textColor="?attr/colorOnSurfaceVariant" />
+
+			<TextView
+				android:id="@+id/extra"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="4dp"
+				android:textAppearance="?attr/textAppearanceBodyMedium"
+				android:textColor="?attr/colorOnSurfaceVariant"
+				android:visibility="gone" />
+
+			<LinearLayout
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginVertical="16dp"
+				android:gravity="center"
+				android:orientation="horizontal">
+
+				<com.google.android.material.button.MaterialButton
+					android:id="@+id/botonAnterior"
+					style="?attr/materialIconButtonStyle"
+					android:layout_width="64dp"
+					android:layout_height="64dp"
+					android:contentDescription="@string/radio_emisora_anterior"
+					android:tooltipText="@string/radio_emisora_anterior"
+					app:icon="@drawable/ic_anterior"
+					app:iconSize="32dp" />
+
+				<com.google.android.material.button.MaterialButton
+					android:id="@+id/botonReproducir"
+					style="?attr/materialIconButtonFilledStyle"
+					android:layout_width="88dp"
+					android:layout_height="88dp"
+					android:layout_marginHorizontal="24dp"
+					android:contentDescription="@string/pausar"
+					app:icon="@drawable/ic_pausa"
+					app:iconSize="44dp" />
+
+				<com.google.android.material.button.MaterialButton
+					android:id="@+id/botonSiguiente"
+					style="?attr/materialIconButtonStyle"
+					android:layout_width="64dp"
+					android:layout_height="64dp"
+					android:contentDescription="@string/radio_emisora_siguiente"
+					android:tooltipText="@string/radio_emisora_siguiente"
+					app:icon="@drawable/ic_siguiente"
+					app:iconSize="32dp" />
+			</LinearLayout>
+
+			<com.google.android.material.button.MaterialButton
+				android:id="@+id/botonFavorita"
+				style="?attr/materialButtonOutlinedStyle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:minHeight="48dp"
+				app:icon="@drawable/ic_estrella" />
+
+			<com.google.android.material.button.MaterialButton
+				android:id="@+id/botonTemporizador"
+				style="?attr/materialButtonOutlinedStyle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:minHeight="48dp"
+				app:icon="@drawable/ic_temporizador" />
+
+			<com.google.android.material.button.MaterialButton
+				android:id="@+id/botonGrabar"
+				style="?attr/materialButtonOutlinedStyle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:minHeight="48dp"
+				app:icon="@drawable/ic_grabar" />
+
+			<com.google.android.material.button.MaterialButton
+				android:id="@+id/botonBuscarCancion"
+				style="?attr/materialButtonOutlinedStyle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:minHeight="48dp"
+				android:text="@string/radio_buscar_cancion"
+				app:icon="@drawable/ic_buscar" />
+
+			<com.google.android.material.button.MaterialButton
+				android:id="@+id/botonCanciones"
+				style="?attr/materialButtonOutlinedStyle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:minHeight="48dp"
+				android:text="@string/radio_canciones_emisora"
+				app:icon="@drawable/ic_lista" />
+
+			<com.google.android.material.button.MaterialButton
+				android:id="@+id/botonEcualizador"
+				style="?attr/materialButtonOutlinedStyle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:minHeight="48dp"
+				android:text="@string/radio_ecualizador"
+				app:icon="@drawable/ic_ajustes" />
+
+			<com.google.android.material.button.MaterialButton
+				android:id="@+id/botonMas"
+				style="?attr/materialButtonOutlinedStyle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:minHeight="48dp"
+				android:text="@string/radio_mas_opciones"
+				app:icon="@drawable/ic_menu" />
+		</LinearLayout>
+	</ScrollView>
+</LinearLayout>

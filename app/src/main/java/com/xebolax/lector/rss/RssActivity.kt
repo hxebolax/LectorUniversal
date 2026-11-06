@@ -23,6 +23,7 @@ import com.xebolax.lector.ui.Seccion
 import com.xebolax.lector.ui.configurarBarra
 import com.xebolax.lector.ui.ponerMenuLateral
 import com.xebolax.lector.ui.ponerPestanas
+import com.xebolax.lector.ui.seguirMiniReproductor
 import com.xebolax.lector.ui.dp
 import com.xebolax.lector.ui.elegir
 import com.xebolax.lector.ui.mensaje
@@ -91,6 +92,7 @@ class RssActivity : AppCompatActivity() {
 		b = ActivityRssBinding.inflate(layoutInflater)
 		configurarBarra(b.barra, getString(R.string.noticias), conAtras = false)
 		setContentView(ponerMenuLateral(b.root, b.barra, Seccion.NOTICIAS, actualizaciones) { b.paginas.setCurrentItem(0, false) })
+		seguirMiniReproductor(b.miniReproductor)
 		Rss.preparar(this)
 		b.paginas.adapter = object : FragmentStateAdapter(this) {
 			override fun getItemCount() = pestanas.size
@@ -216,7 +218,7 @@ class RssActivity : AppCompatActivity() {
 		elegir(getString(R.string.rss_anadir_fuente), listOf(
 			getString(R.string.rss_buscar_fuentes) to { buscarFuentes(categoria) },
 			getString(R.string.rss_por_direccion) to {
-				pedirTexto(getString(R.string.rss_por_direccion), getString(R.string.rss_direccion_ayuda), numerico = true) { t ->
+				pedirTexto(getString(R.string.rss_por_direccion), getString(R.string.rss_direccion_ayuda), teclado = com.xebolax.lector.ui.Teclado.DIRECCION) { t ->
 					if (t.isNotBlank()) suscribirDireccion(t, categoria)
 				}
 			},

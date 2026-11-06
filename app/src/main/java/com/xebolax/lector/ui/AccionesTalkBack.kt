@@ -29,6 +29,11 @@ enum class ZonaAcciones(val titulo: Int) {
 	PODCAST(R.string.zona_podcast),
 	EPISODIO(R.string.zona_episodio),
 	CARPETA_PODCAST(R.string.zona_carpeta_podcast),
+	EMISORA(R.string.zona_emisora),
+	CARPETA_RADIO(R.string.zona_carpeta_radio),
+	CANCION(R.string.zona_cancion),
+	GRABACION(R.string.zona_grabacion),
+	PROGRAMACION(R.string.zona_programacion),
 }
 
 /** Una acción del catálogo: clave guardada, textos con los que aparece, si sale sin tocar nada y su nombre en Ajustes. */
@@ -112,6 +117,31 @@ object AccionesTalkBack {
 			e("capitulos", R.string.pod_ver_capitulos), e("desde_aqui", R.string.pod_escuchar_desde_aqui),
 			e("anteriores", R.string.pod_marcar_anteriores), e("posteriores", R.string.pod_marcar_posteriores),
 			e("ir_podcast", R.string.pod_ir_podcast), e("ficha", R.string.pod_ver_ficha),
+		)
+		ZonaAcciones.EMISORA -> listOf(
+			e("escuchar", R.string.radio_escuchar, R.string.radio_ir_reproductor), e("favorita", R.string.radio_anadir_favorita, R.string.radio_quitar_favorita),
+			e("mover", R.string.mover_a_carpeta), e("quitar_historial", R.string.radio_quitar_historial),
+			e("grabar", R.string.radio_grabar, R.string.radio_detener_grabacion), e("despertar", R.string.radio_despertar_con),
+			e("canciones", R.string.radio_canciones_emisora), e("info", R.string.radio_info), e("compartir", R.string.compartir),
+			o("orden", R.string.accion_subir, R.string.accion_bajar, R.string.accion_primera, R.string.accion_ultima),
+			o("votar", R.string.radio_votar), o("navegador", R.string.abrir_navegador), o("copiar", R.string.radio_copiar_direccion),
+			o("acceso", R.string.radio_acceso_directo), o("editar", R.string.radio_editar),
+		)
+		ZonaAcciones.CARPETA_RADIO -> listOf(
+			e("abrir", R.string.abrir), e("escuchar", R.string.radio_escuchar_carpeta), e("renombrar", R.string.renombrar),
+			e("borrar", R.string.borrar_carpeta), e("orden", R.string.accion_subir, R.string.accion_bajar, R.string.accion_primera, R.string.accion_ultima),
+		)
+		ZonaAcciones.CANCION -> listOf(
+			e("buscar", R.string.radio_buscar_cancion), e("copiar", R.string.radio_copiar_cancion), e("compartir", R.string.radio_compartir_cancion),
+			e("emisora", R.string.radio_escuchar_x), e("borrar", R.string.borrar),
+		)
+		ZonaAcciones.GRABACION -> listOf(
+			e("escuchar", R.string.radio_escuchar), e("biblioteca", R.string.radio_guardar_biblioteca), e("compartir", R.string.compartir),
+			e("renombrar", R.string.renombrar), e("borrar", R.string.borrar),
+		)
+		ZonaAcciones.PROGRAMACION -> listOf(
+			e("activar", R.string.radio_activar, R.string.radio_desactivar), e("editar", R.string.radio_editar_programacion),
+			e("probar", R.string.radio_probar_despertador), e("borrar", R.string.borrar),
 		)
 	}
 

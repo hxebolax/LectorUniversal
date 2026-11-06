@@ -97,6 +97,7 @@ class PrincipalActivity : AppCompatActivity() {
 		onBackPressedDispatcher.addCallback(this, atras)
 		setSupportActionBar(b.barra)
 		setContentView(ponerMenuLateral(b.root, b.barra, Seccion.BIBLIOTECA, actualizaciones) { b.navegacion.selectedItemId = R.id.pestana_recientes })
+		seguirMiniReproductor(b.miniReproductor)
 		ajustarPestanas(resources.configuration)
 
 		pestana = savedInstanceState?.getInt(ESTADO_PESTANA, R.id.pestana_recientes) ?: R.id.pestana_recientes
@@ -253,7 +254,7 @@ class PrincipalActivity : AppCompatActivity() {
 	/** Descarga una página web, guarda su contenido principal y la abre como un libro más. */
 	private fun abrirWeb(direccion: String? = null) {
 		if (direccion == null) {
-			pedirTexto(getString(R.string.abrir_pagina_web), getString(R.string.direccion_web), numerico = true) { abrirWeb(it) }
+			pedirTexto(getString(R.string.abrir_pagina_web), getString(R.string.direccion_web), teclado = Teclado.DIRECCION) { abrirWeb(it) }
 			return
 		}
 		val url = if (direccion.startsWith("http")) direccion else "https://$direccion"

@@ -18,6 +18,12 @@
 		android:layout_height="0dp"
 		android:layout_weight="1" />
 
+	<!-- Lo que suena (voz, audiolibro, episodio o radio), encima de las pestañas -->
+	<com.xebolax.lector.audio.MiniReproductor
+		android:id="@+id/mini_reproductor"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content" />
+
 	<com.google.android.material.bottomnavigation.BottomNavigationView
 		android:id="@+id/pestanas"
 		android:layout_width="match_parent"

@@ -98,7 +98,27 @@ object ControlAudio {
 		val alGuardar: (ms: Long, duracion: Long) -> Unit = { _, _ -> },
 		val alTerminar: () -> Unit = {},
 		val alCambiarVelocidad: (Int) -> Unit = {},
+		/** Radio en directo: sin posición ni duración, se reconecta si se corta y dice la canción que suena. */
+		val directo: Boolean = false,
+		/** Tipo del audio si no se deduce de la dirección (HLS: application/x-mpegURL). */
+		val tipo: String? = null,
+		/** Emisora siguiente (true) o anterior (false) con los botones de la notificación y los auriculares. */
+		val alPasar: ((Boolean) -> Unit)? = null,
+		/** Ha cambiado la canción que dice la emisora. */
+		val alCambiarCancion: (String) -> Unit = {},
+		/** Es un despertador: si la emisora no suena, suena la alarma del sistema. */
+		val despertador: Boolean = false,
 	)
+
+	/** Lo que dice la emisora que suena ahora (radio en directo). */
+	var cancion = ""
+		private set
+
+	/** Radio: qué le pasa a la conexión (vacío si nada): «Reconectando…», «Sin conexión». */
+	var problema = ""
+		private set
+	private var reintentos = 0
+	private var alarmaDeReserva = false
 
 	var externo: Externo? = null
 		private set
@@ -107,30 +127,39 @@ object ControlAudio {
 	@Volatile
 	var externoPendiente: Externo? = null
 
-	private var escuchandoFin = false
+	/** El reproductor al que ya se le puso el oyente (si el servicio se vuelve a crear, hay que ponérselo al nuevo). */
+	private var escuchandoA: ExoPlayer? = null
 
 	/** Carga un audio externo y lo coloca donde se quedó. */
 	fun cargarExterno(e: Externo) {
 		val j = jugador ?: return
-		if (esActual(e.id)) {
+		if (esActual(e.id) && !alarmaDeReserva) {
 			externo = e
 			return
 		}
 		guardar(forzar = true)
 		externo = e
 		idLibro = e.id
+		cancion = ""
+		problema = ""
+		reintentos = 0
+		alarmaDeReserva = false
+		principal.removeCallbacks(reintentar)
 		val incrustados = capitulosPendientes?.takeIf { it.first == e.id }?.second.orEmpty()
 		capitulosPendientes = null
 		libro = LibroAudio(e.titulo, e.autor, pistas = listOf(com.xebolax.lector.modelo.Pista(e.url, e.titulo)), capitulos = e.capitulos.ifEmpty { incrustados })
 		val elemento = MediaItem.Builder()
 			.setUri(Uri.parse(e.url))
 			.setMediaId("${e.id}:0")
+			.apply { e.tipo?.let { setMimeType(it) } }
 			.setMediaMetadata(MediaMetadata.Builder().setTitle(e.titulo).setArtist(e.autor).build())
 			.build()
-		val inicio = if (e.posicionMs > 0) e.posicionMs else e.saltarInicio * 1000L
+		val inicio = if (e.directo) 0L else if (e.posicionMs > 0) e.posicionMs else e.saltarInicio * 1000L
+		j.repeatMode = Player.REPEAT_MODE_OFF
 		j.setMediaItem(elemento, inicio)
-		j.playbackParameters = PlaybackParameters((e.velocidad ?: Preferencias(app).velocidadAudio) / 100f)
-		j.skipSilenceEnabled = Preferencias(app).saltarSilencios
+		// La radio va siempre a su velocidad y sin quitar silencios (es música y voz en directo)
+		j.playbackParameters = PlaybackParameters(if (e.directo) 1f else (e.velocidad ?: Preferencias(app).velocidadAudio) / 100f)
+		j.skipSilenceEnabled = !e.directo && Preferencias(app).saltarSilencios
 		j.prepare()
 		marcadores = emptyList()
 		escucharFin(j)
@@ -156,13 +185,113 @@ object ControlAudio {
 
 	/** Al terminar un audio externo (o al llegar a "saltar final"), se avisa a quien lo reproduce. */
 	private fun escucharFin(j: ExoPlayer) {
-		if (escuchandoFin) return
-		escuchandoFin = true
+		if (escuchandoA === j) return
+		escuchandoA = j
 		j.addListener(object : Player.Listener {
 			override fun onPlaybackStateChanged(estado: Int) {
-				if (estado == Player.STATE_ENDED) principal.post { terminarExterno() }
+				if (estado == Player.STATE_ENDED) principal.post { if (externo?.directo == true) alCortarse(null) else terminarExterno() }
+				if (estado == Player.STATE_READY && externo?.directo == true && problema.isNotEmpty()) {
+					problema = ""
+					reintentos = 0
+					avisar()
+				}
+			}
+
+			// Radio: la canción que suena llega en los metadatos ICY del directo (o en los de HLS)
+			override fun onMetadata(metadatos: androidx.media3.common.Metadata) {
+				val e = externo ?: return
+				if (!e.directo) return
+				for (i in 0 until metadatos.length()) {
+					val titulo = when (val m = metadatos[i]) {
+						is androidx.media3.extractor.metadata.icy.IcyInfo -> m.title
+						is androidx.media3.extractor.metadata.id3.TextInformationFrame -> m.values.firstOrNull()?.takeIf { m.id == "TIT2" }
+						else -> null
+					}?.trim()?.takeIf { it.isNotBlank() && it != "-" } ?: continue
+					principal.post {
+						if (externo === e && titulo != cancion) {
+							cancion = titulo
+							e.alCambiarCancion(titulo)
+							avisar()
+						}
+					}
+				}
+			}
+
+			override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+				if (externo?.directo == true) principal.post { alCortarse(error) }
 			}
 		})
+	}
+
+	/** Reintentos de la radio cuando se corta (Ajustes, Radio). */
+	private fun maxReintentos() = Preferencias(app).p.getString("radio_reintentos", "5")?.toIntOrNull() ?: 5
+
+	private val reintentar = Runnable {
+		val j = jugador ?: return@Runnable
+		if (externo?.directo != true) return@Runnable
+		j.seekToDefaultPosition()
+		j.prepare()
+		j.play()
+	}
+
+	/** Se ha cortado la radio: se reconecta unas cuantas veces y, si es un despertador, suena la alarma del sistema. */
+	private fun alCortarse(error: Throwable?) {
+		val e = externo ?: return
+		if (alarmaDeReserva) return
+		val maximo = maxReintentos()
+		if (jugador?.playWhenReady == true && (maximo < 0 || reintentos < maximo)) {
+			reintentos++
+			problema = app.getString(com.xebolax.lector.R.string.radio_reconectando, reintentos)
+			principal.removeCallbacks(reintentar)
+			// Cada vez se espera un poco más (3, 6, 9… hasta 30 segundos)
+			principal.postDelayed(reintentar, (3_000L * reintentos).coerceAtMost(30_000L))
+		} else {
+			problema = app.getString(com.xebolax.lector.R.string.radio_sin_conexion) +
+				(error?.let { " (" + app.getString(com.xebolax.lector.R.string.radio_error_codigo, it.errorCodeName()) + ")" } ?: "")
+			if (e.despertador) sonarAlarmaDeReserva()
+		}
+		avisar()
+	}
+
+	private fun Throwable.errorCodeName(): String = (this as? androidx.media3.common.PlaybackException)?.errorCodeName ?: javaClass.simpleName
+
+	/** El despertador no consigue sonar con la emisora: suena el tono de alarma del móvil, en bucle. */
+	fun sonarAlarmaDeReserva() {
+		val j = jugador ?: return
+		val tono = android.media.RingtoneManager.getActualDefaultRingtoneUri(app, android.media.RingtoneManager.TYPE_ALARM)
+			?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
+			?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE) ?: return
+		alarmaDeReserva = true
+		principal.removeCallbacks(reintentar)
+		problema = app.getString(com.xebolax.lector.R.string.radio_alarma_reserva)
+		j.setMediaItem(MediaItem.Builder().setUri(tono).setMediaId("alarma").setMediaMetadata(MediaMetadata.Builder().setTitle(app.getString(com.xebolax.lector.R.string.radio_despertador)).build()).build())
+		j.repeatMode = Player.REPEAT_MODE_ONE
+		j.prepare()
+		j.volume = 1f
+		j.play()
+		avisar()
+	}
+
+	private val subida = object : Runnable {
+		var paso = 0
+		var pasos = 1
+		override fun run() {
+			val j = jugador ?: return
+			paso++
+			j.volume = (0.08f + 0.92f * paso / pasos).coerceAtMost(1f)
+			if (paso < pasos && reproduciendo) principal.postDelayed(this, 1000)
+		}
+	}
+
+	/** Despertador: el volumen empieza bajo y sube poco a poco durante esos segundos. */
+	fun subirPocoAPoco(segundos: Int) {
+		val j = jugador ?: return
+		principal.removeCallbacks(subida)
+		if (segundos <= 0) return
+		j.volume = 0.08f
+		subida.paso = 0
+		subida.pasos = segundos
+		principal.postDelayed(subida, 1000)
 	}
 
 	private fun terminarExterno() {
@@ -254,12 +383,27 @@ object ControlAudio {
 
 	fun reproducir() {
 		val j = jugador ?: return
-		// Retroceso al reanudar (para no perder el hilo), solo tras una pausa de más de 10 s
-		val atras = Preferencias(app).retrocesoReanudar * 1000L
-		if (pausadoEn > 0 && SystemClock.elapsedRealtime() - pausadoEn > 10_000 && atras > 0) {
-			j.seekTo((j.currentPosition - atras).coerceAtLeast(0))
+		// Solo suena una cosa: si se estaba leyendo en voz alta, se pausa
+		if (com.xebolax.lector.voz.LectorVoz.leyendo) com.xebolax.lector.voz.LectorVoz.pausar()
+		Sonando.ultima = Sonando.Fuente.AUDIO
+		if (externo?.directo == true) {
+			// Radio: tras una pausa (o un corte) se vuelve al directo, no a lo que quedó en el búfer
+			if (alarmaDeReserva) Unit
+			else if (j.playbackState == Player.STATE_IDLE || j.playbackState == Player.STATE_ENDED || (pausadoEn > 0 && SystemClock.elapsedRealtime() - pausadoEn > 10_000)) {
+				j.seekToDefaultPosition()
+				j.prepare()
+			}
+			reintentos = 0
+			problema = ""
+		} else {
+			// Retroceso al reanudar (para no perder el hilo), solo tras una pausa de más de 10 s
+			val atras = Preferencias(app).retrocesoReanudar * 1000L
+			if (pausadoEn > 0 && SystemClock.elapsedRealtime() - pausadoEn > 10_000 && atras > 0) {
+				j.seekTo((j.currentPosition - atras).coerceAtLeast(0))
+			}
+			if (j.playbackState == Player.STATE_ENDED) j.seekTo(0, 0)
+			if (j.playbackState == Player.STATE_IDLE) j.prepare()
 		}
-		if (j.playbackState == Player.STATE_ENDED) j.seekTo(0, 0)
 		j.volume = 1f
 		j.play()
 		pausadoPorDesconexion = 0
@@ -279,6 +423,8 @@ object ControlAudio {
 		val j = jugador ?: return
 		agitar.parar()
 		principal.removeCallbacks(dejarDeAgitar)
+		principal.removeCallbacks(reintentar)
+		principal.removeCallbacks(subida)
 		j.pause()
 		pausadoEn = SystemClock.elapsedRealtime()
 		guardar(forzar = true)
@@ -289,8 +435,13 @@ object ControlAudio {
 		pausar()
 		jugador?.stop()
 		jugador?.clearMediaItems()
+		jugador?.repeatMode = Player.REPEAT_MODE_OFF
 		libro = null
 		idLibro = -1
+		externo = null
+		cancion = ""
+		problema = ""
+		alarmaDeReserva = false
 		quitarTemporizador()
 		controlador?.let { MediaController.releaseFuture(it) }
 		controlador = null
@@ -586,6 +737,8 @@ object ControlAudio {
 
 	fun guardar(forzar: Boolean = false) {
 		val e = externo
+		// La radio no tiene posición que guardar
+		if (e != null && e.directo) return
 		if (e != null && idLibro == e.id && libro != null) {
 			val ahora = SystemClock.elapsedRealtime()
 			if (!forzar && ahora - ultimoGuardado < 5_000) return

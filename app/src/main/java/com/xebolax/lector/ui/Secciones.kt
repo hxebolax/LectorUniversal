@@ -23,7 +23,7 @@ import com.xebolax.lector.actualizaciones.GestorActualizaciones
 
 /**
  * Las secciones de la app, como si fueran apps dentro de la app: Biblioteca,
- * Podcasts y Noticias. Todas igual: «Abrir menú» arriba a la izquierda (el
+ * Podcasts, Noticias y Radio. Todas igual: «Abrir menú» arriba a la izquierda (el
  * menú lateral, para ir de una a otra y a lo general) y sus pestañas abajo,
  * todas a la vista.
  */
@@ -31,6 +31,18 @@ enum class Seccion(val menu: Int) {
 	BIBLIOTECA(R.id.lateral_biblioteca),
 	PODCASTS(R.id.lateral_podcasts),
 	NOTICIAS(R.id.lateral_noticias),
+	RADIO(R.id.lateral_radio),
+}
+
+/**
+ * El mini reproductor de la sección sigue lo que suena mientras la pantalla
+ * está a la vista (se registra en onStart y se suelta en onStop).
+ */
+fun AppCompatActivity.seguirMiniReproductor(mini: com.xebolax.lector.audio.MiniReproductor) {
+	lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+		override fun onStart(owner: androidx.lifecycle.LifecycleOwner) = mini.empezar()
+		override fun onStop(owner: androidx.lifecycle.LifecycleOwner) = mini.parar()
+	})
 }
 
 /**
@@ -169,14 +181,15 @@ private fun AppCompatActivity.contenidoMenuLateral(seccion: Seccion, alElegir: (
 }
 
 /**
- * Cambia de sección. La Biblioteca queda siempre debajo: al salir de Podcasts
- * o de Noticias con Atrás se vuelve a ella, y no se van apilando secciones.
+ * Cambia de sección. La Biblioteca queda siempre debajo: al salir de Podcasts,
+ * Noticias o Radio con Atrás se vuelve a ella, y no se van apilando secciones.
  */
 fun AppCompatActivity.irASeccion(destino: Seccion, desde: Seccion) {
 	when (destino) {
 		Seccion.BIBLIOTECA -> startActivity(Intent(this, PrincipalActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
 		Seccion.PODCASTS -> com.xebolax.lector.podcast.PodcastActivity.abrir(this)
 		Seccion.NOTICIAS -> com.xebolax.lector.rss.RssActivity.abrir(this)
+		Seccion.RADIO -> com.xebolax.lector.radio.RadioActivity.abrir(this)
 	}
 	if (desde != Seccion.BIBLIOTECA) {
 		finish()

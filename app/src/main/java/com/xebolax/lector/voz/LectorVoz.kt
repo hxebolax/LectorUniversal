@@ -106,6 +106,8 @@ object LectorVoz {
 		private set
 	var titulo = ""
 		private set
+	/** Pantalla a la que vuelve el mini reproductor y la notificación (una noticia, que no tiene id de libro). */
+	var volver: android.content.Intent? = null
 	var bloque = 0
 		private set
 	private var frases: List<IntRange> = emptyList()
@@ -549,6 +551,8 @@ object LectorVoz {
 	fun cargar(doc: Documento, idLibro: Long, tituloLibro: String, desde: Int, caracter: Int = 0) {
 		if (documento !== doc || libro != idLibro) {
 			if (leyendo) pausar()
+			// Quien abra la lectura dice cómo volver a ella (si no, se vuelve al libro por su id)
+			volver = null
 			documento = doc
 			libro = idLibro
 			titulo = tituloLibro
@@ -627,6 +631,9 @@ object LectorVoz {
 	fun reanudar() {
 		if (documento == null) return
 		Log.d(ETIQUETA, "Reanudar")
+		// Solo suena una cosa: si sonaba un audiolibro, un episodio o la radio, se pausa
+		if (com.xebolax.lector.audio.ControlAudio.reproduciendo) com.xebolax.lector.audio.ControlAudio.pausar()
+		com.xebolax.lector.audio.Sonando.ultima = com.xebolax.lector.audio.Sonando.Fuente.VOZ
 		if (!leyendo) pedirFoco()
 		leyendo = true
 		inicioSesion = SystemClock.elapsedRealtime()

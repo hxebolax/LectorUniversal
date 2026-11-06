@@ -262,4 +262,24 @@
 		<item>60 minutes</item>
 		<item>At the end of the chapter</item>
 	</string-array>
+
+	<!-- Radio y mini reproductor (1.0.8) -->
+	<string-array name="radio_ordenes_favoritas">
+		<item>Manual</item>
+		<item>By name</item>
+		<item>The ones you listen to most</item>
+	</string-array>
+	<string-array name="radio_reintentos_nombres">
+		<item>Do not reconnect</item>
+		<item>Retry 3 times</item>
+		<item>Retry 5 times</item>
+		<item>Retry 10 times</item>
+		<item>Always retry</item>
+	</string-array>
+	<string-array name="radio_posponer_nombres">
+		<item>5 minutes</item>
+		<item>10 minutes</item>
+		<item>15 minutes</item>
+		<item>20 minutes</item>
+	</string-array>
 </resources>

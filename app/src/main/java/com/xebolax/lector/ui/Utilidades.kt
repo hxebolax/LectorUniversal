@@ -131,9 +131,10 @@ val MINUTOS_TEMPORIZADOR = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120, -1)
  * Elegir temporizador de apagado: devuelve los minutos (-1 = al final del
  * capítulo, 0 = sin temporizador si conQuitar).
  */
-fun Context.elegirTemporizador(titulo: String, conQuitar: Boolean, conEpisodios: Boolean = false, alElegir: (Int) -> Unit) {
-	// Podcasts: también al final del episodio o tras 2 o 3 episodios
-	val opciones = (if (conQuitar) listOf(0) else emptyList()) + MINUTOS_TEMPORIZADOR + (if (conEpisodios) listOf(-2, -102, -103) else emptyList())
+fun Context.elegirTemporizador(titulo: String, conQuitar: Boolean, conEpisodios: Boolean = false, conCapitulo: Boolean = true, alElegir: (Int) -> Unit) {
+	// Podcasts: también al final del episodio o tras 2 o 3 episodios; la radio no tiene capítulos
+	val opciones = (if (conQuitar) listOf(0) else emptyList()) + MINUTOS_TEMPORIZADOR.filter { conCapitulo || it > 0 } +
+		(if (conEpisodios) listOf(-2, -102, -103) else emptyList())
 	val nombres = opciones.map {
 		when (it) {
 			0 -> getString(R.string.sin_temporizador)
@@ -144,7 +145,7 @@ fun Context.elegirTemporizador(titulo: String, conQuitar: Boolean, conEpisodios:
 		.setTitle(titulo)
 		.setItems(nombres.toTypedArray()) { _, i ->
 			if (i < opciones.size) alElegir(opciones[i])
-			else pedirTexto(titulo, getString(R.string.minutos_ayuda), numerico = true) { texto ->
+			else pedirTexto(titulo, getString(R.string.minutos_ayuda), teclado = Teclado.TIEMPO) { texto ->
 				// Minutos, o horas:minutos
 				val minutos = textoATiempo(texto)?.let { (it / 60_000).toInt() } ?: return@pedirTexto
 				if (minutos in 1..1440) alElegir(minutos)
@@ -180,11 +181,14 @@ fun View.conTemporizadorAlMantener(alMantener: () -> Unit) {
 }
 
 /** Pide un texto. alAceptar recibe el texto sin espacios sobrantes. */
+/** Teclado de un campo: texto, números (con decimales), hora o minutos («1:30»), o dirección web. */
+enum class Teclado { TEXTO, NUMERO, TIEMPO, DIRECCION }
+
 fun Context.pedirTexto(
 	titulo: String,
 	pista: String,
 	inicial: String = "",
-	numerico: Boolean = false,
+	teclado: Teclado = Teclado.TEXTO,
 	multilinea: Boolean = false,
 	alAceptar: (String) -> Unit,
 ) {
@@ -192,7 +196,9 @@ fun Context.pedirTexto(
 		setText(inicial)
 		setSelection(inicial.length)
 		inputType = when {
-			numerico -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+			teclado == Teclado.NUMERO -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+			teclado == Teclado.TIEMPO -> InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_TIME
+			teclado == Teclado.DIRECCION -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
 			multilinea -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
 			else -> InputType.TYPE_CLASS_TEXT
 		}

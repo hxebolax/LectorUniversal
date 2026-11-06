@@ -23,8 +23,8 @@ android {
 		applicationId = "com.xebolax.lector"
 		minSdk = 24
 		targetSdk = 35
-		versionCode = 8
-		versionName = "1.0.7"
+		versionCode = 9
+		versionName = "1.0.8"
 
 		buildConfigField("String", "URL_ACTUALIZACIONES", "\"$urlActualizaciones\"")
 		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -99,6 +99,8 @@ dependencies {
 	// Audiolibros y DAISY: reproductor con controles en la notificación y auriculares
 	implementation("androidx.media3:media3-exoplayer:1.5.1")
 	implementation("androidx.media3:media3-session:1.5.1")
+	// Radio (y podcasts) que emiten en HLS (.m3u8)
+	implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
 
 	// HTML, XHTML (EPUB, MOBI, DAISY) y XML
 	implementation("org.jsoup:jsoup:1.18.3")

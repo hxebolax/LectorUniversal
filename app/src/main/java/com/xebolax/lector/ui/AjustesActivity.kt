@@ -49,6 +49,7 @@ class AjustesActivity : AppCompatActivity() {
 			when (intent.getStringExtra(EXTRA_APARTADO)) {
 				"rss" -> abrirApartado("rss", getString(R.string.aj_rss))
 				"podcasts" -> abrirApartado("podcasts", getString(R.string.aj_podcasts))
+				"radio" -> abrirApartado("radio", getString(R.string.aj_radio))
 			}
 		}
 		supportFragmentManager.addOnBackStackChangedListener {
@@ -150,6 +151,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			"ia" -> R.xml.ajustes_ia
 			"rss" -> R.xml.ajustes_rss
 			"podcasts" -> R.xml.ajustes_podcasts
+			"radio" -> R.xml.ajustes_radio
 			else -> R.xml.ajustes_raiz
 		}
 		setPreferencesFromResource(recurso, raiz)
@@ -199,7 +201,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		alPulsar("ir_acciones") { AccionesTalkBackActivity.abrir(requireContext()) }
 		val apartados = listOf(
 			"ir_general" to "general", "ir_aspecto" to "aspecto", "ir_navegacion" to "navegacion", "ir_voz" to "voz",
-			"ir_audio" to "audio", "ir_podcasts" to "podcasts", "ir_rss" to "rss", "ir_ia" to "ia", "ir_documentos" to "documentos", "ir_biblioteca" to "biblioteca",
+			"ir_audio" to "audio", "ir_podcasts" to "podcasts", "ir_rss" to "rss", "ir_radio" to "radio", "ir_ia" to "ia", "ir_documentos" to "documentos", "ir_biblioteca" to "biblioteca",
 		)
 		for ((clave, xml) in apartados) {
 			val pref = findPreference<Preference>(clave) ?: continue

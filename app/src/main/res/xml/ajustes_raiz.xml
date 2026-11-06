@@ -9,6 +9,7 @@
 	<Preference android:key="ir_audio" android:title="@string/aj_audio" android:summary="@string/aj_audio_desc" />
 	<Preference android:key="ir_podcasts" android:title="@string/aj_podcasts" android:summary="@string/aj_podcasts_desc" />
 	<Preference android:key="ir_rss" android:title="@string/aj_rss" android:summary="@string/aj_rss_desc" />
+	<Preference android:key="ir_radio" android:title="@string/aj_radio" android:summary="@string/aj_radio_desc" />
 	<Preference android:key="ir_ia" android:title="@string/aj_ia" android:summary="@string/aj_ia_desc" />
 	<Preference android:key="ir_documentos" android:title="@string/aj_documentos" android:summary="@string/aj_documentos_desc" />
 	<Preference android:key="ir_biblioteca" android:title="@string/aj_biblioteca" android:summary="@string/aj_biblioteca_desc" />

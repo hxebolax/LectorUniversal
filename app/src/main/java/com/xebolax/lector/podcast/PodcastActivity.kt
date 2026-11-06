@@ -24,6 +24,7 @@ import com.xebolax.lector.ui.Seccion
 import com.xebolax.lector.ui.configurarBarra
 import com.xebolax.lector.ui.ponerMenuLateral
 import com.xebolax.lector.ui.ponerPestanas
+import com.xebolax.lector.ui.seguirMiniReproductor
 import com.xebolax.lector.ui.dp
 import com.xebolax.lector.ui.elegir
 import com.xebolax.lector.ui.mensaje
@@ -76,6 +77,7 @@ class PodcastActivity : AppCompatActivity() {
 		b = ActivityRssBinding.inflate(layoutInflater)
 		configurarBarra(b.barra, getString(R.string.podcasts), conAtras = false)
 		setContentView(ponerMenuLateral(b.root, b.barra, Seccion.PODCASTS, actualizaciones) { b.paginas.setCurrentItem(0, false) })
+		seguirMiniReproductor(b.miniReproductor)
 		b.paginas.adapter = object : FragmentStateAdapter(this) {
 			override fun getItemCount() = pestanas.size
 			override fun createFragment(posicion: Int): Fragment = PodcastListaFragment.nuevo(pestanas[posicion])
@@ -134,7 +136,6 @@ class PodcastActivity : AppCompatActivity() {
 	}
 
 	override fun onCreateOptionsMenu(menu: Menu): Boolean {
-		if (ControlAudio.externo != null) menu.add(Menu.NONE, 7, Menu.NONE, R.string.pod_seguir_escuchando).setIcon(R.drawable.ic_reproducir).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
 		menu.add(Menu.NONE, 1, Menu.NONE, R.string.rss_actualizar).setIcon(R.drawable.ic_actualizar).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
 		menu.add(Menu.NONE, 2, Menu.NONE, R.string.pod_anadir).setIcon(R.drawable.ic_anadir).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
 		menu.add(Menu.NONE, 4, Menu.NONE, R.string.rss_importar_opml)
@@ -148,7 +149,6 @@ class PodcastActivity : AppCompatActivity() {
 			2 -> anadir()
 			4 -> importar.launch(arrayOf("*/*"))
 			5 -> exportar.launch("podcasts.opml")
-			7 -> startActivity(Intent(this, com.xebolax.lector.audio.ReproductorActivity::class.java).putExtra(com.xebolax.lector.audio.ReproductorActivity.EXTRA_EXTERNO, true))
 			else -> return super.onOptionsItemSelected(item)
 		}
 		return true
@@ -177,7 +177,7 @@ class PodcastActivity : AppCompatActivity() {
 		elegir(getString(R.string.pod_anadir), listOf(
 			getString(R.string.pod_buscar) to { buscar() },
 			getString(R.string.rss_por_direccion) to {
-				pedirTexto(getString(R.string.rss_por_direccion), getString(R.string.pod_direccion_ayuda), numerico = true) { t ->
+				pedirTexto(getString(R.string.rss_por_direccion), getString(R.string.pod_direccion_ayuda), teclado = com.xebolax.lector.ui.Teclado.DIRECCION) { t ->
 					if (t.isNotBlank()) suscribirDireccion(t.trim())
 				}
 			},
