@@ -97,7 +97,7 @@
 	<string name="novedades">What\'s new</string>
 	<string name="buscar_actualizaciones">Check for updates</string>
 	<string name="acerca_de">About</string>
-	<string name="acerca_de_texto">Lector Universal %1$s\n\nA reader for books, documents and audiobooks designed for use with TalkBack, with Podcasts and News: EPUB, PDF, Word (also .doc), OpenDocument, RTF, text, HTML, Markdown, FictionBook, Kindle (MOBI, AZW3), CHM, presentations, spreadsheets, comics (CBZ), DAISY 2.02 and 3, and M4B, MP3 and other audiobooks.\n\nMade by Héctor J. Benítez Corredera.\n\nBookmark and note sounds from Paperback (Quin Gillespie, MIT license). Uses PDFBox-Android, Jsoup, CommonMark and Media3 (Apache 2.0, MIT and BSD licenses).</string>
+	<string name="acerca_de_texto">Lector Universal %1$s\n\nA reader for books, documents and audiobooks designed for use with TalkBack, with Podcasts, News and Radio: EPUB, PDF, Word (also .doc), OpenDocument, RTF, text, HTML, Markdown, FictionBook, Kindle (MOBI, AZW3), CHM, presentations, spreadsheets, comics (CBZ), DAISY 2.02 and 3, and M4B, MP3 and other audiobooks.\n\nMade by Héctor J. Benítez Corredera.\n\nBookmark and note sounds from Paperback (Quin Gillespie, MIT license). Uses PDFBox-Android, Jsoup, CommonMark and Media3 (Apache 2.0, MIT and BSD licenses).</string>
 	<string name="ordenar">Sort</string>
 	<string name="carpeta_con_subcarpetas">Add the books and create a library folder for each subfolder</string>
 	<string name="carpeta_sin_subcarpetas">Add all books without creating folders</string>

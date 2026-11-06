@@ -97,7 +97,7 @@
 	<string name="novedades">Novedades</string>
 	<string name="buscar_actualizaciones">Buscar actualizaciones</string>
 	<string name="acerca_de">Acerca de</string>
-	<string name="acerca_de_texto">Lector Universal %1$s\n\nLector de libros, documentos y audiolibros pensado para usarse con TalkBack, con Podcasts y Noticias: EPUB, PDF, Word (también .doc), OpenDocument, RTF, texto, HTML, Markdown, FictionBook, Kindle (MOBI, AZW3), CHM, presentaciones, hojas de cálculo, cómics (CBZ), DAISY 2.02 y 3, y audiolibros M4B, MP3 y otros.\n\nHecho por Héctor J. Benítez Corredera.\n\nSonidos de marcador y nota de Paperback (Quin Gillespie, licencia MIT). Usa PDFBox-Android, Jsoup, CommonMark y Media3 (licencias Apache 2.0, MIT y BSD).</string>
+	<string name="acerca_de_texto">Lector Universal %1$s\n\nLector de libros, documentos y audiolibros pensado para usarse con TalkBack, con Podcasts, Noticias y Radio: EPUB, PDF, Word (también .doc), OpenDocument, RTF, texto, HTML, Markdown, FictionBook, Kindle (MOBI, AZW3), CHM, presentaciones, hojas de cálculo, cómics (CBZ), DAISY 2.02 y 3, y audiolibros M4B, MP3 y otros.\n\nHecho por Héctor J. Benítez Corredera.\n\nSonidos de marcador y nota de Paperback (Quin Gillespie, licencia MIT). Usa PDFBox-Android, Jsoup, CommonMark y Media3 (licencias Apache 2.0, MIT y BSD).</string>
 	<string name="ordenar">Ordenar</string>
 	<string name="carpeta_con_subcarpetas">Añadir los libros y crear una carpeta de la biblioteca por cada subcarpeta</string>
 	<string name="carpeta_sin_subcarpetas">Añadir todos los libros sin crear carpetas</string>

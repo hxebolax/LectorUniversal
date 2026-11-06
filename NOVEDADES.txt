@@ -3,6 +3,19 @@ El texto de la versión que se publica se muestra en la app al ofrecer la actual
 Para una versión nueva: sube versionCode y versionName en app\build.gradle.kts,
 añade aquí su sección y usa la opción 8 de compilar.bat.
 
+== 1.0.8
+- Nueva sección Radio (menú lateral), con más de 50.000 emisoras de todo el mundo del directorio libre radio-browser.info, sin cuenta ni publicidad. Pestañas Favoritas (con carpetas y orden), Explorar (las de tu país, las más escuchadas, las más votadas, en tendencia, lo que se escucha ahora, nuevas, y por género, país o idioma), Buscar (por nombre, con filtros de país, idioma, género, calidad y orden), Historial (emisoras escuchadas, canciones que han sonado y grabaciones) y Programar.
+- Radio: reproductor en directo que se reconecta solo si se corta y dice la canción que suena; emisora anterior y siguiente (también con los auriculares y la notificación); temporizador; ecualizador del sistema; buscar, copiar o compartir la canción; votar, compartir y ver la información de cada emisora.
+- Radio: grabar una emisora sin perder calidad, aunque escuches otra cosa, y grabaciones programadas a una hora. Las grabaciones se escuchan, se comparten o se guardan en la biblioteca.
+- Radio: despertador con tu emisora favorita, los días que elijas, con el volumen subiendo poco a poco, y Apagar y Posponer también con el móvil bloqueado. Si no hay internet, suena la alarma del móvil.
+- Radio: añadir emisoras a mano (también desde listas .pls o .m3u), importar y exportar M3U, «Añadir a Radio» desde Compartir y accesos directos en la pantalla de inicio.
+- Mini reproductor encima de las pestañas en la Biblioteca, Podcasts, Noticias y Radio: lo que suena (un libro o una noticia en voz alta, un audiolibro, un episodio o la radio), Pausar o Reanudar y Detener; tocarlo vuelve a su pantalla. Sigue al cambiar de sección y solo suena una cosa a la vez.
+- La notificación y la pantalla de bloqueo abren siempre lo que suena (antes, con un episodio, una noticia o el primer audiolibro, no abrían nada o abrían otro).
+- Los podcasts y la radio que emiten en HLS (.m3u8) ya se pueden escuchar.
+- Cada campo tiene su teclado: números en Ir a porcentaje e Ir a párrafo, hora en Ir a tiempo y en el temporizador, y el de direcciones solo en las direcciones.
+- Arreglos: el widget ya no cierra la app al leer un audiolibro; Podcasts ya no se cierra al salir de Descubrir mientras carga; en episodios y noticias ya no se ofrecen marcadores que no se guardaban; el temporizador «al final del episodio» se dice bien; las acciones de libros y carpetas confirman lo hecho; instalar una versión anterior ya no cierra la app.
+- Noticias: abrir un artículo en el navegador lo marca como leído. Podcasts: textos propios de la sección (podcasts con errores, página del episodio, pausado).
+
 == 1.0.7
 - Bibliotecas web propias: en Catálogos, «Añadir catálogo o biblioteca web» con la dirección de cualquier biblioteca en línea. La app averigua si es un catálogo OPDS (se lista en la app) o una página web (se abre en el navegador de la app, como Tiflolibros y la ONCE: entras con tu usuario en su página y lo que descargues, libros, documentos o ZIP, se añade a tu biblioteca con su nombre). Si no se puede comprobar, pregunta qué es. El nombre, si no se escribe, se toma de la página.
 - Arreglado: al editar Tiflolibros o la Biblioteca Digital ONCE se perdía que son webs y dejaban de abrirse.
