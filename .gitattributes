@@ -29,3 +29,7 @@
 *.ttf binary
 *.jar binary
 *.so binary
+
+# Muestras de prueba de cada formato: se guardan byte a byte, tal cual
+app/src/androidTest/assets/muestras/** -text
+pruebas/** -text
