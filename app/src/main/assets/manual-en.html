@@ -43,14 +43,15 @@
 </ul>
 
 <h2>The main window and the side menu</h2>
-<p>The app has three sections that work the same way: <strong>Library</strong>, <strong>Podcasts</strong> and <strong>News</strong>. In all of them, the “Open menu” button is at the top left and the section's tabs are at the bottom, always all visible.</p>
-<p>The side menu has the three sections at the top; the one you are using says “selected” and, when you open the menu, focus goes straight to it. Below are Reading statistics, Settings, User guide and About. If you choose the section you are already in, you go back to its first tab. Back closes the menu.</p>
+<p>The app has four sections that work the same way: <strong>Library</strong>, <strong>Podcasts</strong>, <strong>News</strong> and <strong>Radio</strong>. In all of them, the “Open menu” button is at the top left and the section's tabs are at the bottom, always all visible.</p>
+<p><strong>Mini player</strong>: if something is playing or paused (a book or an article read aloud, an audiobook, an episode or the radio), a line appears above the tabs with what is playing and its state, “Pause” or “Resume” and “Stop”. Tapping what is playing takes you back to its screen. It stays there when you change section, so you can listen to the radio while you browse the news. Only one thing plays at a time: if you start something else, the mini player switches to it. The notification and the lock screen also always open what is playing.</p>
+<p>The side menu has the four sections at the top; the one you are using says “selected” and, when you open the menu, focus goes straight to it. Below are Reading statistics, Settings, User guide and About. If you choose the section you are already in, you go back to its first tab. Back closes the menu.</p>
 <ul>
 <li><strong>Reading statistics</strong>: time read today, in the last 7 days, this month and in total, your streak of consecutive days, books finished and in progress, and the most read.</li>
-<li><strong>Settings</strong>: those of the whole app, including Podcasts and News.</li>
+<li><strong>Settings</strong>: those of the whole app, including Podcasts, News and Radio.</li>
 <li><strong>About</strong>: the version, and the Check for updates and What's new buttons.</li>
 </ul>
-<p>With Back: inside a folder you go up to the previous one; in another tab you go back to the first one; and from the first tab of Podcasts or News you go back to the Library.</p>
+<p>With Back: inside a folder you go up to the previous one; in another tab you go back to the first one; and from the first tab of Podcasts, News or Radio you go back to the Library.</p>
 
 <h2>Library</h2>
 <p>It has four tabs: Reading, Library, Bookmarks and Catalogs.</p>
@@ -190,7 +191,7 @@
 </ul>
 
 <h2>Podcasts</h2>
-<p>In the side menu, Podcasts. Its tabs are at the bottom: Subscriptions, Inbox, Queue, Episodes and Discover. At the top: Refresh, Add podcast and, if something is playing, Continue listening; in More options, Import OPML and Export OPML.</p>
+<p>In the side menu, Podcasts. Its tabs are at the bottom: Subscriptions, Inbox, Queue, Episodes and Discover. At the top: Refresh and Add podcast (what is playing is in the mini player, above the tabs); in More options, Import OPML and Export OPML.</p>
 <h3>The tabs</h3>
 <ul>
 <li><strong>Subscriptions</strong>: first your folders, then the podcasts without a folder. The “Order” button sorts them by hand, by name, by unplayed episodes or by latest published. Tap a podcast to see its episodes; there you have “Show all” or “Show only unplayed”, the episode order (newest or oldest first), “Podcast options” and a field to search episodes.</li>
@@ -278,6 +279,45 @@
 <li><strong>News account</strong> (Settings, News): syncs your feeds, read status and favorites with FreshRSS, The Old Reader, Miniflux or Nextcloud News. Each service is explained in that same section. Feedly and Inoreader don't allow it: export your OPML there and import it here.</li>
 </ul>
 
+<h2>Radio</h2>
+<p>In the side menu, Radio. More than 50,000 stations from all over the world from the free <strong>radio-browser.info</strong> directory (no account and no ads), plus any you add by hand. Its tabs are at the bottom: Favourites, Explore, Search, History and Schedule. In More options: Add a station by hand, Update favourites, Import stations (M3U or PLS) and Export favourites (M3U).</p>
+<p>Tapping a station starts playing it and you stay in the list, with what is playing in the mini player at the bottom (so you can try stations one after another). Tapping the one already playing opens its player. If you prefer the player to open every time, turn it on in Settings, Radio.</p>
+<p>Each station says its state first (Playing, Recording, Favourite or whether it was not working at the last check) and then its name, country, genres and quality (for example MP3, 128 kbps).</p>
+<h3>The tabs</h3>
+<ul>
+<li><strong>Favourites</strong>: your stations, with folders as in Podcasts (“New folder”, “Folder options” and “Play this folder”) and the “Order” button: manual, by name or the ones you listen to most. With manual order, each station has Move up one position, Move down one position, Make it first and Make it last.</li>
+<li><strong>Explore</strong>: stations from your country (the “Your country” button changes it), the most listened to in the world, the most voted, trending, what people are listening to now and new ones, plus the By genre, By country and By language lists, with a field to filter them. In a list of stations, the “Order” button chooses most listened to, most voted, trending, by name or best quality. At the end of each list, “Load more stations”. “Go up to” or Back return to the previous level.</li>
+<li><strong>Search</strong>: type the name and press Search (or the keyboard’s search key). The “Filters” button narrows it down by country, language, genre, minimum quality and order, and also lets you search without a name (for example, all jazz stations from France).</li>
+<li><strong>History</strong>: the “Show” button chooses between the stations you listened to, the songs that played (on stations that send the title of what is playing) and your recordings. Each view has its button to clear it and, while recording, “Stop recording”.</li>
+<li><strong>Schedule</strong>: your alarms and scheduled recordings, and the next one. “New alarm” and “New scheduled recording” buttons.</li>
+</ul>
+<h3>Station actions</h3>
+<p>Play (or Go to the player if it is already playing), Add to or Remove from favourites, Move to a folder (in Favourites), Remove from history (in History), Record or Stop recording, Wake me up with this station, Songs that have played, Vote for this station, Station information, Open in browser, Share, Copy the stream address, Create a home screen shortcut and, for stations added by hand, Edit the station. As in the rest of the app, in Settings, TalkBack actions you choose which ones appear when swiping.</p>
+<h3>The radio player</h3>
+<ul>
+<li>At the top, the station name (heading), its state (“Live”, “Paused”, “Connecting…” or “Connection lost. Reconnecting…”) and the song that is playing. TalkBack says the new song when it changes, without moving focus (you can turn this off in Settings, Radio).</li>
+<li><strong>Previous station</strong>, <strong>Play</strong> or Pause and <strong>Next station</strong>: they go through the list you started listening from (or your favourites). Headphone and notification buttons do the same. Long-pressing Play chooses a sleep timer.</li>
+<li>Add to or Remove from favourites, Sleep timer, Record or Stop recording, Search the song online (also copy or share it), Songs that have played, Equalizer (the system one, if the phone has it) and More options (the other station actions and Stop the radio).</li>
+<li>With a keyboard: Space plays or pauses, and Control with the left and right arrows changes station.</li>
+<li>If the connection drops, it reconnects by itself (Settings, Radio, “If the connection drops”). After a long pause, resuming goes back to the live broadcast.</li>
+</ul>
+<h3>Recording</h3>
+<p>“Record” saves the station as it arrives (MP3, AAC or OGG, with no loss of quality) until you stop it or for the minutes you choose. It records separately: you can keep listening to another station, a podcast or a book. While recording there is a notification with “Stop recording”. Recordings are in History, Show: Recordings, with Play, Save to the library, Share, Rename and Delete. Stations that stream in segments (HLS) cannot be recorded, and the app says so.</p>
+<h3>Alarm clock and scheduled recordings</h3>
+<ul>
+<li>In Schedule, or with “Wake me up with this station”. You choose the station, the time (typed with the keyboard), the days (once, every day, Monday to Friday, weekends or the ones you tick), how long it plays or records, and whether it is on.</li>
+<li>The alarm rings even if the phone is idle or locked: the station starts quietly and gets louder over one minute (Settings, Radio), and a screen shows <strong>Turn off the alarm</strong> and <strong>Snooze</strong> (5, 10, 15 or 20 minutes, in Settings). If there is no internet or the station does not respond, the phone’s alarm sound plays so you do not oversleep.</li>
+<li>Each schedule has Turn on or Turn off, Edit, Try it now (alarms) and Delete. They are kept when the phone restarts.</li>
+<li>Android 13 and later ask for permission to show notifications when you set the first alarm; without it the alarm still plays, but without the notice with Turn off and Snooze.</li>
+</ul>
+<h3>Stations by hand, M3U and shortcuts</h3>
+<ul>
+<li><strong>Add a station by hand</strong>: name, stream address (a .pls or .m3u playlist also works: the app gets the address from it), genre and website. It is saved in Favourites.</li>
+<li>From Share in another app, choose <strong>Add to Radio</strong> to add that address.</li>
+<li><strong>Import stations</strong> reads M3U or PLS lists (from other radio apps) and adds them to favourites, with their folders if they have them. <strong>Export favourites</strong> saves them as M3U, which almost every player understands.</li>
+<li><strong>Create a home screen shortcut</strong> puts an icon on the home screen that starts the station with one tap.</li>
+</ul>
+
 <h2>Importing OPML</h2>
 <p>“Import OPML”, in the More options of News or Podcasts, opens the same screen in both cases. The app checks each feed in the file and decides whether it is news or a podcast; then you see the list to review it before importing.</p>
 <ul>
@@ -322,12 +362,13 @@
 <li><strong>Audiobooks and DAISY</strong>: speed, Back and Forward seconds, rewind on resume, headphone buttons, skip silence, play on open and shake to extend the sleep timer.</li>
 <li><strong>Podcasts</strong>: where new episodes go, downloading them, download on Wi-Fi only, how many downloaded episodes are kept per podcast (the oldest are deleted automatically, except favorites and those in the queue), delete the download when finished, continue with the queue, when an episode counts as played, speed, how often to refresh and the podcast account.</li>
 <li><strong>News (RSS)</strong>: how often to refresh, Wi-Fi only, notifications, mark as read on open, oldest first, show only unread in Feeds, when read articles are deleted, what is said about each article, read aloud when opening an article, full article, news sites you subscribe to and the news account.</li>
+<li><strong>Radio</strong>: open the player when you play a station or stay in the list, announce the song that is playing, save the songs, hide stations that do not work, ask before playing on mobile data, what to do if the connection drops, and for the alarm clock, raise the volume gradually and the Snooze minutes.</li>
 <li><strong>Artificial intelligence</strong>: which AI to use, the downloaded AI, use the graphics card, check the AI and your keys.</li>
 <li><strong>Documents</strong>: tables with headers (“Column: value”), image descriptions, split long paragraphs, join PDF lines, text line by line and clear the document cache.</li>
 <li><strong>Library and backup</strong>: watched folders, sync with your server (WebDAV), and export or import a backup with the library, folders, positions, bookmarks, notes, statistics, pronunciation, settings, your news feeds and your podcasts. AI keys and sync account passwords are not included in the backup.</li>
 </ul>
 <h3>TalkBack actions</h3>
-<p>Here you choose, for each place in the app, which actions appear when you swipe up or down with TalkBack and in what order. The places are: books and folders in the library, reader paragraphs, bookmarks and notes, online catalogs, news articles, feeds and folders, podcasts and search results, podcast episodes and podcast folders. Each place says how many actions appear.</p>
+<p>Here you choose, for each place in the app, which actions appear when you swipe up or down with TalkBack and in what order. The places are: books and folders in the library, reader paragraphs, bookmarks and notes, online catalogs, news articles, feeds and folders, podcasts and search results, podcast episodes, podcast folders, radio stations, station folders, songs, recordings, and alarms and scheduled recordings. Each place says how many actions appear.</p>
 <ul>
 <li>Each action is a switch: double-tap it to show it or not.</li>
 <li>Those that appear are sorted with their Move up one position, Move down one position, Move to first and Move to last actions, or by holding.</li>

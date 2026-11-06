@@ -117,7 +117,8 @@ class AccesibilidadTest {
 		if (n.text.isNullOrBlank() && n.contentDescription.isNullOrBlank()) return false
 		var p = n.parent
 		while (p != null) {
-			if (p.isClickable || p.isFocusable || (android.os.Build.VERSION.SDK_INT >= 28 && p.isScreenReaderFocusable)) return false
+			// Un ScrollView es «enfocable» (para el teclado), pero TalkBack sí visita los textos de dentro
+			if (!p.isScrollable && (p.isClickable || p.isFocusable || (android.os.Build.VERSION.SDK_INT >= 28 && p.isScreenReaderFocusable))) return false
 			p = p.parent
 		}
 		return true
@@ -251,6 +252,36 @@ class AccesibilidadTest {
 		}, "https://feeds.npr.org/510289/podcast.xml", "Planet Money")
 		esperar(9000)
 		revisar("Ficha de podcast", 25)
+	}
+
+	/** La Radio: sus pestañas, una lista del directorio, el reproductor y el mini reproductor en las otras secciones. */
+	@Test
+	fun radio() {
+		abrir(intent(com.xebolax.lector.radio.RadioActivity::class.java), 5000)
+		for (m in com.xebolax.lector.radio.RadioListaFragment.PESTANAS) {
+			tocar(es.getString(m.nombre), app.getString(m.nombre))
+			revisar("Radio: ${es.getString(m.nombre)}")
+		}
+		tocar(es.getString(com.xebolax.lector.radio.RadioListaFragment.Modo.EXPLORAR.nombre), app.getString(com.xebolax.lector.radio.RadioListaFragment.Modo.EXPLORAR.nombre))
+		tocar(es.getString(R.string.radio_mas_escuchadas), app.getString(R.string.radio_mas_escuchadas))
+		esperar(9000)
+		revisar("Radio: las más escuchadas", 20)
+		// Una emisora en directo: el reproductor de radio
+		val emisora = com.xebolax.lector.radio.Emisora(uuid = "prueba-bbc", nombre = "BBC World Service",
+			url = "http://stream.live.vc.bbcmedia.co.uk/bbc_world_service", pais = "United Kingdom", codigoPais = "GB", etiquetas = "news,talk", codec = "MP3", bitrate = 56)
+		InstrumentationRegistry.getInstrumentation().runOnMainSync {
+			com.xebolax.lector.radio.Radio.escuchar(app.applicationContext.let { c ->
+				object : android.content.ContextWrapper(c) {
+					override fun startActivity(i: Intent) = super.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+				}
+			}, emisora, abrirPantalla = true)
+		}
+		esperar(9000)
+		revisar("Radio: reproductor")
+		// El mini reproductor, encima de las pestañas de las otras secciones
+		abrir(intent(com.xebolax.lector.rss.RssActivity::class.java), 5000)
+		revisar("Noticias con la radio sonando", 60)
+		InstrumentationRegistry.getInstrumentation().runOnMainSync { com.xebolax.lector.audio.ControlAudio.detener() }
 	}
 
 	// --- El foco vuelve a su sitio al cerrar ventanas ------------------------------------------

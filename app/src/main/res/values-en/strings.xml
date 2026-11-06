@@ -1633,6 +1633,7 @@
 	<string name="radio_buscar_ayuda">Search more than 50,000 stations from around the world by name, country, language or genre.</string>
 	<string name="radio_buscando_emisoras">Searching for stations…</string>
 	<string name="radio_sin_directorio">Could not connect to the station directory (radio-browser.info). Check your internet connection.</string>
+	<string name="radio_buscar_emisoras">Search stations</string>
 	<string name="radio_cargar_mas">Load more stations</string>
 	<string name="radio_vaciar_historial">Clear history</string>
 	<string name="radio_vaciar_canciones">Clear songs</string>
@@ -1831,11 +1832,6 @@
 	<string name="pod_enlace_episodio">Open the episode page</string>
 	<string name="rep_anterior">Previous</string>
 	<string name="rep_siguiente">Next</string>
-	<string name="biblioteca_descargar_enlace">Download from a link</string>
-	<string name="biblioteca_enlace_ayuda">Address of a book or document (EPUB, PDF, DOCX, MP3…)</string>
-	<string name="biblioteca_descargando">Downloading the document…</string>
-	<string name="biblioteca_enlace_no_documento">That address is not a readable document (it is %1$s). To read a web page, use “Open web page”.</string>
-	<string name="biblioteca_enlace_error">Could not download: %1$s</string>
 	<plurals name="pod_errores">
 		<item quantity="one">%d podcast with errors.</item>
 		<item quantity="other">%d podcasts with errors.</item>

@@ -270,52 +270,6 @@ class PrincipalActivity : AppCompatActivity() {
 		}
 	}
 
-	/**
-	 * Descarga un documento de una dirección (un EPUB, un PDF, un MP3 de un
-	 * enlace) a la biblioteca y lo abre. Si la dirección es una página web, lo dice.
-	 */
-	private fun descargarEnlace() {
-		pedirTexto(getString(R.string.biblioteca_descargar_enlace), getString(R.string.biblioteca_enlace_ayuda), teclado = Teclado.DIRECCION) { direccion ->
-			if (direccion.isBlank()) return@pedirTexto
-			val url = direccion.trim().let { if (it.startsWith("http", true)) it else "https://$it" }
-			lifecycleScope.launch {
-				try {
-					val id = conEspera(getString(R.string.biblioteca_descargar_enlace), getString(R.string.biblioteca_descargando)) {
-						withContext(Dispatchers.IO) {
-							val carpeta = File(filesDir, "biblioteca/descargas").apply { mkdirs() }
-							val temporal = File(carpeta, "enlace_${System.currentTimeMillis()}.parte")
-							val tipo = com.xebolax.lector.catalogo.Feed.descargarArchivo(url, temporal, null).orEmpty().lowercase()
-							val nombreUrl = Uri.decode(url.substringBefore('?').substringAfterLast('/')).takeIf { it.contains('.') }
-							val ext = nombreUrl?.substringAfterLast('.')?.lowercase()?.takeIf { Formato.deExtension(it) != Formato.DESCONOCIDO }
-								?: com.xebolax.lector.catalogo.Feed.extension(tipo, url)
-							// Una página web se lee mejor con «Abrir página web» (saca solo el contenido principal)
-							if (tipo.contains("html") && ext in setOf("html", "htm", "")) {
-								temporal.delete()
-								throw IllegalArgumentException(getString(R.string.biblioteca_enlace_no_documento, tipo.substringBefore(';')))
-							}
-							val base = (nombreUrl?.substringBeforeLast('.') ?: "documento").replace(Regex("[\\\\/:*?\"<>|]"), "_").take(80)
-							var destino = File(carpeta, "$base.$ext")
-							var n = 2
-							while (destino.exists()) destino = File(carpeta, "$base ($n).$ext").also { n++ }
-							temporal.renameTo(destino)
-							val formato = Formato.deExtension(destino.extension).takeIf { it != Formato.DESCONOCIDO } ?: Formato.TXT
-							BaseDatos.obtener(this@PrincipalActivity).anadirLibro(Uri.fromFile(destino).toString(), destino.name,
-								base.replace('_', ' ').trim(), "", formato.name, formato.audio, destino.length(), carpetaDestino())
-						}
-					}
-					TareasInicio.completar(this@PrincipalActivity, listOf(id))
-					Abiertos.abrirPantalla(this@PrincipalActivity, id)
-				} catch (e: kotlinx.coroutines.CancellationException) {
-					throw e
-				} catch (e: IllegalArgumentException) {
-					mensaje(getString(R.string.biblioteca_descargar_enlace), e.message.orEmpty())
-				} catch (e: Exception) {
-					mensaje(getString(R.string.biblioteca_descargar_enlace), getString(R.string.biblioteca_enlace_error, e.message ?: e.javaClass.simpleName))
-				}
-			}
-		}
-	}
-
 	/** ¿Están los servicios de Google Play? (sin ellos no hay escáner de Google) */
 	private fun hayPlayServices() = runCatching { packageManager.getApplicationInfo("com.google.android.gms", 0).enabled }.getOrDefault(false)
 
@@ -461,7 +415,6 @@ class PrincipalActivity : AppCompatActivity() {
 				getString(R.string.anadir_archivos) to { elegirArchivos.launch(Formato.TIPOS_MIME) },
 				getString(R.string.anadir_carpeta) to { elegirCarpeta.launch(null) },
 				getString(R.string.abrir_pagina_web) to { abrirWeb() },
-				getString(R.string.biblioteca_descargar_enlace) to { descargarEnlace() },
 				getString(R.string.leer_portapapeles) to { leerPortapapeles() },
 				getString(R.string.escanear_documento) to { elegirEscaner() },
 			))

@@ -1645,6 +1645,7 @@
 	<string name="radio_buscar_ayuda">Busca entre más de 50.000 emisoras de todo el mundo por nombre, país, idioma o género.</string>
 	<string name="radio_buscando_emisoras">Buscando emisoras…</string>
 	<string name="radio_sin_directorio">No se pudo conectar con el directorio de emisoras (radio-browser.info). Comprueba la conexión a internet.</string>
+	<string name="radio_buscar_emisoras">Buscar emisoras</string>
 	<string name="radio_cargar_mas">Cargar más emisoras</string>
 	<string name="radio_vaciar_historial">Vaciar el historial</string>
 	<string name="radio_vaciar_canciones">Vaciar las canciones</string>
@@ -1843,11 +1844,6 @@
 	<string name="pod_enlace_episodio">Abrir la página del episodio</string>
 	<string name="rep_anterior">Anterior</string>
 	<string name="rep_siguiente">Siguiente</string>
-	<string name="biblioteca_descargar_enlace">Descargar desde un enlace</string>
-	<string name="biblioteca_enlace_ayuda">Dirección de un libro o documento (EPUB, PDF, DOCX, MP3…)</string>
-	<string name="biblioteca_descargando">Descargando el documento…</string>
-	<string name="biblioteca_enlace_no_documento">Esa dirección no es un documento que se pueda leer (es %1$s). Para leer una página web, usa «Abrir página web».</string>
-	<string name="biblioteca_enlace_error">No se pudo descargar: %1$s</string>
 	<plurals name="pod_errores">
 		<item quantity="one">%d podcast con errores.</item>
 		<item quantity="other">%d podcasts con errores.</item>

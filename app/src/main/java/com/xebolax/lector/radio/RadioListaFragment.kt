@@ -253,6 +253,7 @@ class RadioListaFragment : Fragment() {
 				val (contenedor, campo) = requireContext().campoTexto(getString(R.string.radio_nombre_buscar), filtro.nombre)
 				campo.imeOptions = EditorInfo.IME_ACTION_SEARCH
 				campo.isSingleLine = true
+				campo.minHeight = dp(requireContext(), 48)
 				contenedor.endIconMode = TextInputLayout.END_ICON_CLEAR_TEXT
 				campo.setOnEditorActionListener { _, accion, _ ->
 					if (accion == EditorInfo.IME_ACTION_SEARCH) {
@@ -270,7 +271,7 @@ class RadioListaFragment : Fragment() {
 				})
 				c.addView(contenedor)
 				c.addView(fila(
-					boton(getString(R.string.buscar)) { buscar() },
+					boton(getString(R.string.radio_buscar_emisoras)) { buscar() },
 					boton(getString(R.string.radio_filtros_x, resumenFiltro())) { elegirFiltros() },
 				))
 			}
@@ -311,6 +312,7 @@ class RadioListaFragment : Fragment() {
 		val (contenedor, campo) = requireContext().campoTexto(pista, inicial)
 		contenedor.endIconMode = TextInputLayout.END_ICON_CLEAR_TEXT
 		campo.isSingleLine = true
+		campo.minHeight = dp(requireContext(), 48)
 		campo.addTextChangedListener(object : TextWatcher {
 			override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
 			override fun onTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
