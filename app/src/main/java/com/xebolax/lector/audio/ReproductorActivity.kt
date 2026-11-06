@@ -141,6 +141,8 @@ class ReproductorActivity : AppCompatActivity() {
 					}
 					is Contenido.Audio -> preparar(l, contenido.libro)
 				}
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
 			} catch (e: Throwable) {
 				Sonidos.sonar(this@ReproductorActivity, Sonidos.Tipo.ERROR)
 				b.capitulo.text = (e as? ExcepcionFormato)?.message ?: getString(R.string.error_abrir, e.message ?: e.javaClass.simpleName)
@@ -158,6 +160,8 @@ class ReproductorActivity : AppCompatActivity() {
 		b.autor.isVisible = e.autor.isNotBlank()
 		b.botonTexto.isVisible = false
 		b.textoSincronizado.isVisible = false
+		// Los marcadores son de los libros de la biblioteca: un episodio o una noticia no los guarda
+		b.botonMarcadores.isVisible = false
 		ControlAudio.conectar(this) {
 			val nuevo = !ControlAudio.esActual(e.id)
 			ControlAudio.cargarExterno(e)
@@ -384,6 +388,7 @@ class ReproductorActivity : AppCompatActivity() {
 			b.autor.text = ext.autor
 			b.autor.isVisible = ext.autor.isNotBlank()
 			avisar(ext.titulo, mostrar = false)
+			invalidateOptionsMenu()
 		}
 		// Los capítulos incrustados del episodio llegan un poco después
 		if ((libroDb?.id ?: 0) < 0 && ControlAudio.idLibro == libroDb?.id && ControlAudio.libro != null && ControlAudio.libro !== libro) {
@@ -443,11 +448,13 @@ class ReproductorActivity : AppCompatActivity() {
 		poner(b.botonTemporizador, when {
 			minutos > 0 -> "$minutos′"
 			minutos == -1 -> getString(R.string.fin_cap_corto)
+			minutos < -1 -> getString(R.string.fin_episodio_corto)
 			else -> getString(R.string.temporizador_corto)
 		})
+		// Al final del capítulo, del episodio o tras N episodios: lo dice como en la lista del temporizador
 		ponerDescripcion(b.botonTemporizador, when {
 			minutos > 0 -> getString(R.string.temporizador_queda, resources.getQuantityString(R.plurals.minutos, minutos, minutos))
-			minutos == -1 -> getString(R.string.temporizador_queda, getString(R.string.al_final_capitulo))
+			minutos < 0 -> getString(R.string.temporizador_queda, nombreTemporizador(minutos))
 			else -> getString(R.string.temporizador)
 		})
 		// Texto sincronizado (DAISY)
@@ -599,7 +606,7 @@ class ReproductorActivity : AppCompatActivity() {
 			append("<li>").append(esc(getString(R.string.velocidad_n, ControlAudio.velocidad()))).append("</li>")
 			val minutos = ControlAudio.minutosTemporizador()
 			if (minutos != 0) append("<li>").append(esc(getString(R.string.temporizador_queda,
-				if (minutos > 0) resources.getQuantityString(R.plurals.minutos, minutos, minutos) else getString(R.string.al_final_capitulo)))).append("</li>")
+				if (minutos > 0) resources.getQuantityString(R.plurals.minutos, minutos, minutos) else nombreTemporizador(minutos)))).append("</li>")
 			if (p.saltarSilencios) append("<li>").append(getString(R.string.saltar_silencios)).append("</li>")
 			if (p.refuerzoVolumen > 0) append("<li>").append(esc(getString(R.string.refuerzo_volumen) + ": +" + p.refuerzoVolumen + " dB")).append("</li>")
 			append("</ul>")
@@ -714,7 +721,7 @@ class ReproductorActivity : AppCompatActivity() {
 			codigo == KeyEvent.KEYCODE_DPAD_RIGHT && evento.isCtrlPressed -> saltar(true)
 			codigo == KeyEvent.KEYCODE_DPAD_UP && evento.isCtrlPressed -> cambiarVelocidad(+5)
 			codigo == KeyEvent.KEYCODE_DPAD_DOWN && evento.isCtrlPressed -> cambiarVelocidad(-5)
-			codigo == KeyEvent.KEYCODE_B && evento.isCtrlPressed -> marcadores()
+			codigo == KeyEvent.KEYCODE_B && evento.isCtrlPressed && (libroDb?.id ?: 0) > 0 -> marcadores()
 			codigo == KeyEvent.KEYCODE_T && evento.isCtrlPressed -> capitulos()
 			codigo == KeyEvent.KEYCODE_G && evento.isCtrlPressed -> irATiempo()
 			else -> return super.onKeyDown(codigo, evento)

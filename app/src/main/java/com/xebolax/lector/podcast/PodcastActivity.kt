@@ -167,7 +167,7 @@ class PodcastActivity : AppCompatActivity() {
 			val r = if (silencioso) Podcasts.actualizarTodos(this@PodcastActivity, avisar = false)
 			else conEspera(getString(R.string.rss_actualizar), getString(R.string.rss_actualizando)) { Podcasts.actualizarTodos(this@PodcastActivity, avisar = false) }
 			val texto = (if (r.nuevos > 0) resources.getQuantityString(R.plurals.pod_nuevos, r.nuevos, r.nuevos) else getString(R.string.pod_sin_nuevos)) +
-				if (r.errores > 0) " " + resources.getQuantityString(R.plurals.rss_errores, r.errores, r.errores) else ""
+				if (r.errores > 0) " " + resources.getQuantityString(R.plurals.pod_errores, r.errores, r.errores) else ""
 			if (!silencioso || r.nuevos > 0) avisar(texto)
 		}
 	}
@@ -176,8 +176,8 @@ class PodcastActivity : AppCompatActivity() {
 	fun anadir() {
 		elegir(getString(R.string.pod_anadir), listOf(
 			getString(R.string.pod_buscar) to { buscar() },
-			getString(R.string.rss_por_direccion) to {
-				pedirTexto(getString(R.string.rss_por_direccion), getString(R.string.pod_direccion_ayuda), teclado = com.xebolax.lector.ui.Teclado.DIRECCION) { t ->
+			getString(R.string.pod_por_direccion) to {
+				pedirTexto(getString(R.string.pod_por_direccion), getString(R.string.pod_direccion_ayuda), teclado = com.xebolax.lector.ui.Teclado.DIRECCION) { t ->
 					if (t.isNotBlank()) suscribirDireccion(t.trim())
 				}
 			},
@@ -221,7 +221,7 @@ class PodcastActivity : AppCompatActivity() {
 			.setMessage(texto.ifBlank { s.titulo })
 			.setPositiveButton(R.string.pod_suscribirse) { _, _ ->
 				lifecycleScope.launch {
-					val url = s.url.ifBlank { runCatching { Podcasts.direccionDe(s.id) }.getOrNull().orEmpty() }
+					val url = s.url.ifBlank { runCatching { Podcasts.direccionDe(s.id) }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull().orEmpty() }
 					if (url.isBlank()) return@launch avisar(getString(R.string.pod_sin_rss))
 					suscribirDireccion(url, s.titulo, s.autor)
 				}

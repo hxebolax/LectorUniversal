@@ -215,6 +215,9 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 		)
 	}
 
+	/** Si se instala una versión anterior de la app, la base de datos (más nueva) se deja como está, sin cerrar la app. */
+	override fun onDowngrade(db: SQLiteDatabase, antes: Int, ahora: Int) = Unit
+
 	override fun onUpgrade(db: SQLiteDatabase, anterior: Int, nueva: Int) {
 		// Una migración por versión
 		if (anterior < 2) crearSeriesYColecciones(db)

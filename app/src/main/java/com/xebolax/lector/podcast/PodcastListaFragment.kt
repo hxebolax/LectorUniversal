@@ -257,8 +257,11 @@ class PodcastListaFragment : Fragment() {
 				})
 			}
 			Modo.DESCARGAS -> anadir(boton(getString(R.string.pod_borrar_escuchados)) {
-				val n = Podcasts.borrarEscuchados(requireContext())
-				a?.avisar(resources.getQuantityString(R.plurals.pod_descargas_borradas, n, n))
+				val c = requireContext().applicationContext
+				viewLifecycleOwner.lifecycleScope.launch {
+					val n = withContext(Dispatchers.IO) { Podcasts.borrarEscuchados(c) }
+					a?.avisar(resources.getQuantityString(R.plurals.pod_descargas_borradas, n, n))
+				}
 			})
 			Modo.DESCUBRIR -> if (resultados != null || episodiosEncontrados != null) {
 				anadir(boton(getString(R.string.pod_nueva_busqueda)) { a?.buscar() })
@@ -355,8 +358,13 @@ class PodcastListaFragment : Fragment() {
 	private fun cargarMasEscuchados() {
 		b.estado.text = getString(R.string.cargando)
 		viewLifecycleOwner.lifecycleScope.launch {
-			sugerencias = runCatching { Podcasts.masEscuchados(categoria) }.getOrElse {
-				b.estado.text = getString(R.string.error_catalogo, it.message.orEmpty())
+			sugerencias = try {
+				Podcasts.masEscuchados(categoria)
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				// Se salió de la pestaña mientras cargaba: ya no hay vista
+				_b?.estado?.text = getString(R.string.error_catalogo, e.message.orEmpty())
 				return@launch
 			}
 			recargar()
@@ -659,7 +667,7 @@ class PodcastListaFragment : Fragment() {
 		if (e.enCola) {
 			if (modo == Modo.COLA) {
 				r += getString(R.string.pod_subir_cola) to { db.moverEnCola(e.id, paso = -1); a.avisar(getString(R.string.pod_posicion_cola, (e.cola - 1).coerceAtLeast(1))) }
-				r += getString(R.string.pod_bajar_cola) to { db.moverEnCola(e.id, paso = 1); a.avisar(getString(R.string.pod_posicion_cola, e.cola + 1)) }
+				r += getString(R.string.pod_bajar_cola) to { db.moverEnCola(e.id, paso = 1); a.avisar(getString(R.string.pod_posicion_cola, (e.cola + 1).coerceAtMost(db.cola().size))) }
 				r += getString(R.string.pod_al_principio) to { db.moverEnCola(e.id, aPosicion = 0); a.avisar(getString(R.string.pod_posicion_cola, 1)) }
 				r += getString(R.string.pod_al_final) to { db.moverEnCola(e.id, aPosicion = Int.MAX_VALUE); a.avisar(getString(R.string.hecho)) }
 			}
@@ -797,7 +805,7 @@ class PodcastListaFragment : Fragment() {
 					val d = listOfNotNull(
 						p.autor.takeIf { it.isNotBlank() },
 						resources.getQuantityString(R.plurals.pod_n_sin_escuchar, p.sinEscuchar, p.sinEscuchar),
-						getString(R.string.rss_pausada_corto).takeIf { p.pausado },
+						getString(R.string.pod_pausado_corto).takeIf { p.pausado },
 						getString(R.string.rss_con_error).takeIf { p.error.isNotBlank() },
 					).joinToString(", ")
 					Triple(p.titulo, d, p.titulo + ", " + d)

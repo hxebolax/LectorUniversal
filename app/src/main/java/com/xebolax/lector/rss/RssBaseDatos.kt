@@ -175,6 +175,9 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 		if (!tieneColumna(db, "articulos", "palabras")) db.execSQL("ALTER TABLE articulos ADD COLUMN palabras INTEGER NOT NULL DEFAULT 0")
 	}
 
+	/** Si se instala una versión anterior de la app, la base de datos (más nueva) se deja como está, sin cerrar la app. */
+	override fun onDowngrade(db: SQLiteDatabase, antes: Int, ahora: Int) = Unit
+
 	override fun onUpgrade(db: SQLiteDatabase, antes: Int, ahora: Int) {
 		// Papelera: 1 = en la papelera; 2 = borrado (se queda oculto para que no vuelva al actualizar)
 		if (antes < 3) db.execSQL("ALTER TABLE articulos ADD COLUMN papelera INTEGER NOT NULL DEFAULT 0")

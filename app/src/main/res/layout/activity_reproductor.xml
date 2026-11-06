@@ -92,6 +92,7 @@
 		<com.google.android.material.button.MaterialButton
 			android:id="@+id/boton_reproducir"
 			style="@style/Boton.Icono.Grande.Principal"
+			android:contentDescription="@string/reproducir"
 			app:icon="@drawable/ic_reproducir" />
 
 		<com.google.android.material.button.MaterialButton
@@ -112,6 +113,7 @@
 		<com.google.android.material.button.MaterialButton
 			android:id="@+id/boton_anterior"
 			style="@style/Boton.Icono.Grande"
+			android:contentDescription="@string/rep_anterior"
 			app:icon="@drawable/ic_anterior_largo" />
 
 		<com.xebolax.lector.lectura.ControlAjustable
@@ -126,6 +128,7 @@
 		<com.google.android.material.button.MaterialButton
 			android:id="@+id/boton_siguiente"
 			style="@style/Boton.Icono.Grande"
+			android:contentDescription="@string/rep_siguiente"
 			app:icon="@drawable/ic_siguiente_largo" />
 	</LinearLayout>
 

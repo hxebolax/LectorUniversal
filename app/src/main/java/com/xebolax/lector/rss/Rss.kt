@@ -122,8 +122,11 @@ object Rss {
 		fuentes.map { f ->
 			async(Dispatchers.IO) {
 				limite.withPermit {
-					val lista = runCatching { actualizar(c, f) }.getOrElse { errores++; emptyList() }
+					val r = runCatching { actualizar(c, f) }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+					val lista = r.getOrDefault(emptyList())
+					// Los contadores se tocan desde varias fuentes a la vez: dentro del bloqueo
 					synchronized(avisos) {
+						if (r.isFailure) errores++
 						nuevos += lista.size
 						if (f.avisar) lista.forEach { avisos += f to it }
 						hechas++
@@ -132,9 +135,12 @@ object Rss {
 				}
 			}
 		}.awaitAll()
-		db.limpiar(prefs(c).getString("rss_dias", "30")?.toIntOrNull() ?: 30)
-		// Reglas y alertas con los artículos que acaban de llegar
-		runCatching { Reglas.aplicar(c, db.recibidosDesde(inicio)) }
+		// Limpiar y aplicar reglas toca la base de datos: fuera del hilo principal
+		withContext(Dispatchers.IO) {
+			db.limpiar(prefs(c).getString("rss_dias", "30")?.toIntOrNull() ?: 30)
+			// Reglas y alertas con los artículos que acaban de llegar
+			runCatching { Reglas.aplicar(c, db.recibidosDesde(inicio)) }
+		}
 		prefs(c).edit().putLong("rss_ultima", System.currentTimeMillis()).apply()
 		Resultado(nuevos, errores, avisos)
 	}

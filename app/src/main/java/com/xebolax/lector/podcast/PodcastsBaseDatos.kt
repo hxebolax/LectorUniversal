@@ -186,6 +186,9 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 		db.execSQL("CREATE TABLE IF NOT EXISTS carpetas (nombre TEXT PRIMARY KEY COLLATE NOCASE, orden INTEGER NOT NULL DEFAULT 0)")
 	}
 
+	/** Si se instala una versión anterior de la app, la base de datos (más nueva) se deja como está, sin cerrar la app. */
+	override fun onDowngrade(db: SQLiteDatabase, antes: Int, ahora: Int) = Unit
+
 	override fun onUpgrade(db: SQLiteDatabase, antes: Int, ahora: Int) {
 		// sinc = 1: lo escuchado ha cambiado y falta enviarlo al servidor (gpodder)
 		if (antes < 2) db.execSQL("ALTER TABLE episodios ADD COLUMN sinc INTEGER NOT NULL DEFAULT 0")

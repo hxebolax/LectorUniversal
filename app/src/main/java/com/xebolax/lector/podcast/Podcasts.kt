@@ -176,16 +176,22 @@ object Podcasts {
 		lista.map { p ->
 			async(Dispatchers.IO) {
 				limite.withPermit {
-					val ids = runCatching { actualizar(c, p) }.getOrElse { errores++; emptyList() }
+					val r = runCatching { actualizar(c, p) }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+					val ids = r.getOrDefault(emptyList())
+					// Los contadores se tocan desde varios podcasts a la vez: dentro del bloqueo
 					synchronized(avisos) {
+						if (r.isFailure) errores++
 						nuevos += ids.size
 						if (p.avisar) ids.forEach { avisos += p to it }
 					}
 				}
 			}
 		}.awaitAll()
-		comprobarDescargas(c)
-		conservarUltimos(c)
+		// Comprobar descargas y borrar los antiguos toca disco y base de datos: fuera del hilo principal
+		withContext(Dispatchers.IO) {
+			comprobarDescargas(c)
+			conservarUltimos(c)
+		}
 		if (avisar && avisos.isNotEmpty()) notificar(c, avisos)
 		prefs(c).edit().putLong("pod_ultima", System.currentTimeMillis()).apply()
 		Resultado(nuevos, errores, avisos)
@@ -444,7 +450,7 @@ object Podcasts {
 		if (datos.isNotBlank()) append("<p>").append(escapar(datos)).append("</p>")
 		val descripcion = if (e.descripcion.contains('<')) e.descripcion else "<p>" + escapar(e.descripcion).replace("\n", "<br>") + "</p>"
 		append(runCatching { enlazarTiempos(descripcion, e.id, e.duracion) }.getOrDefault(descripcion))
-		if (e.enlace.isNotBlank()) append("<p><a href=\"").append(escapar(e.enlace)).append("\">").append(escapar(c.getString(R.string.rss_enlace_original))).append("</a></p>")
+		if (e.enlace.isNotBlank()) append("<p><a href=\"").append(escapar(e.enlace)).append("\">").append(escapar(c.getString(R.string.pod_enlace_episodio))).append("</a></p>")
 		append("</body></html>")
 	}
 
@@ -456,7 +462,7 @@ object Podcasts {
 			if (e.duracion > 0) com.xebolax.lector.ui.tiempoCorto(e.duracion) else "").filter { it.isNotBlank() }.joinToString(" · ")
 		if (datos.isNotBlank()) append("<p>").append(escapar(datos)).append("</p>")
 		append(if (e.descripcion.contains('<')) e.descripcion else "<p>" + escapar(e.descripcion).replace("\n", "<br>") + "</p>")
-		if (e.enlace.isNotBlank()) append("<p><a href=\"").append(escapar(e.enlace)).append("\">").append(escapar(c.getString(R.string.rss_enlace_original))).append("</a></p>")
+		if (e.enlace.isNotBlank()) append("<p><a href=\"").append(escapar(e.enlace)).append("\">").append(escapar(c.getString(R.string.pod_enlace_episodio))).append("</a></p>")
 		append("</body></html>")
 	}
 

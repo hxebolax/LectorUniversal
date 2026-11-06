@@ -65,7 +65,9 @@ object Abiertos {
 	/** Abre un libro en la pantalla que le corresponde (lector de texto o reproductor). */
 	fun abrirPantalla(contexto: Context, libro: Libro) {
 		val destino = if (libro.audio) ReproductorActivity::class.java else LectorActivity::class.java
-		contexto.startActivity(Intent(contexto, destino).putExtra(LectorActivity.EXTRA_LIBRO, libro.id))
+		// Desde el widget (sin pantalla abierta) hace falta una tarea nueva
+		contexto.startActivity(Intent(contexto, destino).putExtra(LectorActivity.EXTRA_LIBRO, libro.id)
+			.apply { if (contexto !is android.app.Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
 	}
 
 	fun abrirPantalla(contexto: Context, id: Long) {

@@ -162,7 +162,14 @@ object RssAcciones {
 			alCambiar()
 		}
 		if (articulo.enlace.isNotBlank() && !articulo.esPodcast) r += a.getString(R.string.rss_descargar_completo) to { descargarCompleto(a, articulo, alCambiar) }
-		if (articulo.enlace.isNotBlank()) r += a.getString(R.string.abrir_navegador) to { abrirNavegador(a, articulo.enlace) }
+		if (articulo.enlace.isNotBlank()) r += a.getString(R.string.abrir_navegador) to {
+			// Leerlo en la web cuenta como leído (si así está en Ajustes, Noticias)
+			if (Rss.prefs(a).getBoolean("rss_marcar_al_abrir", true) && !articulo.leido) {
+				db.marcarLeidos(listOf(articulo.id))
+				alCambiar()
+			}
+			abrirNavegador(a, articulo.enlace)
+		}
 		r += a.getString(R.string.compartir) to { compartir(a, articulo) }
 		// Si ya está en la biblioteca, la acción es abrirlo (no volver a guardarlo)
 		r += (if (enBiblioteca(a, articulo) != null) a.getString(R.string.rss_abrir_en_biblioteca) else a.getString(R.string.rss_guardar_biblioteca)) to {

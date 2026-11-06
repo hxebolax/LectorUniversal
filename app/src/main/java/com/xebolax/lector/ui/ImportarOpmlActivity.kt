@@ -241,7 +241,9 @@ class ImportarOpmlActivity : AppCompatActivity() {
 				conEspera(getString(R.string.rss_importar_opml), resources.getQuantityString(R.plurals.pod_importando, elegidas.size, elegidas.size)) {
 					for (f in elegidas) {
 						if (f.podcast) {
-							if (pod.podcastPorUrl(f.url) == null && runCatching { Podcasts.suscribir(this@ImportarOpmlActivity, f.url, f.titulo, carpeta = f.carpeta) }.isSuccess) podcasts++
+							// Cancelar en la ventana de espera para el bucle (no solo el podcast que se estaba añadiendo)
+							if (pod.podcastPorUrl(f.url) == null && runCatching { Podcasts.suscribir(this@ImportarOpmlActivity, f.url, f.titulo, carpeta = f.carpeta) }
+									.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.isSuccess) podcasts++
 						} else if (rss.fuentePorUrl(f.url) == null) {
 							withContext(Dispatchers.IO) { rss.anadirFuente(f.url, f.titulo, f.sitio, f.carpeta) }
 							noticias++

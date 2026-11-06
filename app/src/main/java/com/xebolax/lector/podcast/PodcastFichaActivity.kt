@@ -120,6 +120,8 @@ class PodcastFichaActivity : AppCompatActivity() {
 				construirCabecera()
 				b.filtroContenedor.isVisible = c.elementos.size > 10
 				mostrar()
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
 			} catch (e: Exception) {
 				b.estado.text = getString(R.string.error_catalogo, e.message.orEmpty())
 				avisar(getString(R.string.error_catalogo, e.message.orEmpty()))

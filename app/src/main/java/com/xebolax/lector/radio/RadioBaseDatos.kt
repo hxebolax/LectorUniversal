@@ -87,6 +87,9 @@ class RadioBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "radi
 		)
 	}
 
+	/** Si se instala una versión anterior de la app, la base de datos (más nueva) se deja como está, sin cerrar la app. */
+	override fun onDowngrade(db: SQLiteDatabase, antes: Int, ahora: Int) = Unit
+
 	override fun onUpgrade(db: SQLiteDatabase, antes: Int, ahora: Int) = Unit
 
 	private fun <T> lista(sql: String, args: Array<String>? = null, fila: (android.database.Cursor) -> T?): List<T> =

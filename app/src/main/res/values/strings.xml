@@ -1835,4 +1835,21 @@
 		<item quantity="one">¿Borrar la carpeta %1$s y quitar su emisora de favoritas?</item>
 		<item quantity="other">¿Borrar la carpeta %1$s y quitar sus %2$d emisoras de favoritas?</item>
 	</plurals>
+
+	<!-- Correcciones de la revisión (1.0.8) -->
+	<string name="fin_episodio_corto">Fin ep.</string>
+	<string name="pod_pausado_corto">pausado</string>
+	<string name="pod_por_direccion">Por dirección (la del RSS del podcast o la de su web)</string>
+	<string name="pod_enlace_episodio">Abrir la página del episodio</string>
+	<string name="rep_anterior">Anterior</string>
+	<string name="rep_siguiente">Siguiente</string>
+	<string name="biblioteca_descargar_enlace">Descargar desde un enlace</string>
+	<string name="biblioteca_enlace_ayuda">Dirección de un libro o documento (EPUB, PDF, DOCX, MP3…)</string>
+	<string name="biblioteca_descargando">Descargando el documento…</string>
+	<string name="biblioteca_enlace_no_documento">Esa dirección no es un documento que se pueda leer (es %1$s). Para leer una página web, usa «Abrir página web».</string>
+	<string name="biblioteca_enlace_error">No se pudo descargar: %1$s</string>
+	<plurals name="pod_errores">
+		<item quantity="one">%d podcast con errores.</item>
+		<item quantity="other">%d podcasts con errores.</item>
+	</plurals>
 </resources>

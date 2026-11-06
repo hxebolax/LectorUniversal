@@ -102,7 +102,7 @@ object AccionesLibro {
 		}
 		lista += if (l.favorito) a.getString(R.string.quitar_favoritos) to { db.cambiarFavorito(l.id, false); a.avisar(a.getString(R.string.quitado_favoritos)) }
 		else a.getString(R.string.anadir_favoritos) to { db.cambiarFavorito(l.id, true); a.avisar(a.getString(R.string.anadido_favoritos)) }
-		if (l.estado != Estado.TERMINADO) lista += a.getString(R.string.marcar_terminado) to { db.cambiarEstado(l.id, Estado.TERMINADO) }
+		if (l.estado != Estado.TERMINADO) lista += a.getString(R.string.marcar_terminado) to { db.cambiarEstado(l.id, Estado.TERMINADO); a.avisar(a.getString(R.string.hecho)) }
 		if (l.estado != Estado.NUEVO) lista += a.getString(R.string.marcar_no_leido) to {
 			a.confirmar(a.getString(R.string.confirmar_no_leido), a.getString(R.string.marcar_no_leido)) { db.cambiarEstado(l.id, Estado.NUEVO) }
 		}
@@ -174,6 +174,7 @@ object AccionesLibro {
 			.setView(formulario)
 			.setPositiveButton(R.string.guardar) { _, _ ->
 				BaseDatos.obtener(a).renombrar(l.id, campoTitulo.text.toString().trim(), campoAutor.text.toString().trim())
+				a.avisar(a.getString(R.string.guardado))
 			}
 			.setNegativeButton(R.string.cancelar, null)
 			.show()
@@ -216,17 +217,24 @@ object AccionesLibro {
 			a.getString(R.string.abrir) to alAbrir,
 			a.getString(R.string.renombrar) to {
 				a.pedirTexto(a.getString(R.string.renombrar), a.getString(R.string.nombre), c.nombre) { nombre ->
-					if (nombre.isNotBlank()) db.renombrarCarpeta(c.id, nombre)
+					if (nombre.isNotBlank()) {
+						db.renombrarCarpeta(c.id, nombre)
+						a.avisar(a.getString(R.string.carpeta_renombrada, nombre.trim()))
+					}
 				}
 			},
 			a.getString(R.string.nueva_subcarpeta) to {
 				a.pedirTexto(a.getString(R.string.nueva_subcarpeta), a.getString(R.string.nombre)) { nombre ->
-					if (nombre.isNotBlank()) db.crearCarpeta(nombre, c.id)
+					if (nombre.isNotBlank()) {
+						db.crearCarpeta(nombre, c.id)
+						a.avisar(a.getString(R.string.carpeta_creada, nombre.trim()))
+					}
 				}
 			},
 			a.getString(R.string.mover_carpeta) to {
 				elegirCarpeta(a, a.getString(R.string.mover_carpeta), c.id) { destino ->
 					if (!db.moverCarpeta(c.id, destino)) a.avisar(a.getString(R.string.no_mover_dentro))
+					else a.avisar(a.getString(R.string.movido_a, if (destino == null) a.getString(R.string.biblioteca_raiz) else db.rutaCarpeta(destino)))
 				}
 			},
 			a.getString(R.string.borrar_carpeta) to {
