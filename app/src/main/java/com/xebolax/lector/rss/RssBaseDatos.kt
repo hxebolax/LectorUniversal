@@ -495,8 +495,8 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 
 	private fun orden(antiguosPrimero: Boolean) = if (antiguosPrimero) "a.fecha ASC, a.id ASC" else "a.fecha DESC, a.id DESC"
 
-	fun sinLeer(antiguosPrimero: Boolean = false, categoria: String? = null): List<Articulo> =
-		if (categoria == null) consulta("a.leido = 0", emptyArray(), orden(antiguosPrimero))
+	fun sinLeer(antiguosPrimero: Boolean = false, categoria: String? = null, limite: Int = 1000): List<Articulo> =
+		if (categoria == null) consulta("a.leido = 0", emptyArray(), orden(antiguosPrimero), limite)
 		else consulta("a.leido = 0 AND f.categoria = ?", arrayOf(categoria), orden(antiguosPrimero))
 
 	fun deFuente(fuente: Long, soloSinLeer: Boolean, antiguosPrimero: Boolean = false): List<Articulo> =
@@ -548,6 +548,9 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 		avisar()
 	}
 
+	/** Para las estadísticas: cuántos artículos cumplen una condición, y cuántas fuentes hay. */
+	fun contarArticulos(donde: String): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM articulos WHERE $donde", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+	fun contarFuentes(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM fuentes", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
 	fun contarSinLeer(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM articulos WHERE leido = 0 AND papelera = 0", null).use { c ->
 		if (c.moveToFirst()) c.getInt(0) else 0
 	}

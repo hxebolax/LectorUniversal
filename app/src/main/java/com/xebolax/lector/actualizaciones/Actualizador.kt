@@ -8,6 +8,8 @@ import android.util.Log
 import com.xebolax.lector.BuildConfig
 import com.xebolax.lector.datos.Preferencias
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -19,7 +21,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-/** Versión publicada en el servidor (version.json). */
+/** Versión publicada en el servidor (version.json) o en GitHub (la última release). */
 data class VersionPublicada(
 	val version: String,
 	val versionCode: Int,
@@ -29,14 +31,21 @@ data class VersionPublicada(
 	val fecha: String,
 	val notas: String,
 	val base: String,
+	/** Dirección del APK si no es base/archivo (GitHub). */
+	val urlDirecta: String = "",
+	/** De dónde viene, para decirlo al ofrecerla: el servidor o «GitHub». */
+	val origen: String = "",
 ) {
-	val url: String get() = "$base/$archivo"
+	val url: String get() = urlDirecta.ifEmpty { "$base/$archivo" }
 }
 
 /**
- * Actualizaciones desde el servidor propio, como en AdultHub:
+ * Actualizaciones desde el servidor propio, desde GitHub, desde los dos (la
+ * versión más nueva; si uno no responde, el otro) o desde una dirección
+ * personalizada (Ajustes > General > Actualizaciones):
  *
- * 1. Se lee `version.json` y se compara con la versión instalada.
+ * 1. Se lee `version.json` (o la última release de GitHub, con su
+ *    version.json adjunto si lo tiene) y se compara con la versión instalada.
  * 2. Se descarga `LectorUniversal_v<versión>.apk` a la caché de la app.
  * 3. Se comprueba que el archivo es el publicado (tamaño y SHA-256) y que es
  *    Lector Universal, más nueva y firmada con la MISMA clave que la instalada. Android
@@ -79,17 +88,106 @@ object Actualizador {
 		return 0
 	}
 
-	/** Lee version.json del servidor (con reintentos si la red falla). Lanza excepción si no se puede. */
+	/**
+	 * La versión publicada en la fuente elegida en Ajustes (con un reintento si
+	 * la red falla). Con «Los dos», la más nueva de las que respondan. Lanza
+	 * excepción si no se puede leer ninguna.
+	 */
 	suspend fun versionPublicada(contexto: Context): VersionPublicada = withContext(Dispatchers.IO) {
-		val base = urlBase(contexto)
-		// Dos intentos cortos: es un archivo diminuto y quien busca a mano está esperando
+		val p = Preferencias(contexto)
+		val servidor = urlBase(contexto)
+		when (p.fuenteActualizaciones) {
+			"servidor" -> conReintento { leerVersion(servidor) }
+			"github" -> conReintento { leerGitHub(BuildConfig.REPO_GITHUB) }
+			"personalizada" -> {
+				val url = p.urlPersonalizada
+				require(url.startsWith("http")) { "No hay dirección personalizada para las actualizaciones. Escríbela en Ajustes, General." }
+				val repo = repoDeGitHub(url)
+				conReintento { if (repo != null) leerGitHub(repo) else leerVersion(url) }
+			}
+			else -> {
+				// Las dos a la vez; vale la que responda y, si responden las dos, la más nueva
+				val pedidas = listOf(
+					async { runCatching { conReintento { leerVersion(servidor) } } },
+					async { runCatching { conReintento { leerGitHub(BuildConfig.REPO_GITHUB) } } },
+				).awaitAll()
+				pedidas.mapNotNull { it.getOrNull() }.maxWithOrNull(::compararPublicadas)
+					?: throw (pedidas.first().exceptionOrNull() ?: IllegalStateException())
+			}
+		}
+	}
+
+	/** Más nueva: por versionCode si las dos lo dicen; si no, por el número de versión. */
+	private fun compararPublicadas(a: VersionPublicada, b: VersionPublicada): Int =
+		if (a.versionCode > 0 && b.versionCode > 0) a.versionCode.compareTo(b.versionCode) else compararVersiones(a.version, b.version)
+
+	/** Dos intentos cortos: es un archivo diminuto y quien busca a mano está esperando. */
+	private suspend fun <T> conReintento(leer: () -> T): T {
 		try {
-			return@withContext leerVersion(base)
+			return leer()
 		} catch (e: IOException) {
-			Log.w(ETIQUETA, "No se pudo leer version.json", e)
+			Log.w(ETIQUETA, "No se pudo leer la versión publicada", e)
 			delay(1500)
 		}
-		leerVersion(base)
+		return leer()
+	}
+
+	/** «https://github.com/usuario/repositorio» → «usuario/repositorio» (null si no es de GitHub). */
+	fun repoDeGitHub(url: String): String? =
+		Regex("^https?://(?:www\\.)?github\\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\\.git)?(?:/.*)?$").find(url.trim())
+			?.let { "${it.groupValues[1]}/${it.groupValues[2]}" }
+
+	/**
+	 * La última release publicada de un repositorio de GitHub: su etiqueta (v1.2.3),
+	 * sus notas y el APK adjunto (tamaño y SHA-256 que calcula GitHub). Si la release
+	 * lleva también un version.json, de él salen el versionCode y las novedades.
+	 */
+	private fun leerGitHub(repo: String): VersionPublicada {
+		val c = conexion("https://api.github.com/repos/$repo/releases/latest", conectar = 8_000)
+		c.setRequestProperty("Accept", "application/vnd.github+json")
+		c.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+		val o = try {
+			when (val codigo = c.responseCode) {
+				200 -> JSONObject(c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() })
+				404 -> throw IllegalStateException("GitHub no tiene versiones publicadas en $repo.")
+				403, 429 -> throw IOException("GitHub no deja consultar más por ahora (límite de peticiones). Inténtalo dentro de un rato.")
+				else -> throw IllegalStateException("GitHub respondió $codigo.")
+			}
+		} finally {
+			c.disconnect()
+		}
+		val adjuntos = o.optJSONArray("assets") ?: org.json.JSONArray()
+		val lista = (0 until adjuntos.length()).map { adjuntos.getJSONObject(it) }
+		val apk = lista.firstOrNull { Regex("[A-Za-z0-9._-]+\\.apk").matches(it.optString("name")) }
+			?: throw IllegalStateException("La última versión de GitHub no trae el archivo de la app (APK).")
+		val urlApk = apk.optString("browser_download_url")
+		require(urlApk.startsWith("https://github.com/")) { "La dirección del APK de GitHub no es válida." }
+		// version.json adjunto (lo sube publicar_actualizacion.ps1): versionCode y novedades
+		val json = lista.firstOrNull { it.optString("name") == "version.json" }?.let { a ->
+			runCatching {
+				val cj = conexion(a.optString("browser_download_url"), conectar = 8_000)
+				try {
+					if (cj.responseCode == 200) JSONObject(cj.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }) else null
+				} finally {
+					cj.disconnect()
+				}
+			}.getOrNull()
+		}
+		val version = json?.optString("version")?.trim()?.takeIf { it.isNotEmpty() } ?: o.optString("tag_name").trim().removePrefix("v").removePrefix("V")
+		require(version.isNotEmpty()) { "La última versión de GitHub no dice su número." }
+		val digest = apk.optString("digest").takeIf { it.startsWith("sha256:") }?.removePrefix("sha256:")
+		return VersionPublicada(
+			version = version,
+			versionCode = json?.optInt("versionCode", 0) ?: 0,
+			archivo = apk.optString("name"),
+			sha256 = (digest ?: json?.optString("sha256")).orEmpty().trim().lowercase(),
+			tamano = apk.optLong("size", 0L),
+			fecha = o.optString("published_at").take(10),
+			notas = json?.optString("notas")?.trim()?.takeIf { it.isNotEmpty() } ?: o.optString("body").trim(),
+			base = "https://github.com/$repo",
+			urlDirecta = urlApk,
+			origen = "GitHub",
+		)
 	}
 
 	private fun leerVersion(base: String): VersionPublicada {
@@ -111,6 +209,7 @@ object Actualizador {
 				fecha = o.optString("date"),
 				notas = o.optString("notas").trim(),
 				base = base,
+				origen = runCatching { URL(base).host }.getOrDefault(base),
 			)
 		} finally {
 			c.disconnect()

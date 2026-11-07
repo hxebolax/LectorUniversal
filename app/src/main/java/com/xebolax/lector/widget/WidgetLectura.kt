@@ -13,7 +13,7 @@ import com.xebolax.lector.audio.ReproductorActivity
 import com.xebolax.lector.lectura.Abiertos
 import com.xebolax.lector.lectura.LectorActivity
 import com.xebolax.lector.modelo.Contenido
-import com.xebolax.lector.ui.PrincipalActivity
+import com.xebolax.lector.ui.PortadaActivity
 import com.xebolax.lector.voz.LectorVoz
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,11 +51,11 @@ class WidgetLectura : AppWidgetProvider() {
 			v.setTextViewText(R.id.widget_titulo, titulo)
 			val detalle = libro?.let { contexto.getString(R.string.porcentaje_n, it.progreso.toInt()) }.orEmpty()
 			v.setTextViewText(R.id.widget_detalle, detalle)
-			// Seguir leyendo: el libro en su pantalla; sin libros, la app
+			// Seguir leyendo: el libro en su pantalla; sin libros, la Portada
 			val abrir = if (libro != null) {
 				val destino = if (libro.audio) ReproductorActivity::class.java else LectorActivity::class.java
 				Intent(contexto, destino).putExtra(LectorActivity.EXTRA_LIBRO, libro.id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-			} else Intent(contexto, PrincipalActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+			} else Intent(contexto, PortadaActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 			val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 			v.setOnClickPendingIntent(R.id.widget_abrir, PendingIntent.getActivity(contexto, 1, abrir, flags))
 			v.setContentDescription(R.id.widget_abrir, contexto.getString(R.string.widget_seguir_leyendo_x, titulo))

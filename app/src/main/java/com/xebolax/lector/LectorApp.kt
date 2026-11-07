@@ -34,6 +34,8 @@ class LectorApp : Application() {
 		aplicarTema(Preferencias(this).temaApp)
 		LectorVoz.iniciar(this)
 		ControlAudio.iniciar(this)
+		// Estadísticas: tiempo escuchando podcasts, noticias y radio
+		com.xebolax.lector.datos.Actividad.empezar(this)
 		// El widget dice el libro y si está leyendo
 		var ultimo: Pair<Long, Boolean>? = null
 		LectorVoz.registrar { e ->

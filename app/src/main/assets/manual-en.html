@@ -42,16 +42,27 @@
 <li><strong>Finish (N pages)</strong> says how many you have. When you tap it, the document is created with the text of all the pages and opens.</li>
 </ul>
 
-<h2>The main window and the side menu</h2>
+<h2>Home, the sections and the side menu</h2>
 <p>The app has four sections that work the same way: <strong>Library</strong>, <strong>Podcasts</strong>, <strong>News</strong> and <strong>Radio</strong>. In all of them, the “Open menu” button is at the top left and the section's tabs are at the bottom, always all visible.</p>
-<p><strong>Mini player</strong>: if something is playing or paused (a book or an article read aloud, an audiobook, an episode or the radio), a line appears above the tabs with what is playing and its state, “Pause” or “Resume” and “Stop”. Tapping what is playing takes you back to its screen. It stays there when you change section, so you can listen to the radio while you browse the news. Only one thing plays at a time: if you start something else, the mini player switches to it. The notification and the lock screen also always open what is playing.</p>
-<p>The side menu has the four sections at the top; the one you are using says “selected” and, when you open the menu, focus goes straight to it. Below are Reading statistics, Settings, User guide and About. If you choose the section you are already in, you go back to its first tab. Back closes the menu.</p>
+<h3>Home</h3>
+<p>This is the screen the app opens with: the most useful things from each section on a single screen, in the order you choose in Settings, Home and sections. Each section starts with a heading with its name and a summary (for example, “Podcasts, 3 new episodes”); with TalkBack's heading navigation you jump from one to the next, and double-tapping the heading opens the whole section (“See all”). Under each heading:</p>
 <ul>
-<li><strong>Reading statistics</strong>: time read today, in the last 7 days, this month and in total, your streak of consecutive days, books finished and in progress, and the most read.</li>
+<li><strong>Library</strong>: the books you are reading, with their progress. Double-tap to open one; the TalkBack actions are the same as in the Library (read aloud, information…).</li>
+<li><strong>Podcasts</strong>: the episodes you left halfway, the queued ones and the new ones. Double-tap to listen; the actions add to or remove from the queue, mark as played and remove from New.</li>
+<li><strong>News</strong>: the latest unread articles. Double-tap to read one; the actions are the same as in News.</li>
+<li><strong>Radio</strong>: your favourite stations (or, if you have none yet, the ones you played last). Double-tap to listen; the one playing says “Playing”.</li>
+</ul>
+<p>At the bottom, the mini player, as in the sections. In Settings, Home and sections you choose how many items each section shows (3, 5 or 10) and which sections appear.</p>
+<h3>Mini player</h3>
+<p>If something is playing or paused (a book or an article read aloud, an audiobook, an episode or the radio), a line appears above the tabs with what is playing and its state, “Pause” or “Resume” and “Stop”. Tapping what is playing takes you back to its screen. It stays there when you change section, so you can listen to the radio while you browse the news. Only one thing plays at a time: if you start something else, the mini player switches to it. The notification and the lock screen also always open what is playing.</p>
+<h3>Side menu</h3>
+<p>The side menu has Home and the four sections at the top, in the order you choose in Settings; the one you are using says “selected” and, when you open the menu, focus goes straight to it. Below are Statistics, Settings, User guide and About. If you choose the section you are already in, you go back to its first tab. Back closes the menu.</p>
+<ul>
+<li><strong>Statistics</strong>: those of every section, in the same order. For each one, the time today, in the last 7 days, this month and in total, and your streak of consecutive days. Library: reading time, words, books finished and in progress, and the most read. Podcasts: listening time, episodes finished, subscriptions, new, queued, downloaded and the most played podcasts. News: time reading or listening to the news, articles opened, feeds, unread, read, favourites and read later. Radio: listening time, stations played, favourites, songs logged, recordings and your most played stations. Each section and each part starts with a heading.</li>
 <li><strong>Settings</strong>: those of the whole app, including Podcasts, News and Radio.</li>
 <li><strong>About</strong>: the version, and the Check for updates and What's new buttons.</li>
 </ul>
-<p>With Back: inside a folder you go up to the previous one; in another tab you go back to the first one; and from the first tab of Podcasts, News or Radio you go back to the Library.</p>
+<p>With Back: inside a folder you go up to the previous one; in another tab you go back to the first one; from the first tab of a section you go back to Home; and from Home you leave the app. In Radio, if you have no favourites yet, the section opens on Explore, and Back from there already takes you to Home.</p>
 
 <h2>Library</h2>
 <p>It has four tabs: Reading, Library, Bookmarks and Catalogs.</p>
@@ -131,7 +142,6 @@
 <li><strong>Info</strong>: title, author, format, words, paragraphs, headings, pages and the time to listen to it all.</li>
 <li><strong>Copy</strong> (Select chapter text): the chapter in a text field so you can move with the cursor, select and use “Copy selection” or “Copy all”.</li>
 <li><strong>Export</strong>: as text or to audio.</li>
-<li><strong>Settings</strong>: opens the app Settings.</li>
 </ul>
 <h3>Search</h3>
 <p>The Search button opens a field with your search history and three options: match case, whole words only and regular expression. Without match case or regular expression, the search ignores accents (“cancion” finds “canción”).</p>
@@ -354,6 +364,7 @@
 <h2>Settings</h2>
 <p>In the side menu, Settings. Each section has its options:</p>
 <ul>
+<li><strong>Home and sections</strong>: the order of the sections (in the side menu, Home and the statistics), which sections Home shows and how many items from each. In “Section order”, a double tap shows or hides the section on Home (it reads as a switch) and you move it with the TalkBack actions Move up one position, Move down one position, Move to first and Move to last, or by touching and holding it. When you move it, focus stays on it and its new position is announced.</li>
 <li><strong>General</strong>: app language and theme, open the last book on startup, keep battery saving from stopping reading, sounds and updates.</li>
 <li><strong>Text appearance</strong>: colors (including high contrast and a black screen to listen while saving battery), text size and font, bold, line spacing, letter spacing, margins, paragraph spacing, justify, keep the screen on, orientation and full screen.</li>
 <li><strong>TalkBack actions</strong>: explained below.</li>
@@ -379,6 +390,14 @@
 
 <h2>Updates</h2>
 <p>The app checks for new versions when it opens (at most every 6 hours; turn it off in Settings, General). To check whenever you want, use About, Check for updates, or Settings, General, Check for updates. If there is one, it shows what it brings with the Update and Later buttons (in the automatic check, also Skip this version). When you update, it downloads it, checks that it is genuine and opens the Android installer; the first time, Android asks you to allow installing apps from this source. What's new in each version is in About, What's new.</p>
+<p>In Settings, General, “Look for updates on” you choose where the app updates from:</p>
+<ul>
+<li><strong>Both: own server and GitHub</strong> (the default): asks both at once and offers the newest version; if one does not answer, it uses the other.</li>
+<li><strong>Own server only</strong>: the author's, or the one you type in “Own server address”.</li>
+<li><strong>GitHub only</strong>: the latest version published in the app's GitHub repository.</li>
+<li><strong>A custom address</strong>: a web folder with version.json and the APK, or a GitHub repository (https://github.com/user/repository).</li>
+</ul>
+<p>Wherever it comes from, the app checks that the download is the published one (size and SHA-256) and that it is signed with the same key as the installed app; Android does not allow installing over an app with a different signature either. When a version is offered, it says where it comes from.</p>
 
 <h2>Troubleshooting</h2>
 <h3>I can't choose the Download folder</h3>

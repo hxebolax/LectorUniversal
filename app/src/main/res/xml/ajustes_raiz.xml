@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Ajustes: una entrada por apartado -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+	<Preference android:key="ir_portada" android:title="@string/aj_portada" android:summary="@string/aj_portada_desc" />
 	<Preference android:key="ir_general" android:title="@string/aj_general" android:summary="@string/aj_general_desc" />
 	<Preference android:key="ir_aspecto" android:title="@string/aj_aspecto" android:summary="@string/aj_aspecto_desc" />
 	<Preference android:key="ir_acciones" android:title="@string/aj_acciones_talkback" android:summary="@string/aj_acciones_talkback_desc" />

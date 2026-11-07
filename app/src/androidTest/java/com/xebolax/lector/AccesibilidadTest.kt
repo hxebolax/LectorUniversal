@@ -188,7 +188,7 @@ class AccesibilidadTest {
 
 	@Test
 	fun recorrerTodo() {
-		val principal = intent(com.xebolax.lector.ui.PrincipalActivity::class.java).setAction(Intent.ACTION_MAIN)
+		val principal = intent(com.xebolax.lector.ui.BibliotecaActivity::class.java).setAction(Intent.ACTION_MAIN)
 		abrir(principal)
 		revisar("Biblioteca: Leyendo")
 		for (pestana in listOf(es.getString(R.string.pestana_biblioteca), es.getString(R.string.pestana_marcadores), es.getString(R.string.pestana_catalogos))) {
@@ -284,6 +284,89 @@ class AccesibilidadTest {
 		InstrumentationRegistry.getInstrumentation().runOnMainSync { com.xebolax.lector.audio.ControlAudio.detener() }
 	}
 
+	/** La actividad que está delante (para comprobar adónde lleva Atrás). */
+	private fun delante(): String {
+		val salida = ui.executeShellCommand("dumpsys activity activities").let { d ->
+			android.os.ParcelFileDescriptor.AutoCloseInputStream(d).bufferedReader().use { it.readText() }
+		}
+		return Regex("topResumedActivity=.*?/([^ }]+)").find(salida)?.groupValues?.get(1).orEmpty()
+	}
+
+	/**
+	 * La Portada: un encabezado por sección (en el orden de Ajustes), Atrás desde
+	 * la pantalla principal de una sección vuelve a ella y, desde ella, sale; el
+	 * orden de las secciones se cambia con las acciones de TalkBack; y las
+	 * estadísticas de todas las secciones.
+	 */
+	@Test
+	fun portada() {
+		com.xebolax.lector.ui.OrdenSecciones.guardar(app, com.xebolax.lector.ui.OrdenSecciones.ORDENABLES)
+		BaseDatos.obtener(app).marcarAbierto(libro)
+		com.xebolax.lector.radio.RadioBaseDatos.obtener(app).apuntarEscuchada(com.xebolax.lector.radio.Emisora(uuid = "prueba-portada", nombre = "Emisora de prueba",
+			url = "http://127.0.0.1/radio", pais = "Spain", codigoPais = "ES", etiquetas = "news"))
+		abrir(intent(com.xebolax.lector.ui.PortadaActivity::class.java).setAction(Intent.ACTION_MAIN), 4000)
+		revisar("Portada", 40)
+		val nodos = mutableListOf<AccessibilityNodeInfo>().also { l -> raiz()?.let { recoger(it, l) } }
+		val encabezados = nodos.filter { it.isHeading }.map { nombre(it) }
+		Log.i("Portada", "Encabezados: $encabezados")
+		org.junit.Assert.assertEquals(4, encabezados.size)
+		org.junit.Assert.assertTrue(encabezados[0], encabezados[0].startsWith(es.getString(R.string.seccion_biblioteca)) || encabezados[0].startsWith("Library"))
+		org.junit.Assert.assertTrue(nodos.any { nombre(it).startsWith("El vencejo") })
+		org.junit.Assert.assertTrue(nodos.any { nombre(it).startsWith("Emisora de prueba") })
+
+		// Biblioteca desde su encabezado; Atrás vuelve a la Portada
+		tocar(encabezados[0])
+		org.junit.Assert.assertTrue(delante(), delante().endsWith("BibliotecaActivity"))
+		atras()
+		esperar(2000)
+		org.junit.Assert.assertTrue(delante(), delante().endsWith("PortadaActivity") || delante().endsWith("PrincipalActivity"))
+		// Noticias desde el menú lateral; Atrás vuelve a la Portada
+		tocar(es.getString(R.string.abrir_menu), app.getString(R.string.abrir_menu))
+		tocar(es.getString(R.string.noticias), app.getString(R.string.noticias))
+		org.junit.Assert.assertTrue(delante(), delante().endsWith("RssActivity"))
+		atras()
+		esperar(2000)
+		org.junit.Assert.assertTrue(delante(), delante().endsWith("PortadaActivity") || delante().endsWith("PrincipalActivity"))
+
+		// Orden de las secciones: Podcasts baja una posición con su acción de TalkBack
+		abrir(intent(com.xebolax.lector.ui.SeccionesActivity::class.java))
+		revisar("Ajustes: orden de las secciones")
+		val podcasts = elemento(es.getString(R.string.podcasts))
+		val bajar = podcasts?.actionList?.firstOrNull { it.label?.toString() == es.getString(R.string.accion_bajar) || it.label?.toString() == "Move down one position" }
+		org.junit.Assert.assertNotNull("Podcasts sin la acción Bajar", bajar)
+		podcasts!!.performAction(bajar!!.id)
+		esperar(1500)
+		org.junit.Assert.assertEquals(com.xebolax.lector.ui.Seccion.PODCASTS, com.xebolax.lector.ui.OrdenSecciones.orden(app)[2])
+		// Doble toque: la quita de la Portada (y otra vez la vuelve a poner)
+		elemento(es.getString(R.string.podcasts))?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+		esperar(1000)
+		org.junit.Assert.assertFalse(com.xebolax.lector.ui.OrdenSecciones.enPortada(app, com.xebolax.lector.ui.Seccion.PODCASTS))
+		abrir(intent(com.xebolax.lector.ui.PortadaActivity::class.java).setAction(Intent.ACTION_MAIN), 4000)
+		val sinPodcasts = mutableListOf<AccessibilityNodeInfo>().also { l -> raiz()?.let { recoger(it, l) } }.filter { it.isHeading }.map { nombre(it) }
+		Log.i("Portada", "Sin Podcasts: $sinPodcasts")
+		org.junit.Assert.assertEquals(3, sinPodcasts.size)
+		com.xebolax.lector.ui.OrdenSecciones.ponerEnPortada(app, com.xebolax.lector.ui.Seccion.PODCASTS, true)
+		com.xebolax.lector.ui.OrdenSecciones.guardar(app, com.xebolax.lector.ui.OrdenSecciones.ORDENABLES)
+
+		// El tiempo escuchando la radio cuenta en sus estadísticas
+		val radioAntes = com.xebolax.lector.datos.Actividad.desde(app, com.xebolax.lector.datos.Actividad.RADIO, BaseDatos.hoy())
+		InstrumentationRegistry.getInstrumentation().runOnMainSync {
+			com.xebolax.lector.radio.Radio.escuchar(app, com.xebolax.lector.radio.Emisora(uuid = "prueba-bbc", nombre = "BBC World Service",
+				url = "http://stream.live.vc.bbcmedia.co.uk/bbc_world_service", pais = "United Kingdom", codigoPais = "GB", codec = "MP3", bitrate = 56), abrirPantalla = false)
+		}
+		esperar(12000)
+		InstrumentationRegistry.getInstrumentation().runOnMainSync { com.xebolax.lector.audio.ControlAudio.detener() }
+		esperar(2000)
+		val radioDespues = com.xebolax.lector.datos.Actividad.desde(app, com.xebolax.lector.datos.Actividad.RADIO, BaseDatos.hoy())
+		Log.i("Portada", "Radio: antes $radioAntes, después $radioDespues")
+		org.junit.Assert.assertTrue("No contó el tiempo de radio: $radioAntes -> $radioDespues", radioDespues.first > radioAntes.first && radioDespues.second > radioAntes.second)
+
+		abrir(intent(com.xebolax.lector.ui.EstadisticasActivity::class.java))
+		revisar("Estadísticas de todas las secciones", 80)
+		val titulos = mutableListOf<AccessibilityNodeInfo>().also { l -> raiz()?.let { recoger(it, l) } }.filter { it.isHeading }.map { nombre(it) }
+		Log.i("Portada", "Estadísticas: $titulos")
+	}
+
 	// --- El foco vuelve a su sitio al cerrar ventanas ------------------------------------------
 
 	private fun conFoco(): AccessibilityNodeInfo? = raiz()?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
@@ -343,7 +426,7 @@ class AccesibilidadTest {
 	/** Solo la Biblioteca (para comprobar rápido los avisos del Accessibility Test Framework). */
 	@Test
 	fun soloBiblioteca() {
-		abrir(intent(com.xebolax.lector.ui.PrincipalActivity::class.java).setAction(Intent.ACTION_MAIN))
+		abrir(intent(com.xebolax.lector.ui.BibliotecaActivity::class.java).setAction(Intent.ACTION_MAIN))
 		tocar(es.getString(R.string.pestana_biblioteca), app.getString(R.string.pestana_biblioteca))
 		revisar("Biblioteca: Biblioteca")
 		raiz()?.findAccessibilityNodeInfosByText(es.getString(R.string.buscar_en_biblioteca))?.firstOrNull()?.let { n ->
@@ -355,7 +438,7 @@ class AccesibilidadTest {
 	/** Qué expone a TalkBack cada elemento del menú lateral (y si un solo doble toque lo activa). */
 	@Test
 	fun menuLateral() {
-		abrir(intent(com.xebolax.lector.ui.PrincipalActivity::class.java).setAction(Intent.ACTION_MAIN))
+		abrir(intent(com.xebolax.lector.ui.BibliotecaActivity::class.java).setAction(Intent.ACTION_MAIN))
 		tocar(es.getString(R.string.abrir_menu), app.getString(R.string.abrir_menu))
 		esperar(1000)
 		Log.i("Menu", "Foco al abrir: ${conFoco()?.let { "${nombre(it)} seleccionado=${it.isSelected}" }}")
@@ -383,7 +466,7 @@ class AccesibilidadTest {
 
 	@Test
 	fun focoVuelveTrasVentanas() {
-		abrir(intent(com.xebolax.lector.ui.PrincipalActivity::class.java).setAction(Intent.ACTION_MAIN))
+		abrir(intent(com.xebolax.lector.ui.BibliotecaActivity::class.java).setAction(Intent.ACTION_MAIN))
 		tocar(es.getString(R.string.pestana_biblioteca), app.getString(R.string.pestana_biblioteca))
 		// Las acciones de un libro (pulsación larga) y volver
 		vuelta("Libro: acciones", elemento("El vencejo"), { it.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK) }, ::atras)

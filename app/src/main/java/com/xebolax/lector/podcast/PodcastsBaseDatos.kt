@@ -468,7 +468,15 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 
 	fun episodio(id: Long): Episodio? = consulta("e.id = ?", arrayOf(id.toString())).firstOrNull()
 	fun cola(): List<Episodio> = consulta("e.cola > 0", orden = "e.cola ASC")
-	fun novedades(): List<Episodio> = consulta("e.estado = -1")
+	fun novedades(limite: Int = 1000): List<Episodio> = consulta("e.estado = -1", limite = limite)
+	fun contarNovedades(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM episodios WHERE estado = -1", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+	/** Para las estadísticas: cuántos episodios cumplen una condición (sin datos del usuario en ella). */
+	fun contarEpisodios(donde: String): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM episodios WHERE $donde", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+	/** Los podcasts con más episodios escuchados: (título, episodios). */
+	fun masEscuchados(limite: Int): List<Pair<String, Int>> = readableDatabase.rawQuery(
+		"SELECT p.titulo, COUNT(*) FROM episodios e JOIN podcasts p ON p.id = e.podcast WHERE e.estado = 1 GROUP BY p.id ORDER BY 2 DESC, p.titulo LIMIT $limite", null,
+	).use { c -> generateSequence { if (c.moveToNext()) c.getString(0) to c.getInt(1) else null }.toList() }
+	fun contarPodcasts(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM podcasts", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
 	fun dePodcast(id: Long, soloSinEscuchar: Boolean, antiguosPrimero: Boolean = false): List<Episodio> =
 		consulta(if (soloSinEscuchar) "e.podcast = ? AND e.estado < 1" else "e.podcast = ?", arrayOf(id.toString()),
 			if (antiguosPrimero) "e.fecha ASC" else "e.fecha DESC")

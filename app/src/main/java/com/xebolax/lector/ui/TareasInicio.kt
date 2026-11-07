@@ -15,7 +15,7 @@ object TareasInicio {
 
 	private const val CADA_MS = 6 * 60 * 60 * 1000L
 
-	fun alAbrir(actividad: PrincipalActivity) {
+	fun alAbrir(actividad: android.app.Activity) {
 		val p = Preferencias(actividad)
 		if (p.carpetasVigiladas.isEmpty()) return
 		val ultima = p.p.getLong("ultima_revision", 0L)

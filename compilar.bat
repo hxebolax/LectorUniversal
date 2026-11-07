@@ -39,7 +39,7 @@ echo   4. Ver moviles conectados
 echo   5. Abrir la maquina virtual de pruebas (emulador)
 echo   6. Compilar, abrir el emulador e instalar en el
 echo   7. Pasar las pruebas automaticas (en el PC y en el emulador o movil)
-echo   8. Compilar y publicar la actualizacion (dist y SynologyDrive\web\LectorUniversal)
+echo   8. Compilar y publicar la actualizacion (servidor y GitHub)
 echo   9. Preparar o reparar el entorno (JDK, SDK, Gradle, emulador)
 echo   0. Salir
 echo.

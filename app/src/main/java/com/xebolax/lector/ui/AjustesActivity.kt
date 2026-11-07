@@ -141,6 +141,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 	override fun onCreatePreferences(estado: Bundle?, raiz: String?) {
 		val xml = arguments?.getString("xml") ?: "raiz"
 		val recurso = when (xml) {
+			"portada" -> R.xml.ajustes_portada
 			"general" -> R.xml.ajustes_general
 			"aspecto" -> R.xml.ajustes_aspecto
 			"navegacion" -> R.xml.ajustes_navegacion
@@ -173,6 +174,8 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				if (xml == "rss") alPulsar("rss_medios") { mediosSuscritos() }
 			}
 		}
+		// Portada y secciones: el orden se elige en su propia pantalla (filas que se mueven)
+		alPulsar("ir_orden_secciones") { startActivity(Intent(requireContext(), SeccionesActivity::class.java)) }
 		// Navegación: las acciones de cada párrafo se eligen (y ordenan) en Acciones de TalkBack
 		alPulsar("ir_acciones_parrafo") { AccionesTalkBackActivity.abrir(requireContext(), ZonaAcciones.PARRAFO) }
 		// Está en Voz y en Audiolibros: se aplica a los dos reproductores
@@ -200,7 +203,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 	private fun configurarRaiz() {
 		alPulsar("ir_acciones") { AccionesTalkBackActivity.abrir(requireContext()) }
 		val apartados = listOf(
-			"ir_general" to "general", "ir_aspecto" to "aspecto", "ir_navegacion" to "navegacion", "ir_voz" to "voz",
+			"ir_portada" to "portada", "ir_general" to "general", "ir_aspecto" to "aspecto", "ir_navegacion" to "navegacion", "ir_voz" to "voz",
 			"ir_audio" to "audio", "ir_podcasts" to "podcasts", "ir_rss" to "rss", "ir_radio" to "radio", "ir_ia" to "ia", "ir_documentos" to "documentos", "ir_biblioteca" to "biblioteca",
 		)
 		for ((clave, xml) in apartados) {
@@ -337,6 +340,24 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		}
 		findPreference<androidx.preference.EditTextPreference>("url_actualizaciones")?.apply {
 			if (text.isNullOrBlank()) text = Preferencias(requireContext()).urlActualizaciones
+			setOnBindEditTextListener { it.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI }
+		}
+		// Dirección personalizada: una carpeta web con version.json o un repositorio de GitHub
+		findPreference<androidx.preference.EditTextPreference>("url_personalizada")?.apply {
+			setOnBindEditTextListener { it.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI }
+			setSummaryProvider { p -> (p as androidx.preference.EditTextPreference).text?.takeIf { it.isNotBlank() } ?: getString(R.string.aj_url_personalizada_vacia) }
+		}
+		// Solo se ve la dirección que usa la fuente elegida
+		fun mostrarDirecciones(fuente: String) {
+			findPreference<Preference>("url_actualizaciones")?.isVisible = fuente == "servidor" || fuente == "ambos"
+			findPreference<Preference>("url_personalizada")?.isVisible = fuente == "personalizada"
+		}
+		findPreference<ListPreference>("fuente_actualizaciones")?.let { pref ->
+			mostrarDirecciones(pref.value ?: "ambos")
+			pref.setOnPreferenceChangeListener { _, nuevo ->
+				mostrarDirecciones(nuevo as String)
+				true
+			}
 		}
 	}
 

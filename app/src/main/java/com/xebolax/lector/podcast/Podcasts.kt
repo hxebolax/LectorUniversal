@@ -339,7 +339,10 @@ object Podcasts {
 				// Casi al final: ya cuenta como escuchado
 				if (dur > 0 && ms > 0 && ms >= dur - umbral && umbral > 0) db.marcarEscuchados(listOf(e.id), true)
 			},
-			alTerminar = { alTerminar(c, e) },
+			alTerminar = {
+				com.xebolax.lector.datos.Actividad.sumarLuego(c, com.xebolax.lector.datos.Actividad.PODCASTS, elementos = 1)
+				alTerminar(c, e)
+			},
 			alCambiarVelocidad = { v -> if (p != null) db.guardarVelocidad(p.id, v) },
 		)
 	}

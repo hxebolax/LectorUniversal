@@ -4,7 +4,7 @@
 
 Lector Universal es una app Android hecha por y para personas ciegas o con baja visión. Lee casi cualquier formato de libro o documento, los lee en voz alta, reproduce audiolibros y libros DAISY, y además tiene un cliente de podcasts, un lector de noticias (RSS) y una radio con más de 50.000 emisoras de todo el mundo. Todo funciona igual en cada sección y todo se maneja con TalkBack, un teclado o Switch Access.
 
-- Versión actual: **1.0.8**
+- Versión actual: **1.0.9** · [Descargar el APK](https://github.com/hxebolax/LectorUniversal/releases/latest)
 - Android 7.0 (API 24) o posterior. Probada en Android 15.
 - Idiomas: español (principal) e inglés.
 - Autor: Héctor J. Benítez Corredera.
@@ -39,6 +39,12 @@ Lector Universal es una app Android hecha por y para personas ciegas o con baja 
 
 La app tiene cuatro **secciones**, como cuatro apps en una. En todas, «Abrir menú» está arriba a la izquierda y las pestañas de la sección están abajo, siempre a la vista. Encima de las pestañas, un **mini reproductor** muestra lo que suena (un libro leído en voz alta, un audiolibro, un episodio o la radio) con Pausar, Detener y volver a su pantalla. Sigue ahí al cambiar de sección: puedes escuchar la radio mientras lees las noticias.
 
+#### Portada
+
+La app se abre en la **Portada**: lo más a mano de cada sección en una sola pantalla (los libros que estás leyendo, los episodios a medias, en la cola o nuevos, las últimas noticias sin leer y tus emisoras favoritas). Cada sección empieza con un encabezado, para saltar de una a otra con TalkBack, que abre la sección entera. Atrás desde cualquier sección vuelve a la Portada, y desde la Portada sale de la app. En Ajustes eliges el orden de las secciones (el del menú lateral, la Portada y las estadísticas) y cuáles salen en la Portada.
+
+Las **estadísticas** (menú lateral) son de todas las secciones: tiempo leyendo, escuchando podcasts o la radio y con las noticias, hoy, en 7 días, este mes y en total, con rachas y lo más leído o escuchado.
+
 #### Biblioteca
 
 - **Formatos**: EPUB 2 y 3, PDF (también escaneados, con reconocimiento de texto sin internet), Word (DOCX y DOC antiguo), OpenDocument (ODT, ODS, ODP), RTF, texto, HTML, Markdown, FictionBook (FB2), Kindle (MOBI, AZW, AZW3, PRC, PDB), CHM, PowerPoint, Excel, CSV, cómics (CBZ), ZIP, **DAISY 2.02 y 3** y audiolibros **M4B y MP3** con capítulos.
@@ -66,7 +72,7 @@ La app tiene cuatro **secciones**, como cuatro apps en una. En todas, «Abrir me
 
 - Sin leer, Fuentes (con carpetas), Favoritos, Más tarde y Buscar. Artículo completo descargado de la web, lectura seguida en voz alta, reglas y alertas por palabras, búsquedas guardadas, OPML y sincronización con FreshRSS, The Old Reader, Miniflux o Nextcloud News.
 
-#### Radio (nueva en la 1.0.8)
+#### Radio
 
 - Más de 50.000 emisoras del directorio libre [radio-browser.info](https://www.radio-browser.info/), sin cuenta ni publicidad, y las que añadas tú a mano.
 - Pestañas **Favoritas** (con carpetas y orden), **Explorar** (las de tu país, las más escuchadas, las más votadas, en tendencia, lo que se escucha ahora, nuevas, y por género, país o idioma), **Buscar** (por nombre con filtros de país, idioma, género, calidad y orden), **Historial** (emisoras, canciones que han sonado y grabaciones) y **Programar**.
@@ -91,9 +97,13 @@ La accesibilidad no es un añadido: cada pantalla se diseña y se prueba con Tal
 
 ### Instalar y actualizar
 
-La app no está en Google Play. Se instala desde el APK publicado en el servidor del autor y **se actualiza sola**: al abrirse busca versiones nuevas, muestra qué traen y, al aceptar, descarga la actualización, comprueba que es auténtica (tamaño, SHA-256, que es esta app y que está firmada con la misma clave) y abre el instalador de Android.
+La app no está en Google Play. Descarga el APK de la [última versión publicada en GitHub](https://github.com/hxebolax/LectorUniversal/releases/latest) y ábrelo en el móvil; la primera vez, Android pide permitir instalar aplicaciones de esa fuente.
 
-La primera vez, Android pide permitir instalar aplicaciones de esta fuente.
+Después **se actualiza sola**: al abrirse busca versiones nuevas, muestra qué traen y, al aceptar, descarga la actualización, comprueba que es auténtica (tamaño, SHA-256, que es esta app y que está firmada con la misma clave) y abre el instalador de Android. En Ajustes, General, eliges de dónde se actualiza:
+
+- **Los dos** (lo normal): el servidor del autor y GitHub a la vez; ofrece la versión más nueva y, si uno no responde, usa el otro.
+- **Solo el servidor propio** o **solo GitHub**.
+- **Una dirección personalizada**: una carpeta web con `version.json` y el APK, o cualquier repositorio de GitHub (`https://github.com/usuario/repositorio`), por ejemplo el de tu propia compilación.
 
 ### Privacidad
 
@@ -146,10 +156,10 @@ gradle assembleRelease      # versión de publicación (solo arm64-v8a y armeabi
 
 El proyecto no incluye el *wrapper* de Gradle; usa Gradle 8.11.1 (el de `entorno\gradle` o el tuyo).
 
-El servidor de actualizaciones se puede cambiar al compilar:
+El servidor de actualizaciones y el repositorio de GitHub de donde se actualiza se pueden cambiar al compilar:
 
 ```bash
-gradle assembleRelease -PurlActualizaciones=https://tu-servidor/LectorUniversal
+gradle assembleRelease -PurlActualizaciones=https://tu-servidor/LectorUniversal -PrepoGithub=usuario/repositorio
 ```
 
 ### Firma
@@ -169,12 +179,12 @@ Si no hay firma propia, la versión de publicación se firma con la clave de dep
 
 ### Publicar una versión
 
-La app busca versiones en `https://xebolax.synology.me/LectorUniversal` (`version.json` y `LectorUniversal_v<versión>.apk`).
+La app busca versiones en el servidor `https://xebolax.synology.me/LectorUniversal` (`version.json` y `LectorUniversal_v<versión>.apk`) y en las [releases de GitHub](https://github.com/hxebolax/LectorUniversal/releases) (la última, con el APK y el mismo `version.json` adjuntos).
 
 1. Sube `versionCode` (en 1) y `versionName` en `app/build.gradle.kts`.
 2. Añade la sección `== <versión>` con las novedades al principio de `NOVEDADES.txt` (su texto es el que muestra la app al ofrecer la actualización).
 3. Si cambiaste algún lector de formatos, sube `VERSION` en `formatos/CacheContenido.kt` para que los libros se vuelvan a convertir.
-4. `compilar.bat` → opción 8. Deja el APK y `version.json` en `dist\` y los copia a la carpeta sincronizada con el servidor.
+4. `compilar.bat` → opción 8. Deja el APK y `version.json` en `dist\`, los copia a la carpeta sincronizada con el servidor y, si está [gh](https://cli.github.com) con la sesión iniciada, crea la release `v<versión>` en GitHub con los dos archivos y las novedades (`herramientas/publicar_actualizacion.ps1`; `-SinGitHub` para no hacerlo).
 
 ### Estructura del código
 
@@ -187,14 +197,14 @@ Código en Kotlin, en `app/src/main/java/com/xebolax/lector/`, con identificador
 | `lectura/` | Pantalla de lectura, navegación por elementos y controles ajustables para TalkBack. |
 | `voz/` | Lectura en voz alta (`LectorVoz`, `ServicioVoz`), pronunciación y exportar a audio. |
 | `audio/` | Reproductor común (`ControlAudio`, `ServicioAudio` con Media3), su pantalla y el **mini reproductor** (`Sonando`). |
-| `biblioteca/`, `datos/` | Añadir archivos y carpetas; base de datos de la biblioteca y ajustes. |
+| `biblioteca/`, `datos/` | Añadir archivos y carpetas; base de datos de la biblioteca, ajustes y actividad de cada sección para las estadísticas (`Actividad`). |
 | `catalogo/` | Catálogos OPDS y bibliotecas web. |
 | `podcast/` | Sección Podcasts (base de datos propia `podcasts.db`). |
 | `rss/` | Sección Noticias (base de datos propia `rss.db`), artículo completo y sincronización. |
 | `radio/` | Sección Radio: cliente de radio-browser.info, base de datos `radio.db`, reproductor en directo, grabación y despertador. |
 | `ia/`, `ocr/` | Inteligencia artificial y reconocimiento de texto. |
-| `sincronizacion/`, `actualizaciones/` | Sincronización WebDAV y actualizaciones de la app. |
-| `ui/` | Ventana principal, secciones y menú lateral, ajustes, acciones de TalkBack, foco y ayudantes comunes. |
+| `sincronizacion/`, `actualizaciones/` | Sincronización WebDAV y actualizaciones de la app (servidor propio, GitHub o una dirección personalizada). |
+| `ui/` | Portada (`PortadaActivity`), Biblioteca (`BibliotecaActivity`), secciones, orden y menú lateral (`Secciones.kt`), estadísticas, ajustes, acciones de TalkBack, foco y ayudantes comunes. |
 
 Pruebas en `app/src/test` (JVM) y `app/src/androidTest` (dispositivo). Herramientas de Windows en `herramientas/` (preparar el entorno y publicar).
 
@@ -204,7 +214,7 @@ Todo cambio sigue dos listas de comprobación, y si chocan, gana la accesibilida
 
 - **Accesibilidad** (TalkBack y baja visión): nombre en cada control, filas de una sola parada, acciones de TalkBack por zona (`ui/AccionesTalkBack.kt`), encabezados, foco que vuelve al cerrar (`ui/MemoriaFoco.kt`), espera con Cancelar (`ui/Espera.kt`), 48 dp, contraste y texto al 200 %.
 - **Calidad Android** (Core app quality y Material 3): Atrás estándar, de borde a borde, nada lento en el hilo principal, audio con foco y Media3, permisos en contexto, cadenas en recursos (es y en).
-- **Coherencia**: cada sección funciona igual; Ajustes solo en el menú lateral; los textos según la sección (libro, artículo, episodio, emisora); las acciones cambian según el estado («Quitar de favoritas» si ya lo es).
+- **Coherencia**: cada sección funciona igual; la Portada es el destino de inicio (Atrás desde una sección vuelve a ella y desde ella sale); Ajustes solo en el menú lateral; los textos según la sección (libro, artículo, episodio, emisora); las acciones cambian según el estado («Quitar de favoritas» si ya lo es).
 - Sangría con tabuladores; finales de línea LF (los `.bat` y `.ps1`, CRLF).
 
 ### Traducir la app
@@ -223,12 +233,12 @@ Copia `app/src/main/res/values/strings.xml` y `arrays.xml` a `app/src/main/res/v
 - Ideas de funciones: Paperback, AntennaPod, RadioDroid, Feeder, Read You, Readrops y Capy Reader. Su código no se ha copiado: las secciones de Podcasts y Radio están escritas desde cero.
 - Iconos: Material Symbols (Apache 2.0)
 
-La licencia del propio proyecto la decidirá su autor antes de publicarlo.
+Este repositorio aún no tiene licencia; la elegirá su autor. Mientras tanto rigen los derechos de autor por defecto: GitHub permite ver el código y bifurcarlo, pero no da permiso para reutilizarlo ni redistribuirlo.
 
 ---
 
 ## English summary
 
-**Lector Universal** is an Android reader built for blind and low-vision people who use TalkBack. It opens EPUB, PDF (including scanned ones, with offline OCR), Word, OpenDocument, RTF, HTML, Markdown, FB2, Kindle, CHM, PowerPoint, Excel, comics, DAISY 2.02/3 and M4B/MP3 audiobooks; reads them aloud with any installed voice; and includes a podcast client, an RSS reader and, since 1.0.8, an internet radio with 50,000+ stations from radio-browser.info, with recording and a radio alarm clock. A mini player above the tabs keeps what is playing at hand in every section.
+**Lector Universal** is an Android reader built for blind and low-vision people who use TalkBack. It opens EPUB, PDF (including scanned ones, with offline OCR), Word, OpenDocument, RTF, HTML, Markdown, FB2, Kindle, CHM, PowerPoint, Excel, comics, DAISY 2.02/3 and M4B/MP3 audiobooks; reads them aloud with any installed voice; and includes a podcast client, an RSS reader and an internet radio with 50,000+ stations from radio-browser.info, with recording and a radio alarm clock. It opens on a Home screen that gathers the most useful items from every section (in the order you choose), with statistics for all of them, and a mini player above the tabs keeps what is playing at hand in every section. Download the APK from the [latest GitHub release](https://github.com/hxebolax/LectorUniversal/releases/latest); the app then updates itself from the author's server, from GitHub, from both or from a custom address.
 
 Building on Windows: run `compilar.bat` (it downloads a portable JDK, Gradle, Android SDK and a TalkBack-enabled emulator into `entorno\`). Elsewhere: JDK 17 + Gradle 8.11.1 + Android SDK 35, then `gradle assembleDebug`. Tests: `gradle testDebugUnitTest` and `gradle connectedDebugAndroidTest` (run `AccesibilidadTest` with TalkBack on). The user interface is available in Spanish and English; source code identifiers and comments are in Spanish.

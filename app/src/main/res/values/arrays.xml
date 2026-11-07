@@ -304,8 +304,7 @@
 		<item>Información</item>
 		<item>Copiar texto</item>
 		<item>Exportar</item>
-		<item>Ajustes</item>
-	</string-array>
+</string-array>
 	<string-array name="botones_valores" translatable="false">
 		<item>boton_indice</item>
 		<item>boton_buscar</item>
@@ -321,7 +320,6 @@
 		<item>boton_informacion</item>
 		<item>boton_seleccionar</item>
 		<item>boton_exportar</item>
-		<item>boton_ajustes</item>
 	</string-array>
 	<string-array name="pod_auto_descargar_nombres">
 		<item>Lo de Ajustes</item>
@@ -510,4 +508,28 @@
 	</string-array>
 
 	<!-- Correcciones de la revisión (1.0.8) -->
+
+	<!-- 1.0.9: Portada, secciones, estadísticas y actualizaciones -->
+	<string-array name="portada_elementos_nombres">
+		<item>3</item>
+		<item>5</item>
+		<item>10</item>
+	</string-array>
+	<string-array name="portada_elementos_valores" translatable="false">
+		<item>3</item>
+		<item>5</item>
+		<item>10</item>
+	</string-array>
+	<string-array name="fuente_actualizaciones_nombres">
+		<item>Los dos: mi servidor y GitHub (la más nueva)</item>
+		<item>Solo el servidor propio</item>
+		<item>Solo GitHub</item>
+		<item>Una dirección personalizada</item>
+	</string-array>
+	<string-array name="fuente_actualizaciones_valores" translatable="false">
+		<item>ambos</item>
+		<item>servidor</item>
+		<item>github</item>
+		<item>personalizada</item>
+	</string-array>
 </resources>

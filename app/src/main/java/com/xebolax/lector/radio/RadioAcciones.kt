@@ -144,6 +144,7 @@ object RadioAcciones {
 			autor = g.emisora,
 			url = Uri.fromFile(f).toString(),
 			posicionMs = 0,
+			seccion = com.xebolax.lector.datos.Actividad.RADIO,
 		)
 		a.startActivity(Intent(a, com.xebolax.lector.audio.ReproductorActivity::class.java).putExtra(com.xebolax.lector.audio.ReproductorActivity.EXTRA_EXTERNO, true))
 	}

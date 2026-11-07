@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-	Menú lateral. Arriba, las secciones de la app (como apps dentro de la app,
-	todas con sus pestañas abajo): Biblioteca (con los catálogos en línea en una
-	pestaña), Podcasts, Noticias y Radio. Abajo, lo general.
+	Menú lateral. Arriba, la Portada y las secciones de la app (como apps dentro
+	de la app, todas con sus pestañas abajo): Biblioteca (con los catálogos en
+	línea en una pestaña), Podcasts, Noticias y Radio, en el orden elegido en
+	Ajustes (Secciones.kt). Abajo, lo general.
 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 	<group
 		android:id="@+id/grupo_secciones"
 		android:checkableBehavior="single">
+		<item android:id="@+id/lateral_portada" android:icon="@drawable/ic_portada" android:title="@string/portada" />
 		<item
 			android:id="@+id/lateral_biblioteca"
 			android:icon="@drawable/ic_biblioteca"

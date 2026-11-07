@@ -125,13 +125,6 @@
 			android:contentDescription="@string/exportar"
 			android:text="@string/exportar_corto"
 			app:icon="@drawable/ic_exportar" />
-
-		<com.google.android.material.button.MaterialButton
-			android:id="@+id/boton_ajustes"
-			style="@style/Boton.Barra"
-			android:contentDescription="@string/ajustes"
-			android:text="@string/ajustes"
-			app:icon="@drawable/ic_ajustes" />
 		</LinearLayout>
 	</LinearLayout>
 

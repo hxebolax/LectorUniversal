@@ -111,6 +111,7 @@ class GestorActualizaciones(private val actividad: AppCompatActivity) {
 		val texto = buildString {
 			append(actividad.getString(R.string.actualizacion_texto, BuildConfig.VERSION_NAME, v.version))
 			if (v.tamano > 0) append(" ").append(actividad.getString(R.string.actualizacion_tamano, tamano(v.tamano)))
+			if (v.origen.isNotBlank()) append(" ").append(actividad.getString(R.string.actualizacion_origen, v.origen))
 			if (v.notas.isNotBlank()) append("\n\n").append(actividad.getString(R.string.novedades)).append("\n").append(v.notas)
 		}
 		val dialogo = MaterialAlertDialogBuilder(actividad)

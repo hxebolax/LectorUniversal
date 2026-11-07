@@ -112,6 +112,7 @@ class ReproductorActivity : AppCompatActivity() {
 				url = url,
 				posicionMs = db.articulo(idArticulo)?.posicionAudio ?: 0,
 				alGuardar = { ms, _ -> db.guardarPosicionAudio(idArticulo, ms) },
+				seccion = com.xebolax.lector.datos.Actividad.NOTICIAS,
 			)
 		}
 		if (url != null || intent.getBooleanExtra(EXTRA_EXTERNO, false)) {

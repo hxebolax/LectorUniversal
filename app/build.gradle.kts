@@ -8,6 +8,9 @@ plugins {
 // Servidor de actualizaciones: ahí van version.json y LectorUniversal_v<versión>.apk.
 // Se puede cambiar en Ajustes; para compilar con otro: gradle assembleRelease -PurlActualizaciones=https://...
 val urlActualizaciones = (project.findProperty("urlActualizaciones") as String?) ?: "https://xebolax.synology.me/LectorUniversal"
+// Repositorio de GitHub cuyas versiones publicadas (releases) también puede usar el actualizador.
+// Para compilar con otro: gradle assembleRelease -PrepoGithub=usuario/repositorio
+val repoGithub = (project.findProperty("repoGithub") as String?) ?: "hxebolax/LectorUniversal"
 
 // Firma propia guardada en la carpeta "firma" (la crea compilar.bat).
 val propiedadesFirma = Properties().apply {
@@ -23,10 +26,11 @@ android {
 		applicationId = "com.xebolax.lector"
 		minSdk = 24
 		targetSdk = 35
-		versionCode = 9
-		versionName = "1.0.8"
+		versionCode = 10
+		versionName = "1.0.9"
 
 		buildConfigField("String", "URL_ACTUALIZACIONES", "\"$urlActualizaciones\"")
+		buildConfigField("String", "REPO_GITHUB", "\"$repoGithub\"")
 		testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 	}
 

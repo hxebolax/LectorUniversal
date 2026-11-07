@@ -28,6 +28,10 @@ class Preferencias(contexto: Context) {
 	val buscarActualizaciones get() = p.getBoolean("buscar_actualizaciones", true)
 	val urlActualizaciones get() = texto("url_actualizaciones", BuildConfig.URL_ACTUALIZACIONES).trim().trimEnd('/')
 		.ifBlank { BuildConfig.URL_ACTUALIZACIONES }
+	/** De dónde se actualiza: servidor (propio), github, ambos (la más nueva de los dos) o personalizada. */
+	val fuenteActualizaciones get() = texto("fuente_actualizaciones", "ambos")
+	/** Fuente personalizada: una carpeta web con version.json o un repositorio de GitHub. */
+	val urlPersonalizada get() = texto("url_personalizada", "").trim().trimEnd('/')
 
 	// --- Aspecto del texto
 	val temaLectura get() = texto("tema_lectura", "app")

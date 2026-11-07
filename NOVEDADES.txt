@@ -3,6 +3,14 @@ El texto de la versión que se publica se muestra en la app al ofrecer la actual
 Para una versión nueva: sube versionCode y versionName en app\build.gradle.kts,
 añade aquí su sección y usa la opción 8 de compilar.bat.
 
+== 1.0.9
+- Nueva Portada: la app se abre en una pantalla con lo más a mano de cada sección (los libros que lees, los episodios a medias, en la cola o nuevos, las últimas noticias sin leer y tus emisoras favoritas). Cada sección tiene su encabezado, para saltar con TalkBack, y un doble toque en él abre la sección entera.
+- Atrás desde la pantalla principal de cualquier sección vuelve a la Portada, y desde la Portada sale de la app.
+- Ajustes, Portada y secciones: elige el orden de las secciones (menú lateral, Portada y estadísticas), cuáles salen en la Portada y cuántos elementos de cada una. Las secciones se mueven con las acciones de TalkBack.
+- Estadísticas de todas las secciones: además de la lectura, el tiempo escuchando podcasts y la radio y el tiempo con las noticias, con rachas, episodios terminados, noticias abiertas, emisoras más escuchadas y más.
+- Actualizaciones desde tu servidor, desde GitHub, desde los dos (la versión más nueva) o desde una dirección personalizada (Ajustes, General). La app ya está en GitHub como proyecto público.
+- La pantalla de lectura ya no tiene botón Ajustes: los Ajustes están solo en el menú lateral.
+
 == 1.0.8
 - Nueva sección Radio (menú lateral), con más de 50.000 emisoras de todo el mundo del directorio libre radio-browser.info, sin cuenta ni publicidad. Pestañas Favoritas (con carpetas y orden), Explorar (las de tu país, las más escuchadas, las más votadas, en tendencia, lo que se escucha ahora, nuevas, y por género, país o idioma), Buscar (por nombre, con filtros de país, idioma, género, calidad y orden), Historial (emisoras escuchadas, canciones que han sonado y grabaciones) y Programar.
 - Radio: reproductor en directo que se reconecta solo si se corta y dice la canción que suena; emisora anterior y siguiente (también con los auriculares y la notificación); temporizador; ecualizador del sistema; buscar, copiar o compartir la canción; votar, compartir y ver la información de cada emisora.

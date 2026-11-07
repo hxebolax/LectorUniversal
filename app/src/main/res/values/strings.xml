@@ -90,7 +90,7 @@
 	<string name="revisar_carpetas">Buscar libros nuevos en las carpetas vigiladas</string>
 	<string name="abrir_pagina_web">Abrir una página web</string>
 	<string name="leer_portapapeles">Leer el texto copiado</string>
-	<string name="estadisticas">Estadísticas de lectura</string>
+	<string name="estadisticas">Estadísticas</string>
 	<string name="diccionario_pronunciacion">Diccionario de pronunciación</string>
 	<string name="ajustes">Ajustes</string>
 	<string name="manual">Manual de uso</string>
@@ -441,7 +441,7 @@
 	<string name="aj_actualizaciones">Actualizaciones</string>
 	<string name="aj_buscar_actualizaciones">Buscar actualizaciones al abrir la app</string>
 	<string name="aj_buscar_actualizaciones_desc">Como mucho cada 6 horas; nunca se instala nada sin preguntar</string>
-	<string name="aj_url_actualizaciones">Servidor de actualizaciones</string>
+	<string name="aj_url_actualizaciones">Dirección del servidor propio</string>
 	<string name="aj_tamano_letra">Tamaño de letra</string>
 	<string name="aj_fuente">Tipo de letra</string>
 	<string name="aj_negrita">Letra en negrita</string>
@@ -1847,5 +1847,103 @@
 	<plurals name="pod_errores">
 		<item quantity="one">%d podcast con errores.</item>
 		<item quantity="other">%d podcasts con errores.</item>
+	</plurals>
+
+	<!-- 1.0.9: Portada, secciones, estadísticas y actualizaciones -->
+	<string name="portada">Portada</string>
+	<string name="portada_seguir_leyendo">Seguir leyendo</string>
+	<string name="portada_biblioteca_vacia">Tu biblioteca está vacía. Ábrela para añadir libros.</string>
+	<string name="portada_nada_leyendo">No estás leyendo nada ahora.</string>
+	<string name="portada_sin_podcasts_corto">Sin suscripciones</string>
+	<string name="portada_seguir_escuchando">Seguir escuchando</string>
+	<string name="portada_sin_podcasts">Aún no sigues ningún podcast. Ábrelos para buscar uno.</string>
+	<string name="portada_nada_pendiente">No tienes episodios a medias, en la cola ni nuevos.</string>
+	<string name="portada_noticias_al_dia">Estás al día: no hay noticias sin leer.</string>
+	<string name="portada_tus_favoritas">Tus favoritas</string>
+	<string name="portada_ultimas_escuchadas">Últimas escuchadas</string>
+	<string name="portada_sin_emisoras">Aún no has escuchado ninguna emisora. Ábrela para buscar una.</string>
+	<string name="portada_vacia">No hay secciones en la Portada. Elígelas en Ajustes, Portada y secciones.</string>
+	<string name="portada_quedan">quedan %1$s</string>
+	<string name="portada_en_cola">en la cola</string>
+	<string name="portada_nuevo">nuevo</string>
+	<string name="portada_ver_todo">Ver todo</string>
+	<string name="portada_ver_todo_en">ver todo en %1$s</string>
+	<string name="aj_portada">Portada y secciones</string>
+	<string name="aj_portada_desc">Orden de las secciones y qué sale en la Portada</string>
+	<string name="aj_orden_secciones">Orden de las secciones</string>
+	<string name="aj_orden_secciones_desc">El orden del menú lateral, de la Portada y de las estadísticas, y qué secciones salen en la Portada</string>
+	<string name="aj_portada_elementos">Elementos de cada sección en la Portada</string>
+	<string name="secciones_explicacion">Toca dos veces una sección para ponerla o quitarla de la Portada. Para moverla, usa las acciones de TalkBack (Subir, Bajar…) o mantenla pulsada. El orden vale para el menú lateral, la Portada y las estadísticas.</string>
+	<string name="seccion_movida">%1$s, posición %2$d de %3$d</string>
+	<string name="seccion_en_portada">%1$s sale en la Portada</string>
+	<string name="seccion_fuera_portada">%1$s ya no sale en la Portada</string>
+	<string name="seccion_poner_portada">Poner en la Portada</string>
+	<string name="seccion_quitar_portada">Quitar de la Portada</string>
+	<string name="seccion_detalle">Posición %1$d de %2$d · %3$s</string>
+	<string name="seccion_sale_portada">sale en la Portada</string>
+	<string name="seccion_no_sale_portada">no sale en la Portada</string>
+	<string name="seccion_en_la_portada">en la Portada</string>
+	<string name="est_linea">%1$s: %2$s, %3$s</string>
+	<string name="est_tiempo_escuchando">Tiempo escuchando</string>
+	<string name="est_tiempo_noticias">Tiempo con las noticias</string>
+	<string name="est_suscripciones">Suscripciones: %1$d</string>
+	<string name="est_episodios_escuchados">Episodios escuchados: %1$d</string>
+	<string name="est_episodios_nuevos">Episodios nuevos: %1$d</string>
+	<string name="est_en_cola">En la cola: %1$d</string>
+	<string name="est_descargados">Descargados: %1$d</string>
+	<string name="est_mas_escuchados">Podcasts más escuchados</string>
+	<string name="est_fuentes">Fuentes: %1$d</string>
+	<string name="est_sin_leer">Sin leer: %1$d</string>
+	<string name="est_leidas">Leídas: %1$d</string>
+	<string name="est_favoritas_noticias">Favoritas: %1$d</string>
+	<string name="est_mas_tarde">Para más tarde: %1$d</string>
+	<string name="est_favoritas_radio">Emisoras favoritas: %1$d</string>
+	<string name="est_canciones">Canciones apuntadas: %1$d</string>
+	<string name="est_grabaciones">Grabaciones: %1$d, %2$s en total</string>
+	<string name="est_mas_escuchadas">Las emisoras que más escuchas</string>
+	<string name="aj_fuente_actualizaciones">Buscar actualizaciones en</string>
+	<string name="aj_url_personalizada">Dirección personalizada</string>
+	<string name="aj_url_personalizada_desc">La dirección de una carpeta web con version.json y el APK, o la de un repositorio de GitHub (https://github.com/usuario/repositorio).</string>
+	<string name="aj_url_personalizada_vacia">Sin escribir</string>
+	<string name="actualizacion_origen">Viene de %1$s.</string>
+	<plurals name="portada_episodios_nuevos">
+		<item quantity="one">%1$d episodio nuevo</item>
+		<item quantity="many">%1$d episodios nuevos</item>
+		<item quantity="other">%1$d episodios nuevos</item>
+	</plurals>
+	<plurals name="portada_sin_leer">
+		<item quantity="one">%1$d sin leer</item>
+		<item quantity="many">%1$d sin leer</item>
+		<item quantity="other">%1$d sin leer</item>
+	</plurals>
+	<plurals name="est_episodios_terminados">
+		<item quantity="one">%1$d episodio terminado</item>
+		<item quantity="many">%1$d episodios terminados</item>
+		<item quantity="other">%1$d episodios terminados</item>
+	</plurals>
+	<plurals name="est_episodios">
+		<item quantity="one">%1$d episodio</item>
+		<item quantity="many">%1$d episodios</item>
+		<item quantity="other">%1$d episodios</item>
+	</plurals>
+	<plurals name="est_noticias_abiertas">
+		<item quantity="one">%1$d noticia abierta</item>
+		<item quantity="many">%1$d noticias abiertas</item>
+		<item quantity="other">%1$d noticias abiertas</item>
+	</plurals>
+	<plurals name="est_emisoras_puestas">
+		<item quantity="one">%1$d vez que pusiste una emisora</item>
+		<item quantity="many">%1$d veces que pusiste una emisora</item>
+		<item quantity="other">%1$d veces que pusiste una emisora</item>
+	</plurals>
+	<plurals name="est_racha_escuchando">
+		<item quantity="one">Racha: %1$d día seguido escuchando</item>
+		<item quantity="many">Racha: %1$d días seguidos escuchando</item>
+		<item quantity="other">Racha: %1$d días seguidos escuchando</item>
+	</plurals>
+	<plurals name="est_racha_noticias">
+		<item quantity="one">Racha: %1$d día seguido con las noticias</item>
+		<item quantity="many">Racha: %1$d días seguidos con las noticias</item>
+		<item quantity="other">Racha: %1$d días seguidos con las noticias</item>
 	</plurals>
 </resources>

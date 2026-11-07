@@ -18,7 +18,7 @@ import com.google.android.material.navigation.NavigationBarView
 import com.xebolax.lector.R
 import com.xebolax.lector.actualizaciones.GestorActualizaciones
 import com.xebolax.lector.biblioteca.Importador
-import com.xebolax.lector.databinding.ActivityPrincipalBinding
+import com.xebolax.lector.databinding.ActivityBibliotecaBinding
 import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.datos.Orden
 import com.xebolax.lector.datos.Preferencias
@@ -35,18 +35,19 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Ventana principal, la sección Biblioteca: pestañas abajo (Leyendo,
- * Biblioteca, Marcadores y Catálogos, las bibliotecas en línea) y el menú
- * lateral (Secciones.kt) para ir a Podcasts, Noticias y lo general. Las pestañas se ocultan y muestran, no se recrean.
+ * La sección Biblioteca: pestañas abajo (Leyendo, Biblioteca, Marcadores y
+ * Catálogos, las bibliotecas en línea) y el menú lateral (Secciones.kt) para
+ * ir a la Portada, a las demás secciones y a lo general. Las pestañas se
+ * ocultan y muestran, no se recrean.
  * También recibe los archivos que se abren con la app desde otras.
  */
-class PrincipalActivity : AppCompatActivity() {
+class BibliotecaActivity : AppCompatActivity() {
 
 	companion object {
 		private const val ESTADO_PESTANA = "pestana"
 	}
 
-	private lateinit var b: ActivityPrincipalBinding
+	private lateinit var b: ActivityBibliotecaBinding
 	private var pestana = R.id.pestana_recientes
 	val actualizaciones = GestorActualizaciones(this)
 
@@ -57,8 +58,6 @@ class PrincipalActivity : AppCompatActivity() {
 	private val elegirCarpeta = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
 		uri?.let { preguntarCarpeta(it) }
 	}
-
-	private val permisoNotificaciones = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
 	/** Escáner de documentos de Google: fotos de las hojas, recortadas y enderezadas. */
 	private val escanear = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
@@ -76,24 +75,20 @@ class PrincipalActivity : AppCompatActivity() {
 		if (r.resultCode == RESULT_OK && paginas.isNotEmpty()) guardarEscaneado(paginas)
 	}
 
-	/** Atrás: en una subcarpeta sube; en otra pestaña vuelve a Leyendo; en Leyendo sale. */
+	/** Atrás: en una subcarpeta sube; en otra pestaña vuelve a Leyendo; en Leyendo, a la Portada. */
 	private val atras = object : OnBackPressedCallback(true) {
 		override fun handleOnBackPressed() {
 			when {
 				pestana == R.id.pestana_biblioteca && biblioteca?.subir() == true -> Unit
 				pestana != R.id.pestana_recientes -> b.navegacion.selectedItemId = R.id.pestana_recientes
-				else -> {
-					isEnabled = false
-					onBackPressedDispatcher.onBackPressed()
-					isEnabled = true
-				}
+				else -> volverAPortada()
 			}
 		}
 	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
-		b = ActivityPrincipalBinding.inflate(layoutInflater)
+		b = ActivityBibliotecaBinding.inflate(layoutInflater)
 		onBackPressedDispatcher.addCallback(this, atras)
 		setSupportActionBar(b.barra)
 		setContentView(ponerMenuLateral(b.root, b.barra, Seccion.BIBLIOTECA, actualizaciones) { b.navegacion.selectedItemId = R.id.pestana_recientes })
@@ -109,16 +104,7 @@ class PrincipalActivity : AppCompatActivity() {
 		}
 		b.navegacion.setOnItemReselectedListener { }
 
-		if (savedInstanceState == null) {
-			atenderIntent(intent)
-			actualizaciones.alIniciar()
-			TareasInicio.alAbrir(this)
-			if (Build.VERSION.SDK_INT >= 33) permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-			// Abrir el último libro al iniciar (Ajustes)
-			if (Preferencias(this).abrirUltimo && intent?.action == Intent.ACTION_MAIN) {
-				BaseDatos.obtener(this).ultimoAbierto()?.let { Abiertos.abrirPantalla(this, it) }
-			}
-		}
+		if (savedInstanceState == null) atenderIntent(intent)
 	}
 
 	override fun onConfigurationChanged(nueva: Configuration) {
@@ -176,7 +162,7 @@ class PrincipalActivity : AppCompatActivity() {
 		val nombre = b.navegacion.menu.findItem(id).title.toString()
 		// En Catálogos, el catálogo abierto
 		val catalogo = (fm.findFragmentByTag(etiqueta(id)) as? com.xebolax.lector.catalogo.CatalogoFragment)?.titulo()
-		b.barra.title = catalogo ?: if (id == R.id.pestana_recientes) getString(R.string.app_name) else nombre
+		b.barra.title = catalogo ?: if (id == R.id.pestana_recientes) getString(R.string.seccion_biblioteca) else nombre
 		title = b.barra.title
 		// Cada pestaña es un panel: TalkBack anuncia su nombre al aparecer
 		fm.findFragmentByTag(etiqueta(id))?.view?.let {
@@ -189,12 +175,12 @@ class PrincipalActivity : AppCompatActivity() {
 
 	private fun anadirArchivos(uris: List<Uri>) {
 		lifecycleScope.launch {
-			val r = conEspera(getString(R.string.anadir_libros), getString(R.string.anadiendo_libros)) { Importador.anadirArchivos(this@PrincipalActivity, uris, carpetaDestino()) }
+			val r = conEspera(getString(R.string.anadir_libros), getString(R.string.anadiendo_libros)) { Importador.anadirArchivos(this@BibliotecaActivity, uris, carpetaDestino()) }
 			resultado(r)
 			// Uno solo: se abre directamente
 			if (uris.size == 1) {
-				val id = r.anadidos.firstOrNull() ?: BaseDatos.obtener(this@PrincipalActivity).libroPorUri(uris[0].toString())?.id
-				id?.let { Abiertos.abrirPantalla(this@PrincipalActivity, it) }
+				val id = r.anadidos.firstOrNull() ?: BaseDatos.obtener(this@BibliotecaActivity).libroPorUri(uris[0].toString())?.id
+				id?.let { Abiertos.abrirPantalla(this@BibliotecaActivity, it) }
 			}
 		}
 	}
@@ -221,7 +207,7 @@ class PrincipalActivity : AppCompatActivity() {
 		lifecycleScope.launch {
 			val r = try {
 				conEspera(getString(R.string.anadir_carpeta), getString(R.string.buscando_libros)) {
-					Importador.anadirCarpeta(this@PrincipalActivity, arbol, carpetaDestino(), crearCarpetas)
+					Importador.anadirCarpeta(this@BibliotecaActivity, arbol, carpetaDestino(), crearCarpetas)
 				}
 			} catch (e: kotlinx.coroutines.CancellationException) {
 				throw e
@@ -246,7 +232,7 @@ class PrincipalActivity : AppCompatActivity() {
 
 	private fun revisar() {
 		lifecycleScope.launch {
-			val n = conEspera(getString(R.string.revisar_carpetas), getString(R.string.buscando_libros)) { Importador.revisarVigiladas(this@PrincipalActivity) }
+			val n = conEspera(getString(R.string.revisar_carpetas), getString(R.string.buscando_libros)) { Importador.revisarVigiladas(this@BibliotecaActivity) }
 			avisar(if (n == 0) getString(R.string.sin_libros_nuevos) else resources.getQuantityString(R.plurals.libros_anadidos, n, n), mostrar = true)
 		}
 	}
@@ -260,8 +246,8 @@ class PrincipalActivity : AppCompatActivity() {
 		val url = if (direccion.startsWith("http")) direccion else "https://$direccion"
 		lifecycleScope.launch {
 			try {
-				val id = conEspera(getString(R.string.abrir_pagina_web), getString(R.string.descargando_pagina)) { PaginaWeb.guardar(this@PrincipalActivity, url) }
-				Abiertos.abrirPantalla(this@PrincipalActivity, id)
+				val id = conEspera(getString(R.string.abrir_pagina_web), getString(R.string.descargando_pagina)) { PaginaWeb.guardar(this@BibliotecaActivity, url) }
+				Abiertos.abrirPantalla(this@BibliotecaActivity, id)
 			} catch (e: kotlinx.coroutines.CancellationException) {
 				throw e
 			} catch (e: Exception) {
@@ -300,11 +286,11 @@ class PrincipalActivity : AppCompatActivity() {
 	private fun guardarEscaneado(paginas: List<String>, carpeta: Long? = carpetaDestino()) {
 		lifecycleScope.launch {
 			val ahora = java.util.Date()
-			val titulo = getString(R.string.escaneado_el, android.text.format.DateFormat.getMediumDateFormat(this@PrincipalActivity).format(ahora) +
-				" " + android.text.format.DateFormat.getTimeFormat(this@PrincipalActivity).format(ahora))
-			val id = withContext(Dispatchers.IO) { com.xebolax.lector.ocr.Ocr.guardar(this@PrincipalActivity, titulo, paginas, carpeta) }
+			val titulo = getString(R.string.escaneado_el, android.text.format.DateFormat.getMediumDateFormat(this@BibliotecaActivity).format(ahora) +
+				" " + android.text.format.DateFormat.getTimeFormat(this@BibliotecaActivity).format(ahora))
+			val id = withContext(Dispatchers.IO) { com.xebolax.lector.ocr.Ocr.guardar(this@BibliotecaActivity, titulo, paginas, carpeta) }
 			avisar(getString(R.string.ocr_hecho))
-			Abiertos.abrirPantalla(this@PrincipalActivity, id)
+			Abiertos.abrirPantalla(this@BibliotecaActivity, id)
 		}
 	}
 
@@ -318,7 +304,7 @@ class PrincipalActivity : AppCompatActivity() {
 						if (imagenes.size > 1) avisar(getString(R.string.ocr_progreso, i + 1, imagenes.size), mostrar = false)
 						val mapa = withContext(Dispatchers.IO) { contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it) } }
 							?: return@mapIndexed ""
-						com.xebolax.lector.ocr.Ocr.reconocer(this@PrincipalActivity, mapa)
+						com.xebolax.lector.ocr.Ocr.reconocer(this@BibliotecaActivity, mapa)
 					}
 				}
 				guardarEscaneado(paginas, carpeta)
@@ -346,9 +332,9 @@ class PrincipalActivity : AppCompatActivity() {
 				val carpeta = File(filesDir, "textos").apply { mkdirs() }
 				val archivo = File(carpeta, "texto_${System.currentTimeMillis()}.txt")
 				archivo.writeText(texto)
-				BaseDatos.obtener(this@PrincipalActivity).anadirLibro(Uri.fromFile(archivo).toString(), archivo.name, titulo, "", Formato.TXT.name, false, archivo.length(), null)
+				BaseDatos.obtener(this@BibliotecaActivity).anadirLibro(Uri.fromFile(archivo).toString(), archivo.name, titulo, "", Formato.TXT.name, false, archivo.length(), null)
 			}
-			Abiertos.abrirPantalla(this@PrincipalActivity, id)
+			Abiertos.abrirPantalla(this@BibliotecaActivity, id)
 		}
 	}
 
@@ -372,7 +358,7 @@ class PrincipalActivity : AppCompatActivity() {
 				@Suppress("DEPRECATION")
 				intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let { lista ->
 					lifecycleScope.launch {
-						val ids = lista.mapNotNull { runCatching { Importador.anadirExterno(this@PrincipalActivity, it) }.getOrNull() }
+						val ids = lista.mapNotNull { runCatching { Importador.anadirExterno(this@BibliotecaActivity, it) }.getOrNull() }
 						avisar(resources.getQuantityString(R.plurals.libros_anadidos, ids.size, ids.size), mostrar = true)
 					}
 				}
@@ -384,9 +370,9 @@ class PrincipalActivity : AppCompatActivity() {
 	private fun abrirExterno(uri: Uri) {
 		lifecycleScope.launch {
 			try {
-				val id = Importador.anadirExterno(this@PrincipalActivity, uri)
-				TareasInicio.completar(this@PrincipalActivity, listOf(id))
-				Abiertos.abrirPantalla(this@PrincipalActivity, id)
+				val id = Importador.anadirExterno(this@BibliotecaActivity, uri)
+				TareasInicio.completar(this@BibliotecaActivity, listOf(id))
+				Abiertos.abrirPantalla(this@BibliotecaActivity, id)
 			} catch (e: kotlinx.coroutines.CancellationException) {
 				throw e
 			} catch (e: Exception) {

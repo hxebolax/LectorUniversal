@@ -39,7 +39,6 @@ import com.xebolax.lector.modelo.Posicion
 import com.xebolax.lector.modelo.Textos
 import com.xebolax.lector.modelo.TipoBloque
 import com.xebolax.lector.ui.Accion
-import com.xebolax.lector.ui.AjustesActivity
 import com.xebolax.lector.ui.ListaActivity
 import com.xebolax.lector.ui.Sonidos
 import com.xebolax.lector.ui.TextoActivity
@@ -346,10 +345,6 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 				},
 			))
 		}
-		b.botonAjustes.setOnClickListener {
-			volviendoDeAjustes = true
-			startActivity(Intent(this, AjustesActivity::class.java))
-		}
 		b.botonera.addOnLayoutChangeListener { _, izq, _, der, _, izqAntes, _, derAntes, _ ->
 			if (der - izq != derAntes - izqAntes) b.botonera.post { repartirBotonera() }
 		}
@@ -405,17 +400,24 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		} else ventana.show(WindowInsetsCompat.Type.systemBars())
 	}
 
-	private var volviendoDeAjustes = false
+	/** Para aplicar lo que se cambie en Ajustes (desde el menú lateral) al volver a la lectura. */
+	private var ajustesAlSalir = ""
 
 	override fun onResume() {
 		super.onResume()
-		if (volviendoDeAjustes) {
-			volviendoDeAjustes = false
+		val ajustes = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this).all.toString()
+		if (ajustesAlSalir.isNotEmpty() && ajustes != ajustesAlSalir) {
 			aplicarPreferencias()
 			actualizarVelocidad()
 			repartirBotonera()
 		}
+		ajustesAlSalir = ""
 		ultimoLatido = System.currentTimeMillis()
+	}
+
+	override fun onStop() {
+		super.onStop()
+		ajustesAlSalir = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this).all.toString()
 	}
 
 	override fun onPause() {
@@ -471,7 +473,14 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 
 	private fun volcarEstadisticas() {
 		val d = doc ?: return
-		if (idLibro <= 0) return
+		if (idLibro <= 0) {
+			// Una noticia: su tiempo cuenta en las estadísticas de Noticias
+			if (intent.hasExtra(com.xebolax.lector.rss.RssAcciones.EXTRA_ARTICULO) && segundosPendientes > 0) {
+				com.xebolax.lector.datos.Actividad.sumarLuego(this, com.xebolax.lector.datos.Actividad.NOTICIAS, segundosPendientes)
+			}
+			segundosPendientes = 0
+			return
+		}
 		val avance = d.inicioBloque[actual.coerceIn(0, d.bloques.size)] - d.inicioBloque[bloqueSesion.coerceIn(0, d.bloques.size)]
 		if (segundosPendientes > 0 || avance > 0) db.sumarLectura(idLibro, segundosPendientes, avance.coerceAtLeast(0))
 		segundosPendientes = 0
@@ -1700,13 +1709,13 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		if (tipo == Tipo.LIBRO) listOf(
 			b.botonIndice, b.botonBuscar, b.botonIr, b.botonMarcadores, b.botonVoz, b.botonDonde, b.botonIa, b.botonElementos,
 			b.botonTemporizador, b.botonAspecto, b.botonAjustesLibro, b.botonInformacion, b.botonSeleccionar,
-			b.botonExportar, b.botonAjustes,
+			b.botonExportar,
 		)
 		// Artículos y textos: la voz lo primero, a mano; sin lo que solo vale para libros de la
 		// biblioteca (marcadores, su voz, información y exportar a audio)
 		else listOf(b.botonVoz) + botonesRss + listOf(
 			b.botonIndice, b.botonBuscar, b.botonIr, b.botonDonde, b.botonIa, b.botonElementos,
-			b.botonTemporizador, b.botonAspecto, b.botonSeleccionar, b.botonAjustes,
+			b.botonTemporizador, b.botonAspecto, b.botonSeleccionar,
 		)
 	}
 	private var enMenu: List<com.google.android.material.button.MaterialButton> = emptyList()

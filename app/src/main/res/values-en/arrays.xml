@@ -172,8 +172,7 @@
 		<item>Information</item>
 		<item>Copy text</item>
 		<item>Export</item>
-		<item>Settings</item>
-	</string-array>
+</string-array>
 	<string-array name="pod_auto_descargar_nombres">
 		<item>As in Settings</item>
 		<item>Yes</item>
@@ -284,4 +283,17 @@
 	</string-array>
 
 	<!-- Correcciones de la revisión (1.0.8) -->
+
+	<!-- 1.0.9: Portada, secciones, estadísticas y actualizaciones -->
+	<string-array name="portada_elementos_nombres">
+		<item>3</item>
+		<item>5</item>
+		<item>10</item>
+	</string-array>
+	<string-array name="fuente_actualizaciones_nombres">
+		<item>Both: own server and GitHub (the newest)</item>
+		<item>Own server only</item>
+		<item>GitHub only</item>
+		<item>A custom address</item>
+	</string-array>
 </resources>

@@ -30,6 +30,7 @@ object RssAcciones {
 		val fuente = db.fuente(articulo.fuente)
 		if (Rss.prefs(a).getBoolean("rss_marcar_al_abrir", true) && !articulo.leido) db.marcarLeidos(listOf(articulo.id))
 		RssTrabajo.quitarAviso(a, articulo.id)
+		com.xebolax.lector.datos.Actividad.sumarLuego(a, com.xebolax.lector.datos.Actividad.NOTICIAS, elementos = 1)
 		if (fuente?.enNavegador == true && articulo.enlace.isNotBlank()) {
 			abrirNavegador(a, articulo.enlace)
 			return

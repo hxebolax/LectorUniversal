@@ -264,6 +264,7 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 	fun recientes(limite: Int = 50): List<Libro> = libros("abierto > 0", null, Orden.RECIENTES.sql, limite.toString())
 
 	fun ultimoAbierto(): Libro? = recientes(1).firstOrNull()
+	fun contarLibros(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM libros", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
 
 	/** Libros de una carpeta (null = raíz de la biblioteca, sin carpeta). */
 	fun deCarpeta(carpeta: Long?, orden: Orden = Orden.TITULO): List<Libro> =

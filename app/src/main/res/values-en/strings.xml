@@ -90,7 +90,7 @@
 	<string name="revisar_carpetas">Look for new books in watched folders</string>
 	<string name="abrir_pagina_web">Open a web page</string>
 	<string name="leer_portapapeles">Read copied text</string>
-	<string name="estadisticas">Reading statistics</string>
+	<string name="estadisticas">Statistics</string>
 	<string name="diccionario_pronunciacion">Pronunciation dictionary</string>
 	<string name="ajustes">Settings</string>
 	<string name="manual">User guide</string>
@@ -441,7 +441,7 @@
 	<string name="aj_actualizaciones">Updates</string>
 	<string name="aj_buscar_actualizaciones">Check for updates when opening the app</string>
 	<string name="aj_buscar_actualizaciones_desc">At most every 6 hours; nothing is ever installed without asking</string>
-	<string name="aj_url_actualizaciones">Update server</string>
+	<string name="aj_url_actualizaciones">Own server address</string>
 	<string name="aj_tamano_letra">Text size</string>
 	<string name="aj_fuente">Font</string>
 	<string name="aj_negrita">Bold text</string>
@@ -1835,5 +1835,103 @@
 	<plurals name="pod_errores">
 		<item quantity="one">%d podcast with errors.</item>
 		<item quantity="other">%d podcasts with errors.</item>
+	</plurals>
+
+	<!-- 1.0.9: Portada, secciones, estadísticas y actualizaciones -->
+	<string name="portada">Home</string>
+	<string name="portada_seguir_leyendo">Continue reading</string>
+	<string name="portada_biblioteca_vacia">Your library is empty. Open it to add books.</string>
+	<string name="portada_nada_leyendo">You are not reading anything right now.</string>
+	<string name="portada_sin_podcasts_corto">No subscriptions</string>
+	<string name="portada_seguir_escuchando">Continue listening</string>
+	<string name="portada_sin_podcasts">You don\'t follow any podcast yet. Open Podcasts to find one.</string>
+	<string name="portada_nada_pendiente">No episodes in progress, queued or new.</string>
+	<string name="portada_noticias_al_dia">You\'re up to date: no unread news.</string>
+	<string name="portada_tus_favoritas">Your favourites</string>
+	<string name="portada_ultimas_escuchadas">Recently played</string>
+	<string name="portada_sin_emisoras">You haven\'t listened to any station yet. Open Radio to find one.</string>
+	<string name="portada_vacia">There are no sections on the Home screen. Choose them in Settings, Home and sections.</string>
+	<string name="portada_quedan">%1$s left</string>
+	<string name="portada_en_cola">in the queue</string>
+	<string name="portada_nuevo">new</string>
+	<string name="portada_ver_todo">See all</string>
+	<string name="portada_ver_todo_en">see all in %1$s</string>
+	<string name="aj_portada">Home and sections</string>
+	<string name="aj_portada_desc">Section order and what the Home screen shows</string>
+	<string name="aj_orden_secciones">Section order</string>
+	<string name="aj_orden_secciones_desc">The order of the side menu, the Home screen and the statistics, and which sections the Home screen shows</string>
+	<string name="aj_portada_elementos">Items per section on the Home screen</string>
+	<string name="secciones_explicacion">Double-tap a section to show or hide it on the Home screen. To move it, use the TalkBack actions (Move up, Move down…) or touch and hold it. The order applies to the side menu, the Home screen and the statistics.</string>
+	<string name="seccion_movida">%1$s, position %2$d of %3$d</string>
+	<string name="seccion_en_portada">%1$s is shown on the Home screen</string>
+	<string name="seccion_fuera_portada">%1$s is no longer shown on the Home screen</string>
+	<string name="seccion_poner_portada">Show on the Home screen</string>
+	<string name="seccion_quitar_portada">Hide from the Home screen</string>
+	<string name="seccion_detalle">Position %1$d of %2$d · %3$s</string>
+	<string name="seccion_sale_portada">shown on the Home screen</string>
+	<string name="seccion_no_sale_portada">not shown on the Home screen</string>
+	<string name="seccion_en_la_portada">on the Home screen</string>
+	<string name="est_linea">%1$s: %2$s, %3$s</string>
+	<string name="est_tiempo_escuchando">Listening time</string>
+	<string name="est_tiempo_noticias">Time with the news</string>
+	<string name="est_suscripciones">Subscriptions: %1$d</string>
+	<string name="est_episodios_escuchados">Episodes played: %1$d</string>
+	<string name="est_episodios_nuevos">New episodes: %1$d</string>
+	<string name="est_en_cola">In the queue: %1$d</string>
+	<string name="est_descargados">Downloaded: %1$d</string>
+	<string name="est_mas_escuchados">Most played podcasts</string>
+	<string name="est_fuentes">Feeds: %1$d</string>
+	<string name="est_sin_leer">Unread: %1$d</string>
+	<string name="est_leidas">Read: %1$d</string>
+	<string name="est_favoritas_noticias">Favourites: %1$d</string>
+	<string name="est_mas_tarde">Read later: %1$d</string>
+	<string name="est_favoritas_radio">Favourite stations: %1$d</string>
+	<string name="est_canciones">Songs logged: %1$d</string>
+	<string name="est_grabaciones">Recordings: %1$d, %2$s in total</string>
+	<string name="est_mas_escuchadas">Your most played stations</string>
+	<string name="aj_fuente_actualizaciones">Look for updates on</string>
+	<string name="aj_url_personalizada">Custom address</string>
+	<string name="aj_url_personalizada_desc">The address of a web folder with version.json and the APK, or of a GitHub repository (https://github.com/user/repository).</string>
+	<string name="aj_url_personalizada_vacia">Not set</string>
+	<string name="actualizacion_origen">It comes from %1$s.</string>
+	<plurals name="portada_episodios_nuevos">
+		<item quantity="one">%1$d new episode</item>
+		<item quantity="many">%1$d new episodes</item>
+		<item quantity="other">%1$d new episodes</item>
+	</plurals>
+	<plurals name="portada_sin_leer">
+		<item quantity="one">%1$d unread</item>
+		<item quantity="many">%1$d unread</item>
+		<item quantity="other">%1$d unread</item>
+	</plurals>
+	<plurals name="est_episodios_terminados">
+		<item quantity="one">%1$d episode finished</item>
+		<item quantity="many">%1$d episodes finished</item>
+		<item quantity="other">%1$d episodes finished</item>
+	</plurals>
+	<plurals name="est_episodios">
+		<item quantity="one">%1$d episode</item>
+		<item quantity="many">%1$d episodes</item>
+		<item quantity="other">%1$d episodes</item>
+	</plurals>
+	<plurals name="est_noticias_abiertas">
+		<item quantity="one">%1$d article opened</item>
+		<item quantity="many">%1$d articles opened</item>
+		<item quantity="other">%1$d articles opened</item>
+	</plurals>
+	<plurals name="est_emisoras_puestas">
+		<item quantity="one">%1$d station played</item>
+		<item quantity="many">%1$d stations played</item>
+		<item quantity="other">%1$d stations played</item>
+	</plurals>
+	<plurals name="est_racha_escuchando">
+		<item quantity="one">Streak: %1$d day in a row listening</item>
+		<item quantity="many">Streak: %1$d days in a row listening</item>
+		<item quantity="other">Streak: %1$d days in a row listening</item>
+	</plurals>
+	<plurals name="est_racha_noticias">
+		<item quantity="one">Streak: %1$d day in a row with the news</item>
+		<item quantity="many">Streak: %1$d days in a row with the news</item>
+		<item quantity="other">Streak: %1$d days in a row with the news</item>
 	</plurals>
 </resources>

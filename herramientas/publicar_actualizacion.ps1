@@ -3,18 +3,22 @@
 #
 # Copia LectorUniversal.apk a dist\LectorUniversal_v<version>.apk y crea
 # dist\version.json con la version, el tamano, el SHA-256 y las novedades
-# (seccion "== <version>" de NOVEDADES.txt). Despues basta con subir los dos
-# archivos a la carpeta LectorUniversal del servidor (la que figura en
-# Ajustes > General > Servidor de actualizaciones).
+# (seccion "== <version>" de NOVEDADES.txt). Despues los copia a la carpeta
+# sincronizada con el servidor (si existe) y, si esta la herramienta gh de
+# GitHub con la sesion iniciada, crea la release v<version> en GitHub con los
+# dos archivos (la app puede actualizarse desde el servidor, GitHub o ambos).
 #
-# Uso: publicar_actualizacion.ps1 [-Apk otro.apk] [-Dist otra_carpeta]
+# Uso: publicar_actualizacion.ps1 [-Apk otro.apk] [-Dist otra_carpeta] [-Repo usuario/repositorio] [-SinGitHub]
 
 param(
 	[string]$Apk = "",
 	[string]$Dist = "",
 	# Carpeta sincronizada con el servidor web (https://xebolax.synology.me/LectorUniversal).
 	# Si existe, el APK y version.json se copian alli directamente.
-	[string]$Servidor = "$env:USERPROFILE\SynologyDrive\web\LectorUniversal"
+	[string]$Servidor = "$env:USERPROFILE\SynologyDrive\web\LectorUniversal",
+	# Repositorio de GitHub donde se publica la release (el mismo que REPO_GITHUB de build.gradle.kts)
+	[string]$Repo = "hxebolax/LectorUniversal",
+	[switch]$SinGitHub
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,4 +92,31 @@ if ($Servidor -and (Test-Path (Split-Path -Parent $Servidor))) {
 	Write-Host "[OK] Copiados a $Servidor (Synology Drive los sube al servidor)." -ForegroundColor Green
 } else {
 	Write-Host "     Sube los dos archivos a la carpeta del servidor de actualizaciones."
+}
+
+# GitHub: release v<version> con el APK y version.json (las notas, las de NOVEDADES.txt)
+if (-not $SinGitHub) {
+	$gh = Get-Command gh -ErrorAction SilentlyContinue
+	if (-not $gh) {
+		Write-Host "[AVISO] Sin la herramienta gh no se publica en GitHub (https://cli.github.com)."
+	} else {
+		& gh auth status *> $null
+		if ($LASTEXITCODE -ne 0) {
+			Write-Host "[AVISO] gh no tiene la sesion iniciada (gh auth login): no se publica en GitHub."
+		} else {
+			$etiqueta = "v$nombre"
+			$fichNotas = Join-Path $Dist "notas.md"
+			[IO.File]::WriteAllText($fichNotas, $notas + "`n", $Utf8)
+			& gh release view $etiqueta --repo $Repo *> $null
+			if ($LASTEXITCODE -eq 0) {
+				# Ya existe: se reemplazan los archivos y las notas
+				& gh release upload $etiqueta $destino (Join-Path $Dist "version.json") --repo $Repo --clobber
+				& gh release edit $etiqueta --repo $Repo --notes-file $fichNotas
+			} else {
+				& gh release create $etiqueta $destino (Join-Path $Dist "version.json") --repo $Repo --title "Lector Universal $nombre" --notes-file $fichNotas --latest
+			}
+			if ($LASTEXITCODE -eq 0) { Write-Host "[OK] Publicada en GitHub: https://github.com/$Repo/releases/tag/$etiqueta" -ForegroundColor Green }
+			else { Write-Host "[ERROR] No se pudo publicar en GitHub." -ForegroundColor Red }
+		}
+	}
 }

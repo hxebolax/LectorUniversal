@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ajustes, Portada y secciones -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<Preference
+		android:key="ir_orden_secciones"
+		android:title="@string/aj_orden_secciones"
+		android:summary="@string/aj_orden_secciones_desc" />
+	<ListPreference
+		android:key="portada_elementos"
+		android:title="@string/aj_portada_elementos"
+		android:entries="@array/portada_elementos_nombres"
+		android:entryValues="@array/portada_elementos_valores"
+		android:defaultValue="3"
+		app:useSimpleSummaryProvider="true" />
+</PreferenceScreen>

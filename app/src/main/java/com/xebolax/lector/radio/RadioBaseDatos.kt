@@ -266,6 +266,7 @@ class RadioBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "radi
 
 	// --- Canciones -------------------------------------------------------------------------------
 
+	fun contarCanciones(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM canciones", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
 	fun canciones(uuid: String? = null): List<Cancion> = lista(
 		"SELECT id, titulo, uuid, emisora, fecha FROM canciones" + (if (uuid != null) " WHERE uuid = ?" else "") + " ORDER BY fecha DESC LIMIT 1000",
 		uuid?.let { arrayOf(it) },

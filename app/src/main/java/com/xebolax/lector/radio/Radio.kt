@@ -121,6 +121,7 @@ object Radio {
 			if (despertador) ControlAudio.subirPocoAPoco(if (prefs(app).getBoolean("radio_despertador_gradual", true)) 60 else 0)
 		}
 		db.apuntarEscuchada(e)
+		com.xebolax.lector.datos.Actividad.sumarLuego(app, com.xebolax.lector.datos.Actividad.RADIO, elementos = 1)
 		if (!e.propia) LectorApp.ambito.launch { RadioBrowser.contarClic(e.uuid) }
 		if (volver) c.startActivity(Intent(c, RadioReproductorActivity::class.java).addFlags(if (c is Activity) 0 else Intent.FLAG_ACTIVITY_NEW_TASK))
 	}

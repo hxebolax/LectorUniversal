@@ -87,21 +87,23 @@ class RadioActivity : AppCompatActivity() {
 		if (!concedido) mensaje(getString(R.string.radio_despertador), getString(R.string.radio_sin_permiso_avisos))
 	}
 
+	/** La pestaña con la que se abre la sección: Favoritas o, si no hay, Explorar. */
+	private var pestanaInicio = 0
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		b = ActivityRssBinding.inflate(layoutInflater)
 		configurarBarra(b.barra, getString(R.string.radio), conAtras = false)
-		setContentView(ponerMenuLateral(b.root, b.barra, Seccion.RADIO, actualizaciones) { b.paginas.setCurrentItem(0, false) })
+		setContentView(ponerMenuLateral(b.root, b.barra, Seccion.RADIO, actualizaciones) { b.paginas.setCurrentItem(pestanaInicio, false) })
 		seguirMiniReproductor(b.miniReproductor)
 		b.paginas.adapter = object : FragmentStateAdapter(this) {
 			override fun getItemCount() = pestanas.size
 			override fun createFragment(posicion: Int): Fragment = RadioListaFragment.nuevo(pestanas[posicion])
 		}
-		ponerPestanas(b.barra, b.paginas, b.pestanas, pestanas.map { it.nombre to it.icono }, getString(R.string.radio))
-		// La primera vez, si no hay favoritas, se empieza en Explorar
-		if (savedInstanceState == null && RadioBaseDatos.obtener(this).favoritas().isEmpty()) {
-			b.paginas.setCurrentItem(pestanas.indexOf(RadioListaFragment.Modo.EXPLORAR), false)
-		}
+		ponerPestanas(b.barra, b.paginas, b.pestanas, pestanas.map { it.nombre to it.icono }, getString(R.string.radio)) { pestanaInicio }
+		// Si no hay favoritas, se empieza en Explorar (y Atrás desde ella vuelve a la Portada)
+		if (RadioBaseDatos.obtener(this).favoritas().isEmpty()) pestanaInicio = pestanas.indexOf(RadioListaFragment.Modo.EXPLORAR)
+		if (savedInstanceState == null && pestanaInicio != 0) b.paginas.setCurrentItem(pestanaInicio, false)
 		if (savedInstanceState == null) atender(intent)
 		// Datos de las favoritas al día (votos, direcciones que cambian), como mucho una vez al día
 		lifecycleScope.launch { runCatching { Radio.ponerAlDia(this@RadioActivity) } }

@@ -93,7 +93,13 @@ class NavegadorBibliotecaTest {
 			for (i in 0 until n.childCount) buscar(n.getChild(i), t)?.let { return it }
 			return null
 		}
-		val boton = buscar(ui.rootInActiveWindow, "DAISY")
+		// La página tarda en llegar al árbol de accesibilidad: se espera a que salga el botón
+		var boton: AccessibilityNodeInfo? = null
+		val limite = System.currentTimeMillis() + 20000
+		while (boton == null && System.currentTimeMillis() < limite) {
+			boton = buscar(ui.rootInActiveWindow, "DAISY")
+			if (boton == null) Thread.sleep(500)
+		}
 		Log.i("NavegadorBib", "Botón DAISY: ${boton != null} pulsado=${boton?.performAction(AccessibilityNodeInfo.ACTION_CLICK)}")
 		Thread.sleep(15000)
 		Log.i("NavegadorBib", "Tras pulsar: ${textos()}")

@@ -34,10 +34,21 @@
 			android:title="@string/aj_buscar_actualizaciones"
 			android:summary="@string/aj_buscar_actualizaciones_desc"
 			android:defaultValue="true" />
+		<ListPreference
+			android:key="fuente_actualizaciones"
+			android:title="@string/aj_fuente_actualizaciones"
+			android:entries="@array/fuente_actualizaciones_nombres"
+			android:entryValues="@array/fuente_actualizaciones_valores"
+			android:defaultValue="ambos"
+			app:useSimpleSummaryProvider="true" />
 		<EditTextPreference
 			android:key="url_actualizaciones"
 			android:title="@string/aj_url_actualizaciones"
 			app:useSimpleSummaryProvider="true" />
+		<EditTextPreference
+			android:key="url_personalizada"
+			android:title="@string/aj_url_personalizada"
+			android:dialogMessage="@string/aj_url_personalizada_desc" />
 		<Preference
 			android:key="comprobar_ahora"
 			android:title="@string/buscar_actualizaciones" />

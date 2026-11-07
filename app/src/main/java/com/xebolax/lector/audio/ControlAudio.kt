@@ -108,7 +108,12 @@ object ControlAudio {
 		val alCambiarCancion: (String) -> Unit = {},
 		/** Es un despertador: si la emisora no suena, suena la alarma del sistema. */
 		val despertador: Boolean = false,
-	)
+		/** Sección en cuyas estadísticas cuenta el tiempo (vacío: radio si es en directo, si no podcasts). */
+		val seccion: String = "",
+	) {
+		val seccionActividad: String
+			get() = seccion.ifEmpty { if (directo) com.xebolax.lector.datos.Actividad.RADIO else com.xebolax.lector.datos.Actividad.PODCASTS }
+	}
 
 	/** Lo que dice la emisora que suena ahora (radio en directo). */
 	var cancion = ""

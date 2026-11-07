@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	Portada: la pantalla de inicio. Barra con «Abrir menú», la lista con lo de
+	cada sección (encabezados para saltar con TalkBack) y el mini reproductor
+	abajo. Sin pestañas: cada sección tiene las suyas.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:fitsSystemWindows="true"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/barra"
+		android:layout_width="match_parent"
+		android:layout_height="?attr/actionBarSize"
+		app:title="@string/app_name" />
+
+	<androidx.recyclerview.widget.RecyclerView
+		android:id="@+id/recycler"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:clipToPadding="false"
+		android:paddingBottom="8dp" />
+
+	<!-- Lo que suena (voz, audiolibro, episodio o radio) -->
+	<com.xebolax.lector.audio.MiniReproductor
+		android:id="@+id/mini_reproductor"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content" />
+</LinearLayout>
