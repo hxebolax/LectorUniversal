@@ -96,6 +96,8 @@ if ($Servidor -and (Test-Path (Split-Path -Parent $Servidor))) {
 
 # GitHub: release v<version> con el APK y version.json (las notas, las de NOVEDADES.txt)
 if (-not $SinGitHub) {
+	# gh escribe en stderr cosas esperadas («release not found»): no deben cortar el script
+	$ErrorActionPreference = "Continue"
 	$gh = Get-Command gh -ErrorAction SilentlyContinue
 	if (-not $gh) {
 		Write-Host "[AVISO] Sin la herramienta gh no se publica en GitHub (https://cli.github.com)."
