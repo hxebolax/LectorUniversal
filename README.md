@@ -8,6 +8,7 @@ Lector Universal es una app Android hecha por y para personas ciegas o con baja 
 - Android 7.0 (API 24) o posterior. Probada en Android 15.
 - Idiomas: español (principal) e inglés.
 - Autor: Héctor J. Benítez Corredera.
+- Licencia: [GNU GPL versión 3](LICENSE), software libre.
 
 ---
 
@@ -28,6 +29,7 @@ Lector Universal es una app Android hecha por y para personas ciegas o con baja 
   - [Estructura del código](#estructura-del-código)
   - [Normas del proyecto](#normas-del-proyecto)
   - [Traducir la app](#traducir-la-app)
+- [Licencia](#licencia)
 - [Créditos y licencias de terceros](#créditos-y-licencias-de-terceros)
 - [English summary](#english-summary)
 
@@ -223,6 +225,18 @@ Copia `app/src/main/res/values/strings.xml` y `arrays.xml` a `app/src/main/res/v
 
 ---
 
+## Licencia
+
+Lector Universal es software libre: puedes usarlo, estudiarlo, compartirlo y modificarlo según los términos de la [Licencia Pública General de GNU, versión 3](LICENSE) (GPL-3.0), publicada por la Free Software Foundation. Si distribuyes la app o una versión modificada, tienes que hacerlo con la misma licencia y con su código fuente.
+
+Se distribuye con la esperanza de que sea útil, pero sin ninguna garantía; consulta la licencia para más detalles.
+
+Copyright (C) 2026 Héctor J. Benítez Corredera
+
+### Permiso adicional (sección 7 de la GPL)
+
+La app usa bibliotecas de Google que no son libres: ML Kit (reconocimiento de texto, identificación del idioma, escáner de documentos e inteligencia artificial del móvil) y los servicios de Google Play de los que dependen. Como permiso adicional según la sección 7 de la GPL-3.0, el autor permite combinar Lector Universal con esas bibliotecas y distribuir el resultado, aunque sus licencias no sean compatibles con la GPL. El resto de requisitos de la GPL siguen aplicándose a todo el código de Lector Universal. Quien distribuya una versión modificada puede quitar este permiso de su versión.
+
 ## Créditos y licencias de terceros
 
 - [AndroidX, Media3 y Material Components](https://developer.android.com/) (Apache 2.0)
@@ -233,12 +247,12 @@ Copia `app/src/main/res/values/strings.xml` y `arrays.xml` a `app/src/main/res/v
 - Ideas de funciones: Paperback, AntennaPod, RadioDroid, Feeder, Read You, Readrops y Capy Reader. Su código no se ha copiado: las secciones de Podcasts y Radio están escritas desde cero.
 - Iconos: Material Symbols (Apache 2.0)
 
-Este repositorio aún no tiene licencia; la elegirá su autor. Mientras tanto rigen los derechos de autor por defecto: GitHub permite ver el código y bifurcarlo, pero no da permiso para reutilizarlo ni redistribuirlo.
+Las bibliotecas de terceros conservan sus propias licencias; todas las libres de esta lista son compatibles con la GPL-3.0.
 
 ---
 
 ## English summary
 
-**Lector Universal** is an Android reader built for blind and low-vision people who use TalkBack. It opens EPUB, PDF (including scanned ones, with offline OCR), Word, OpenDocument, RTF, HTML, Markdown, FB2, Kindle, CHM, PowerPoint, Excel, comics, DAISY 2.02/3 and M4B/MP3 audiobooks; reads them aloud with any installed voice; and includes a podcast client, an RSS reader and an internet radio with 50,000+ stations from radio-browser.info, with recording and a radio alarm clock. It opens on a Home screen that gathers the most useful items from every section (in the order you choose), with statistics for all of them, and a mini player above the tabs keeps what is playing at hand in every section. Download the APK from the [latest GitHub release](https://github.com/hxebolax/LectorUniversal/releases/latest); the app then updates itself from the author's server, from GitHub, from both or from a custom address.
+**Lector Universal** is an Android reader built for blind and low-vision people who use TalkBack. It opens EPUB, PDF (including scanned ones, with offline OCR), Word, OpenDocument, RTF, HTML, Markdown, FB2, Kindle, CHM, PowerPoint, Excel, comics, DAISY 2.02/3 and M4B/MP3 audiobooks; reads them aloud with any installed voice; and includes a podcast client, an RSS reader and an internet radio with 50,000+ stations from radio-browser.info, with recording and a radio alarm clock. It opens on a Home screen that gathers the most useful items from every section (in the order you choose), with statistics for all of them, and a mini player above the tabs keeps what is playing at hand in every section. It is free software under the [GNU GPL version 3](LICENSE), with an additional permission (GPL section 7) to combine it with Google's non-free ML Kit libraries. Download the APK from the [latest GitHub release](https://github.com/hxebolax/LectorUniversal/releases/latest); the app then updates itself from the author's server, from GitHub, from both or from a custom address.
 
 Building on Windows: run `compilar.bat` (it downloads a portable JDK, Gradle, Android SDK and a TalkBack-enabled emulator into `entorno\`). Elsewhere: JDK 17 + Gradle 8.11.1 + Android SDK 35, then `gradle assembleDebug`. Tests: `gradle testDebugUnitTest` and `gradle connectedDebugAndroidTest` (run `AccesibilidadTest` with TalkBack on). The user interface is available in Spanish and English; source code identifiers and comments are in Spanish.
