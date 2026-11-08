@@ -178,7 +178,10 @@ class CatalogoFragment : Fragment() {
 			val a = JSONArray(texto)
 			List(a.length()) { i ->
 				val o = a.getJSONObject(i)
-				Fuente(o.optString("nombre"), o.optString("url"), o.optString("usuario"), o.optString("clave"), o.optBoolean("web"))
+				val url = o.optString("url")
+				// La contraseña está con las demás claves (Secretos), no en la lista
+				val clave = o.optString("clave").ifEmpty { com.xebolax.lector.datos.Secretos.leer(requireContext(), com.xebolax.lector.datos.Secretos.deCatalogo(url)) }
+				Fuente(o.optString("nombre"), url, o.optString("usuario"), clave, o.optBoolean("web"))
 			}
 		}.getOrDefault(emptyList())
 		// Las bibliotecas web (Tiflolibros, ONCE) se añaden una vez a las listas ya guardadas
@@ -201,7 +204,9 @@ class CatalogoFragment : Fragment() {
 	}
 
 	private fun guardarFuentes(lista: List<Fuente>) {
-		prefs().edit().putString(CLAVE, JSONArray(lista.map { it.json() }).toString()).apply()
+		// Las contraseñas van aparte, con las demás claves (para que no salgan en las copias sin querer)
+		lista.forEach { com.xebolax.lector.datos.Secretos.guardar(requireContext(), com.xebolax.lector.datos.Secretos.deCatalogo(it.url), it.clave) }
+		prefs().edit().putString(CLAVE, JSONArray(lista.map { it.json().apply { remove("clave") } }).toString()).apply()
 	}
 
 	private fun mostrarFuentes(enfocar: Boolean = true) {

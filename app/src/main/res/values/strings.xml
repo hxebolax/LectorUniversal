@@ -1946,4 +1946,93 @@
 		<item quantity="many">Racha: %1$d días seguidos con las noticias</item>
 		<item quantity="other">Racha: %1$d días seguidos con las noticias</item>
 	</plurals>
+
+	<!-- Copias de seguridad -->
+	<string name="aj_copias">Copias de seguridad</string>
+	<string name="aj_copias_desc">Guardar y restaurar todo, con contraseña si quieres; copia de seguridad de Android</string>
+	<string name="aj_copias_explicacion">Una copia guarda en un archivo lo que elijas: tus libros, podcasts, noticias, radio, ajustes y, si la proteges con contraseña, tus claves. Con ella puedes tener la app exactamente igual en otro móvil o volver atrás. El archivo lo guardas tú donde quieras; no se envía a ningún sitio.</string>
+	<string name="copia_crear">Crear una copia de seguridad</string>
+	<string name="aj_copia_crear_desc">Eliges qué guardar, si lleva contraseña y dónde guardar el archivo</string>
+	<string name="copia_restaurar">Restaurar una copia de seguridad</string>
+	<string name="aj_copia_restaurar_desc">Abres una copia, ves qué lleva y eliges qué recuperar. También las copias antiguas</string>
+	<string name="copia_deshacer">Deshacer la última restauración</string>
+	<string name="aj_copia_deshacer_desc">Vuelve a como estaba todo el %1$s, antes de restaurar</string>
+	<string name="aj_copia_android">Copia de seguridad de Android</string>
+	<string name="aj_copia_android_desc">Android guarda solo, en tu cuenta de Google, la biblioteca, los podcasts, la radio, las estadísticas y los ajustes, y al pasar a un móvil nuevo también las noticias y los libros guardados en la app.</string>
+	<string name="aj_copia_android_claves">Incluir claves y contraseñas en la copia de Android</string>
+	<string name="aj_copia_android_claves_desc">Las claves de la IA y las contraseñas de sincronización, de catálogos y de podcasts privados. Desactivado, no salen nunca de este móvil.</string>
+	<string name="copia_android_claves_si">Las claves y contraseñas irán en la copia de Android</string>
+	<string name="copia_android_claves_no">Las claves y contraseñas ya no salen de este móvil</string>
+	<string name="parte_biblioteca">Biblioteca</string>
+	<string name="parte_biblioteca_desc">Libros, carpetas, posiciones, marcadores, notas, colecciones, pronunciación y estadísticas de lectura</string>
+	<string name="parte_archivos">Libros guardados en la app</string>
+	<string name="parte_archivos_desc">Descargas de los catálogos, páginas web, textos y documentos escaneados</string>
+	<string name="parte_podcasts">Podcasts</string>
+	<string name="parte_podcasts_desc">Suscripciones, carpetas, episodios escuchados, cola y favoritos (no las descargas)</string>
+	<string name="parte_noticias">Noticias</string>
+	<string name="parte_noticias_desc">Fuentes, carpetas, artículos, leídos, favoritos y para más tarde</string>
+	<string name="parte_radio">Radio</string>
+	<string name="parte_radio_desc">Favoritas, historial, canciones, despertadores y grabaciones programadas</string>
+	<string name="parte_grabaciones">Grabaciones de radio</string>
+	<string name="parte_grabaciones_desc">Los archivos de audio grabados</string>
+	<string name="parte_estadisticas">Estadísticas de escucha</string>
+	<string name="parte_estadisticas_desc">Tiempo con los podcasts, las noticias y la radio</string>
+	<string name="parte_ajustes">Ajustes</string>
+	<string name="parte_ajustes_desc">Todos los de la app: voz, aspecto, secciones, acciones de TalkBack y cuentas</string>
+	<string name="parte_claves">Claves y contraseñas</string>
+	<string name="parte_claves_desc">Claves de la IA y contraseñas de sincronización, catálogos y podcasts privados. Solo con contraseña</string>
+	<string name="copia_elige_guardar">Elige qué guardar. Al lado de cada parte, lo que ocupa ahora.</string>
+	<string name="copia_elige_restaurar">Elige qué recuperar. Lo que marques sustituirá a lo que tienes ahora en este móvil.</string>
+	<string name="copia_elige_algo">Elige al menos una parte</string>
+	<string name="copia_proteger">Proteger con contraseña</string>
+	<string name="copia_contrasena_obligatoria">La copia lleva tus claves y contraseñas, así que tiene que ir protegida con una contraseña. Sin ella no se puede abrir ni restaurar, y no hay forma de recuperarla: guárdala bien.</string>
+	<string name="copia_contrasena_opcional">Recomendado: con contraseña, nadie puede abrir la copia sin ella. Si la olvidas, no hay forma de recuperarla.</string>
+	<string name="copia_contrasena">Contraseña</string>
+	<string name="copia_repetir_contrasena">Repite la contraseña</string>
+	<string name="copia_contrasena_corta">Tiene que tener al menos 8 caracteres</string>
+	<string name="copia_contrasenas_distintas">No coincide con la primera</string>
+	<string name="copia_sin_contrasena">Sin contraseña</string>
+	<string name="copia_nombre_archivo">Lector Universal - copia %1$s</string>
+	<string name="copia_guardando_inicio">Preparando la copia…</string>
+	<string name="copia_protegiendo">Preparando el cifrado…</string>
+	<string name="copia_guardando">Guardando: %1$s…</string>
+	<string name="copia_no_se_puede_escribir">No se puede escribir en ese archivo.</string>
+	<string name="copia_guardada">La copia está guardada. Ocupa %1$s.</string>
+	<string name="copia_lleva">Lleva: %1$s.</string>
+	<string name="copia_con_contrasena">Está protegida con contraseña: guárdala bien, sin ella no se puede restaurar.</string>
+	<string name="copia_sin_contrasena_aviso">No tiene contraseña: quien tenga el archivo puede ver tus datos. Guárdalo en un sitio seguro.</string>
+	<string name="copia_error_guardar">No se pudo guardar la copia. %1$s</string>
+	<string name="copia_no_es_copia">Ese archivo no es una copia de seguridad de Lector Universal.</string>
+	<string name="copia_abriendo">Abriendo la copia…</string>
+	<string name="copia_comprobando_contrasena">Comprobando la contraseña…</string>
+	<string name="copia_protegida">Copia protegida</string>
+	<string name="copia_escribe_contrasena">Escribe la contraseña de esta copia.</string>
+	<string name="copia_contrasena_incorrecta">La contraseña no es correcta, o la copia está dañada.</string>
+	<string name="copia_error_abrir">No se pudo abrir la copia. %1$s</string>
+	<string name="copia_info">Copia del %1$s, hecha en %2$s con Lector Universal %3$s.</string>
+	<string name="copia_info_cifrada">Protegida con contraseña.</string>
+	<string name="copia_info_sin_cifrar">Sin contraseña.</string>
+	<string name="copia_mas_nueva">Esta copia es de una versión más nueva de la app. Conviene actualizar Lector Universal antes de restaurarla.</string>
+	<string name="copia_elegir_que">Elegir qué restaurar</string>
+	<string name="copia_confirmar_restaurar">Se sustituirá en este móvil: %1$s.
+
+Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copias de seguridad, Deshacer la última restauración). Al terminar, la app se reinicia.</string>
+	<string name="copia_confirmar_deshacer">Todo volverá a como estaba antes de la última restauración: %1$s. Al terminar, la app se reinicia.</string>
+	<string name="copia_restaurar_boton">Restaurar</string>
+	<string name="copia_deshacer_boton">Deshacer</string>
+	<string name="copia_comprobando">Comprobando la copia…</string>
+	<string name="copia_guardando_actual">Guardando cómo está todo ahora…</string>
+	<string name="copia_aplicando">Restaurando…</string>
+	<string name="copia_error_restaurar">No se pudo restaurar la copia y no se ha cambiado nada. %1$s</string>
+	<string name="copia_restaurada">Listo. La app se reinicia ahora con lo restaurado.</string>
+	<string name="copia_nada_que_deshacer">No hay ninguna restauración que deshacer.</string>
+	<string name="aj_biblioteca_sinc">Biblioteca y sincronización</string>
+	<string name="aj_biblioteca_sinc_desc">Carpetas vigiladas y sincronizar la biblioteca con tu servidor</string>
+
+	<!-- Botón Siguiente -->
+	<string name="siguiente">Siguiente</string>
+
+	<!-- Copias: mostrar contraseña -->
+	<string name="copia_mostrar_contrasena">Mostrar la contraseña</string>
+	<string name="copia_mostrar_repetida">Mostrar la contraseña repetida</string>
 </resources>

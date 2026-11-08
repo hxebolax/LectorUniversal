@@ -26,7 +26,21 @@ import kotlinx.coroutines.selects.select
  * Devuelve lo que devuelva el trabajo (y sus errores se lanzan aquí); si se
  * cancela, lanza CancellationException y la corrutina que la llama se para.
  */
-suspend fun <T> AppCompatActivity.conEspera(titulo: String, mensaje: String = getString(R.string.espera_un_momento), trabajo: suspend () -> T): T {
+/**
+ * Para trabajos largos con pasos (guardar una copia de seguridad...): el texto
+ * de la ventana de espera cambia con cada paso y TalkBack lo dice.
+ */
+class Avance {
+	@Volatile internal var texto: String? = null
+	@Volatile internal var vista: TextView? = null
+
+	fun decir(nuevo: String) {
+		texto = nuevo
+		vista?.let { v -> v.post { v.text = nuevo } }
+	}
+}
+
+suspend fun <T> AppCompatActivity.conEspera(titulo: String, mensaje: String = getString(R.string.espera_un_momento), avance: Avance? = null, trabajo: suspend () -> T): T {
 	val tarea = lifecycleScope.async { trabajo() }
 	val cancelar = CompletableDeferred<Unit>()
 	var dialogo: AlertDialog? = null
@@ -39,9 +53,14 @@ suspend fun <T> AppCompatActivity.conEspera(titulo: String, mensaje: String = ge
 			// La rueda es solo visual: el mensaje ya dice qué pasa
 			addView(ProgressBar(this@conEspera).apply { importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO })
 			addView(TextView(this@conEspera).apply {
-				text = mensaje
+				text = avance?.texto ?: mensaje
 				setPadding(m / 2, 0, 0, 0)
 				setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
+				// Con pasos, cada cambio se anuncia (sin quitar el foco)
+				if (avance != null) {
+					accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+					avance.vista = this
+				}
 			})
 		}
 		dialogo = MaterialAlertDialogBuilder(this@conEspera)
@@ -62,6 +81,7 @@ suspend fun <T> AppCompatActivity.conEspera(titulo: String, mensaje: String = ge
 		throw e
 	} finally {
 		mostrar.cancel()
+		avance?.vista = null
 		dialogo?.takeIf { it.isShowing }?.dismiss()
 	}
 }

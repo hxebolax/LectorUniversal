@@ -49,6 +49,11 @@ object Actividad {
 
 	private fun bd(c: Context): Bd = bd ?: synchronized(this) { bd ?: Bd(c.applicationContext).also { bd = it } }
 
+	/** Cierra la base de datos (antes de restaurar una copia; se vuelve a abrir al usarla). */
+	fun cerrar() {
+		bd?.close()
+	}
+
 	/** Suma tiempo y elementos de hoy a una sección. */
 	fun sumar(c: Context, seccion: String, segundos: Long = 0, elementos: Int = 0) {
 		if (segundos <= 0 && elementos <= 0) return

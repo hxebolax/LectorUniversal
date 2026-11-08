@@ -46,7 +46,7 @@ object PodcastsSincronizacion {
 	private fun servicio(c: Context): Servicio? {
 		val p = Podcasts.prefs(c)
 		val usuario = p.getString("pod_sinc_usuario", "").orEmpty().trim()
-		val clave = p.getString("pod_sinc_clave", "").orEmpty()
+		val clave = com.xebolax.lector.datos.Secretos.leer(c, "pod_sinc_clave")
 		val url = p.getString("pod_sinc_url", "").orEmpty().trim().trimEnd('/')
 		return when (p.getString("pod_sinc_tipo", "ninguno")) {
 			"gpodder" -> {

@@ -50,6 +50,7 @@ class AjustesActivity : AppCompatActivity() {
 				"rss" -> abrirApartado("rss", getString(R.string.aj_rss))
 				"podcasts" -> abrirApartado("podcasts", getString(R.string.aj_podcasts))
 				"radio" -> abrirApartado("radio", getString(R.string.aj_radio))
+				"copias" -> abrirApartado("copias", getString(R.string.aj_copias))
 			}
 		}
 		supportFragmentManager.addOnBackStackChangedListener {
@@ -79,69 +80,14 @@ class AjustesFragment : PreferenceFragmentCompat() {
 
 	val titulo: String? get() = arguments?.getString("titulo")
 
-	private val exportar = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-		uri ?: return@registerForActivityResult
-		lifecycleScope.launch {
-			val ok = withContext(Dispatchers.IO) {
-				runCatching {
-					val c = requireContext()
-					val copia = JSONObject()
-						.put("app", "LectorUniversal")
-						.put("biblioteca", BaseDatos.obtener(c).exportar())
-						// También las fuentes de Noticias y los podcasts (en OPML, como los guardan otras apps)
-						.put("noticias_opml", com.xebolax.lector.rss.Rss.exportarOpml(c))
-						.put("podcasts_opml", com.xebolax.lector.podcast.Podcasts.exportarOpml(c))
-						.put("ajustes", JSONObject(PreferenceManager.getDefaultSharedPreferences(c).all.filterKeys { !it.startsWith("ia_clave") && !it.endsWith("sinc_clave") }.mapValues { (_, v) ->
-							if (v is Set<*>) org.json.JSONArray(v.toList()) else v
-						}))
-					c.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(copia.toString(1)) }
-				}.isSuccess
-			}
-			(activity as? AppCompatActivity)?.avisar(getString(if (ok) R.string.copia_exportada else R.string.error_exportar))
-		}
-	}
-
-	private val importar = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-		uri ?: return@registerForActivityResult
-		requireContext().confirmar(getString(R.string.confirmar_importar), getString(R.string.importar)) {
-			lifecycleScope.launch {
-				val a = activity as? AppCompatActivity ?: return@launch
-				val ok = a.conEspera(getString(R.string.aj_importar_copia)) { withContext(Dispatchers.IO) {
-					runCatching {
-						val c = requireContext()
-						val texto = c.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("vacío")
-						val copia = JSONObject(texto)
-						BaseDatos.obtener(c).importar(copia.getJSONObject("biblioteca"))
-						copia.optString("noticias_opml").takeIf { it.isNotBlank() }?.let { com.xebolax.lector.rss.Rss.importarOpml(c, it) }
-						copia.optString("podcasts_opml").takeIf { it.isNotBlank() }?.let { opml ->
-							val db = com.xebolax.lector.podcast.PodcastsBaseDatos.obtener(c)
-							com.xebolax.lector.podcast.Podcasts.leerOpml(c, opml).forEach { (titulo, url, carpeta) -> db.anadirPodcast(url, titulo.ifBlank { url }, carpeta = carpeta) }
-						}
-						copia.optJSONObject("ajustes")?.let { a ->
-							val editor = PreferenceManager.getDefaultSharedPreferences(c).edit()
-							for (clave in a.keys()) {
-								when (val v = a.get(clave)) {
-									is Boolean -> editor.putBoolean(clave, v)
-									is Int -> editor.putInt(clave, v)
-									is Long -> editor.putLong(clave, v)
-									is Double -> editor.putFloat(clave, v.toFloat())
-									is org.json.JSONArray -> editor.putStringSet(clave, List(v.length()) { v.getString(it) }.toSet())
-									else -> editor.putString(clave, v.toString())
-								}
-							}
-							editor.apply()
-						}
-					}.isSuccess
-				} }
-				(activity as? AppCompatActivity)?.avisar(getString(if (ok) R.string.copia_importada else R.string.error_importar))
-			}
-		}
-	}
+	/** Crear, restaurar y deshacer copias de seguridad (apartado Copias de seguridad). */
+	private val copias = GestorCopias(this)
 
 	override fun onCreatePreferences(estado: Bundle?, raiz: String?) {
 		val xml = arguments?.getString("xml") ?: "raiz"
 		val recurso = when (xml) {
 			"portada" -> R.xml.ajustes_portada
+			"copias" -> R.xml.ajustes_copias
 			"general" -> R.xml.ajustes_general
 			"aspecto" -> R.xml.ajustes_aspecto
 			"navegacion" -> R.xml.ajustes_navegacion
@@ -156,9 +102,17 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			else -> R.xml.ajustes_raiz
 		}
 		setPreferencesFromResource(recurso, raiz)
+		// Claves y contraseñas: se leen y guardan aparte (Secretos), no en los ajustes normales
+		for (k in com.xebolax.lector.datos.Secretos.CLAVES_AJUSTES) {
+			findPreference<androidx.preference.EditTextPreference>(k)?.apply {
+				preferenceDataStore = com.xebolax.lector.datos.Secretos.almacen(requireContext())
+				text = com.xebolax.lector.datos.Secretos.leer(requireContext(), k)
+			}
+		}
 		when (xml) {
 			"raiz" -> configurarRaiz()
 			"general" -> configurarGeneral()
+			"copias" -> configurarCopias()
 			"voz" -> configurarVoz()
 			"documentos" -> configurarDocumentos()
 			"biblioteca" -> configurarBiblioteca()
@@ -203,7 +157,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 	private fun configurarRaiz() {
 		alPulsar("ir_acciones") { AccionesTalkBackActivity.abrir(requireContext()) }
 		val apartados = listOf(
-			"ir_portada" to "portada", "ir_general" to "general", "ir_aspecto" to "aspecto", "ir_navegacion" to "navegacion", "ir_voz" to "voz",
+			"ir_portada" to "portada", "ir_copias" to "copias", "ir_general" to "general", "ir_aspecto" to "aspecto", "ir_navegacion" to "navegacion", "ir_voz" to "voz",
 			"ir_audio" to "audio", "ir_podcasts" to "podcasts", "ir_rss" to "rss", "ir_radio" to "radio", "ir_ia" to "ia", "ir_documentos" to "documentos", "ir_biblioteca" to "biblioteca",
 		)
 		for ((clave, xml) in apartados) {
@@ -361,6 +315,27 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		}
 	}
 
+	private fun configurarCopias() {
+		alPulsar("copia_crear") { copias.crear() }
+		alPulsar("copia_restaurar") { copias.restaurar() }
+		alPulsar("copia_deshacer") { copias.deshacer() }
+		actualizarDeshacer()
+		// Claves en la copia de Android: al cambiar, pasan al archivo que Android copia o al que no
+		findPreference<androidx.preference.SwitchPreferenceCompat>(com.xebolax.lector.datos.Secretos.OPCION_COPIA_ANDROID)?.setOnPreferenceChangeListener { _, nuevo ->
+			com.xebolax.lector.datos.Secretos.cambiarCopiaAndroid(requireContext(), nuevo as Boolean)
+			(activity as? AppCompatActivity)?.avisar(getString(if (nuevo) R.string.copia_android_claves_si else R.string.copia_android_claves_no))
+			true
+		}
+	}
+
+	/** «Deshacer la última restauración» solo se ve si hay algo que deshacer. */
+	private fun actualizarDeshacer() {
+		findPreference<Preference>("copia_deshacer")?.apply {
+			isVisible = copias.hayQueDeshacer()
+			if (isVisible) summary = getString(R.string.aj_copia_deshacer_desc, copias.fechaDeshacer())
+		}
+	}
+
 	private fun sinRestriccionBateria(): Boolean {
 		val energia = requireContext().getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
 		return energia.isIgnoringBatteryOptimizations(requireContext().packageName)
@@ -373,6 +348,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 	override fun onResume() {
 		super.onResume()
 		findPreference<Preference>("optimizacion_bateria")?.let { actualizarBateria(it) }
+		actualizarDeshacer()
 		findPreference<Preference>("ia_modelo_local")?.let { actualizarModeloLocal(it) }
 	}
 
@@ -645,7 +621,5 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		}
 		actualizarVigiladas()
 		alPulsar("carpetas_vigiladas") { carpetasVigiladas() }
-		alPulsar("exportar_copia") { exportar.launch("LectorUniversal_copia.json") }
-		alPulsar("importar_copia") { importar.launch(arrayOf("application/json", "text/plain", "*/*")) }
 	}
 }

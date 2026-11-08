@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ajustes, Copias de seguridad: las de la app (GestorCopias) y la de Android -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+	<Preference
+		android:key="copia_explicacion"
+		android:selectable="false"
+		android:summary="@string/aj_copias_explicacion" />
+	<Preference
+		android:key="copia_crear"
+		android:title="@string/copia_crear"
+		android:summary="@string/aj_copia_crear_desc" />
+	<Preference
+		android:key="copia_restaurar"
+		android:title="@string/copia_restaurar"
+		android:summary="@string/aj_copia_restaurar_desc" />
+	<Preference
+		android:key="copia_deshacer"
+		android:title="@string/copia_deshacer" />
+	<PreferenceCategory android:title="@string/aj_copia_android">
+		<Preference
+			android:key="copia_android_explicacion"
+			android:selectable="false"
+			android:summary="@string/aj_copia_android_desc" />
+		<SwitchPreferenceCompat
+			android:key="copia_android_claves"
+			android:title="@string/aj_copia_android_claves"
+			android:summary="@string/aj_copia_android_claves_desc"
+			android:defaultValue="false" />
+	</PreferenceCategory>
+</PreferenceScreen>

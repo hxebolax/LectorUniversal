@@ -1934,4 +1934,93 @@
 		<item quantity="many">Streak: %1$d days in a row with the news</item>
 		<item quantity="other">Streak: %1$d days in a row with the news</item>
 	</plurals>
+
+	<!-- Copias de seguridad -->
+	<string name="aj_copias">Backups</string>
+	<string name="aj_copias_desc">Back up and restore everything, with a password if you like; Android backup</string>
+	<string name="aj_copias_explicacion">A backup saves what you choose to a file: your books, podcasts, news, radio, settings and, if you protect it with a password, your keys. With it you can have the app exactly the same on another phone, or go back. You save the file wherever you want; it is not sent anywhere.</string>
+	<string name="copia_crear">Create a backup</string>
+	<string name="aj_copia_crear_desc">Choose what to save, whether it has a password and where to save the file</string>
+	<string name="copia_restaurar">Restore a backup</string>
+	<string name="aj_copia_restaurar_desc">Open a backup, see what it contains and choose what to recover. Also older backups</string>
+	<string name="copia_deshacer">Undo the last restore</string>
+	<string name="aj_copia_deshacer_desc">Goes back to how everything was on %1$s, before restoring</string>
+	<string name="aj_copia_android">Android backup</string>
+	<string name="aj_copia_android_desc">Android saves automatically, in your Google account, the library, podcasts, radio, statistics and settings, and when you move to a new phone also the news and the books saved in the app.</string>
+	<string name="aj_copia_android_claves">Include keys and passwords in the Android backup</string>
+	<string name="aj_copia_android_claves_desc">AI keys and the passwords for sync, catalogs and private podcasts. When off, they never leave this phone.</string>
+	<string name="copia_android_claves_si">Keys and passwords will be included in the Android backup</string>
+	<string name="copia_android_claves_no">Keys and passwords no longer leave this phone</string>
+	<string name="parte_biblioteca">Library</string>
+	<string name="parte_biblioteca_desc">Books, folders, positions, bookmarks, notes, collections, pronunciation and reading statistics</string>
+	<string name="parte_archivos">Books saved in the app</string>
+	<string name="parte_archivos_desc">Catalog downloads, web pages, texts and scanned documents</string>
+	<string name="parte_podcasts">Podcasts</string>
+	<string name="parte_podcasts_desc">Subscriptions, folders, played episodes, queue and favourites (not downloads)</string>
+	<string name="parte_noticias">News</string>
+	<string name="parte_noticias_desc">Feeds, folders, articles, read, favourites and read later</string>
+	<string name="parte_radio">Radio</string>
+	<string name="parte_radio_desc">Favourites, history, songs, alarms and scheduled recordings</string>
+	<string name="parte_grabaciones">Radio recordings</string>
+	<string name="parte_grabaciones_desc">The recorded audio files</string>
+	<string name="parte_estadisticas">Listening statistics</string>
+	<string name="parte_estadisticas_desc">Time with podcasts, news and radio</string>
+	<string name="parte_ajustes">Settings</string>
+	<string name="parte_ajustes_desc">Every app setting: voice, appearance, sections, TalkBack actions and accounts</string>
+	<string name="parte_claves">Keys and passwords</string>
+	<string name="parte_claves_desc">AI keys and passwords for sync, catalogs and private podcasts. Only with a password</string>
+	<string name="copia_elige_guardar">Choose what to save. Next to each part, its current size.</string>
+	<string name="copia_elige_restaurar">Choose what to recover. What you check will replace what you have now on this phone.</string>
+	<string name="copia_elige_algo">Choose at least one part</string>
+	<string name="copia_proteger">Protect with a password</string>
+	<string name="copia_contrasena_obligatoria">The backup contains your keys and passwords, so it must be protected with a password. Without it the backup cannot be opened or restored, and there is no way to recover it: keep it safe.</string>
+	<string name="copia_contrasena_opcional">Recommended: with a password, nobody can open the backup without it. If you forget it, there is no way to recover it.</string>
+	<string name="copia_contrasena">Password</string>
+	<string name="copia_repetir_contrasena">Repeat the password</string>
+	<string name="copia_contrasena_corta">It must have at least 8 characters</string>
+	<string name="copia_contrasenas_distintas">It does not match the first one</string>
+	<string name="copia_sin_contrasena">No password</string>
+	<string name="copia_nombre_archivo">Lector Universal - backup %1$s</string>
+	<string name="copia_guardando_inicio">Preparing the backup…</string>
+	<string name="copia_protegiendo">Preparing encryption…</string>
+	<string name="copia_guardando">Saving: %1$s…</string>
+	<string name="copia_no_se_puede_escribir">Cannot write to that file.</string>
+	<string name="copia_guardada">The backup is saved. Its size is %1$s.</string>
+	<string name="copia_lleva">It contains: %1$s.</string>
+	<string name="copia_con_contrasena">It is protected with a password: keep it safe, without it the backup cannot be restored.</string>
+	<string name="copia_sin_contrasena_aviso">It has no password: whoever has the file can see your data. Keep it somewhere safe.</string>
+	<string name="copia_error_guardar">The backup could not be saved. %1$s</string>
+	<string name="copia_no_es_copia">That file is not a Lector Universal backup.</string>
+	<string name="copia_abriendo">Opening the backup…</string>
+	<string name="copia_comprobando_contrasena">Checking the password…</string>
+	<string name="copia_protegida">Protected backup</string>
+	<string name="copia_escribe_contrasena">Type the password for this backup.</string>
+	<string name="copia_contrasena_incorrecta">The password is not correct, or the backup is damaged.</string>
+	<string name="copia_error_abrir">The backup could not be opened. %1$s</string>
+	<string name="copia_info">Backup from %1$s, made on %2$s with Lector Universal %3$s.</string>
+	<string name="copia_info_cifrada">Protected with a password.</string>
+	<string name="copia_info_sin_cifrar">No password.</string>
+	<string name="copia_mas_nueva">This backup is from a newer version of the app. Update Lector Universal before restoring it.</string>
+	<string name="copia_elegir_que">Choose what to restore</string>
+	<string name="copia_confirmar_restaurar">This will be replaced on this phone: %1$s.
+
+First, how everything is now is saved, in case you want to undo it (Settings, Backups, Undo the last restore). When it finishes, the app restarts.</string>
+	<string name="copia_confirmar_deshacer">Everything will go back to how it was before the last restore: %1$s. When it finishes, the app restarts.</string>
+	<string name="copia_restaurar_boton">Restore</string>
+	<string name="copia_deshacer_boton">Undo</string>
+	<string name="copia_comprobando">Checking the backup…</string>
+	<string name="copia_guardando_actual">Saving how everything is now…</string>
+	<string name="copia_aplicando">Restoring…</string>
+	<string name="copia_error_restaurar">The backup could not be restored and nothing has been changed. %1$s</string>
+	<string name="copia_restaurada">Done. The app restarts now with what was restored.</string>
+	<string name="copia_nada_que_deshacer">There is no restore to undo.</string>
+	<string name="aj_biblioteca_sinc">Library and sync</string>
+	<string name="aj_biblioteca_sinc_desc">Watched folders and syncing the library with your server</string>
+
+	<!-- Botón Siguiente -->
+	<string name="siguiente">Next</string>
+
+	<!-- Copias: mostrar contraseña -->
+	<string name="copia_mostrar_contrasena">Show password</string>
+	<string name="copia_mostrar_repetida">Show repeated password</string>
 </resources>

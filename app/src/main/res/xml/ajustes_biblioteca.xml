@@ -23,14 +23,4 @@
 			android:key="sinc_ahora"
 			android:title="@string/aj_sinc_ahora" />
 	</PreferenceCategory>
-	<PreferenceCategory android:title="@string/aj_copia">
-		<Preference
-			android:key="exportar_copia"
-			android:title="@string/aj_exportar_copia"
-			android:summary="@string/aj_exportar_copia_desc" />
-		<Preference
-			android:key="importar_copia"
-			android:title="@string/aj_importar_copia"
-			android:summary="@string/aj_importar_copia_desc" />
-	</PreferenceCategory>
 </PreferenceScreen>

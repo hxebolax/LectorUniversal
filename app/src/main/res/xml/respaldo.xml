@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copia de seguridad de Android (versiones hasta la 11) -->
+<!-- Copia de seguridad de Android (hasta Android 11): como la de la nube de respaldo_reglas.xml -->
 <full-backup-content>
 	<include domain="database" path="biblioteca.db" />
+	<include domain="database" path="podcasts.db" />
+	<include domain="database" path="radio.db" />
+	<include domain="database" path="actividad.db" />
 	<include domain="sharedpref" path="." />
+	<exclude domain="sharedpref" path="secretos.xml" />
 </full-backup-content>

@@ -54,7 +54,7 @@ object RssSincronizacion {
 		val p = Rss.prefs(c)
 		val url = p.getString("rss_sinc_url", "").orEmpty().trim().trimEnd('/')
 		val usuario = p.getString("rss_sinc_usuario", "").orEmpty()
-		val clave = p.getString("rss_sinc_clave", "").orEmpty()
+		val clave = com.xebolax.lector.datos.Secretos.leer(c, "rss_sinc_clave")
 		if (url.isBlank()) return null
 		return when (p.getString("rss_sinc_tipo", "ninguno")) {
 			"greader" -> GoogleReader(url, usuario, clave)

@@ -3,6 +3,14 @@ El texto de la versión que se publica se muestra en la app al ofrecer la actual
 Para una versión nueva: sube versionCode y versionName en app\build.gradle.kts,
 añade aquí su sección y usa la opción 8 de compilar.bat.
 
+== 1.0.10
+- Nuevo gestor de copias de seguridad (Ajustes, Copias de seguridad): eliges qué guardar (biblioteca, libros guardados en la app, podcasts, noticias, radio, grabaciones, estadísticas, ajustes, y claves y contraseñas) y, al restaurar, qué recuperar. Sirve para cambiar de móvil y tenerlo todo exactamente igual.
+- Las copias se pueden proteger con contraseña: van cifradas con AES de 256 bits. Las claves y contraseñas solo se guardan en copias con contraseña.
+- Antes de cambiar nada, la copia se comprueba entera, y antes de restaurar se guarda cómo estaba todo para poder deshacerlo.
+- Las claves de la IA y las contraseñas se guardan aparte y ya no van en la copia de seguridad de Android (tu cuenta de Google), salvo que lo actives. Esa copia ahora también lleva los podcasts, la radio y las estadísticas.
+- La telemetría que traían las bibliotecas de reconocimiento de texto e idioma de Google está desactivada: ya no se envía nada. Gracias a Jesús Pavón Abián.
+- La lectura en voz alta ya no puede cerrar la app si falla la detección del idioma. Gracias a Jesús Pavón Abián.
+
 == 1.0.9
 - Nueva Portada: la app se abre en una pantalla con lo más a mano de cada sección (los libros que lees, los episodios a medias, en la cola o nuevos, las últimas noticias sin leer y tus emisoras favoritas). Cada sección tiene su encabezado, para saltar con TalkBack, y un doble toque en él abre la sección entera.
 - Atrás desde la pantalla principal de cualquier sección vuelve a la Portada, y desde la Portada sale de la app.

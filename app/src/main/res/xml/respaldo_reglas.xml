@@ -1,13 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copia de seguridad de Android: biblioteca y ajustes (no la caché de documentos) -->
+<!--
+	Copia de seguridad de Android (Android 12 y posteriores).
+	- En la nube (cuenta de Google, máximo 25 MB): biblioteca, podcasts, radio,
+	  estadísticas y ajustes. Noticias no, porque los artículos pueden pasar del límite.
+	- Al pasar a un móvil nuevo (cable o wifi): todas las bases de datos, los
+	  ajustes y los libros guardados dentro de la app.
+	- Las claves y contraseñas (secretos.xml) no van nunca. Si el usuario lo elige
+	  en Ajustes, Copias de seguridad, pasan a secretos_copia.xml, que sí va (datos/Secretos.kt).
+-->
 <data-extraction-rules>
 	<cloud-backup>
 		<include domain="database" path="biblioteca.db" />
+		<include domain="database" path="podcasts.db" />
+		<include domain="database" path="radio.db" />
+		<include domain="database" path="actividad.db" />
 		<include domain="sharedpref" path="." />
+		<exclude domain="sharedpref" path="secretos.xml" />
 	</cloud-backup>
 	<device-transfer>
-		<include domain="database" path="biblioteca.db" />
+		<include domain="database" path="." />
 		<include domain="sharedpref" path="." />
-		<include domain="file" path="." />
+		<exclude domain="sharedpref" path="secretos.xml" />
+		<include domain="file" path="biblioteca" />
+		<include domain="file" path="textos" />
+		<include domain="file" path="web" />
 	</device-transfer>
 </data-extraction-rules>

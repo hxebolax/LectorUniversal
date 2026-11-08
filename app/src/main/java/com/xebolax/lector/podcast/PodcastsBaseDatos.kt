@@ -90,6 +90,8 @@ data class Episodio(
 /** Base de datos de los podcasts (aparte de la biblioteca y de las noticias). */
 class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "podcasts.db", null, 4) {
 
+	private val app: Context = c.applicationContext
+
 	companion object {
 		@Volatile
 		private var instancia: PodcastsBaseDatos? = null
@@ -253,7 +255,16 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 	}
 
 	fun credenciales(id: Long, usuario: String, clave: String) {
-		writableDatabase.update("podcasts", ContentValues().apply { put("usuario", usuario); put("clave", clave) }, "id = ?", arrayOf(id.toString()))
+		writableDatabase.update("podcasts", ContentValues().apply { put("usuario", usuario); put("clave", "") }, "id = ?", arrayOf(id.toString()))
+		podcast(id)?.let { com.xebolax.lector.datos.Secretos.guardar(app, com.xebolax.lector.datos.Secretos.dePodcast(it.url), clave) }
+	}
+
+	/** Pasa las contraseñas de los podcasts privados a Secretos (una vez, al actualizar la app). */
+	fun apartarClaves() {
+		readableDatabase.rawQuery("SELECT url, clave FROM podcasts WHERE clave != ''", null).use { c ->
+			while (c.moveToNext()) com.xebolax.lector.datos.Secretos.guardar(app, com.xebolax.lector.datos.Secretos.dePodcast(c.getString(0)), c.getString(1))
+		}
+		writableDatabase.execSQL("UPDATE podcasts SET clave = ''")
 	}
 
 	/** Fecha del episodio más reciente de cada podcast (para ordenar por lo último publicado). */
@@ -334,7 +345,8 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 		duracionMin = getInt(getColumnIndexOrThrow("duracion_min")),
 		antiguosPrimero = getInt(getColumnIndexOrThrow("antiguos_primero")) == 1,
 		usuario = getString(getColumnIndexOrThrow("usuario")),
-		clave = getString(getColumnIndexOrThrow("clave")),
+		// La contraseña de un podcast privado está con las demás claves (Secretos)
+		clave = getString(getColumnIndexOrThrow("clave")).ifEmpty { com.xebolax.lector.datos.Secretos.leer(app, com.xebolax.lector.datos.Secretos.dePodcast(getString(getColumnIndexOrThrow("url")))) },
 		sinEscuchar = sin,
 		total = total,
 	)
@@ -380,6 +392,7 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 	}
 
 	fun editarPodcast(p: Podcast) {
+		com.xebolax.lector.datos.Secretos.guardar(app, com.xebolax.lector.datos.Secretos.dePodcast(p.url), p.clave)
 		val carpeta = crearCarpeta(p.carpeta)
 		writableDatabase.update("podcasts", ContentValues().apply {
 			put("titulo", p.titulo)
@@ -389,7 +402,7 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 			put("duracion_min", p.duracionMin)
 			put("antiguos_primero", if (p.antiguosPrimero) 1 else 0)
 			put("usuario", p.usuario)
-			put("clave", p.clave)
+			put("clave", "")
 			put("velocidad", p.velocidad)
 			put("saltar_inicio", p.saltarInicio)
 			put("saltar_final", p.saltarFinal)

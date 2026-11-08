@@ -367,6 +367,35 @@ class AccesibilidadTest {
 		Log.i("Portada", "Estadísticas: $titulos")
 	}
 
+	/** Copias de seguridad: el apartado, elegir qué guardar y la contraseña (con sus errores). */
+	@Test
+	fun copias() {
+		abrir(intent(com.xebolax.lector.ui.AjustesActivity::class.java).putExtra(com.xebolax.lector.ui.AjustesActivity.EXTRA_APARTADO, "copias"), 3000)
+		revisar("Ajustes: copias de seguridad")
+		tocar(es.getString(R.string.copia_crear), app.getString(R.string.copia_crear))
+		esperar(1500)
+		revisar("Copia: elegir qué guardar", 30)
+		val casillas = mutableListOf<AccessibilityNodeInfo>().also { l -> raiz()?.let { recoger(it, l) } }.filter { it.isCheckable }
+		Log.i("Copias", "Casillas: ${casillas.map { "${nombre(it)} marcada=${it.isChecked}" }}")
+		org.junit.Assert.assertTrue(casillas.size >= 2)
+		tocar(es.getString(R.string.siguiente), app.getString(R.string.siguiente))
+		esperar(1000)
+		revisar("Copia: contraseña", 20)
+		// Contraseñas distintas: el error sale en el segundo campo y no se cierra
+		val campos = mutableListOf<AccessibilityNodeInfo>().also { l -> raiz()?.let { recoger(it, l) } }.filter { it.isEditable }
+		org.junit.Assert.assertEquals(2, campos.size)
+		campos[0].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, android.os.Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "contraseña larga") })
+		campos[1].performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, android.os.Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "otra distinta") })
+		tocar(es.getString(R.string.guardar), app.getString(R.string.guardar))
+		esperar(1000)
+		val error = raiz()?.findAccessibilityNodeInfosByText(es.getString(R.string.copia_contrasenas_distintas))?.isNotEmpty() == true ||
+			raiz()?.findAccessibilityNodeInfosByText(app.getString(R.string.copia_contrasenas_distintas))?.isNotEmpty() == true
+		Log.i("Copias", "Error de contraseñas distintas visible: $error")
+		org.junit.Assert.assertTrue(error)
+		revisar("Copia: contraseña con error", 20)
+		atras()
+	}
+
 	// --- El foco vuelve a su sitio al cerrar ventanas ------------------------------------------
 
 	private fun conFoco(): AccessibilityNodeInfo? = raiz()?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)

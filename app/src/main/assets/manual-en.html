@@ -345,7 +345,7 @@
 <li><strong>Scanned PDFs</strong>: when you open one, the app warns you and offers to recognize the text of the whole PDF (OCR, offline). The result is a new document in the library. It is also in the AI button.</li>
 <li><strong>Comics</strong> (CBZ): each page is a heading with its image. “Describe the image” describes it with AI or reads the text in its speech bubbles, and in the AI button, “Recognize the text of every page” creates a document with all the text.</li>
 <li><strong>Export to audio</strong>: Export button, “Export to audio”. You choose a folder and one M4A file per chapter is created with that book's voice; progress appears in the notification.</li>
-<li><strong>Sync with your server (WebDAV)</strong>: in Settings, Library and backup, enter the address of a WebDAV folder (for example the WebDAV Server package on Synology, or Nextcloud), your user name and your password. Where you are and the bookmarks of each book are shared between your devices.</li>
+<li><strong>Sync with your server (WebDAV)</strong>: in Settings, Library and sync, enter the address of a WebDAV folder (for example the WebDAV Server package on Synology, or Nextcloud), your user name and your password. Where you are and the bookmarks of each book are shared between your devices.</li>
 <li><strong>Widget</strong> “Continue reading” for the home screen.</li>
 </ul>
 
@@ -376,7 +376,8 @@
 <li><strong>Radio</strong>: open the player when you play a station or stay in the list, announce the song that is playing, save the songs, hide stations that do not work, ask before playing on mobile data, what to do if the connection drops, and for the alarm clock, raise the volume gradually and the Snooze minutes.</li>
 <li><strong>Artificial intelligence</strong>: which AI to use, the downloaded AI, use the graphics card, check the AI and your keys.</li>
 <li><strong>Documents</strong>: tables with headers (“Column: value”), image descriptions, split long paragraphs, join PDF lines, text line by line and clear the document cache.</li>
-<li><strong>Library and backup</strong>: watched folders, sync with your server (WebDAV), and export or import a backup with the library, folders, positions, bookmarks, notes, statistics, pronunciation, settings, your news feeds and your podcasts. AI keys and sync account passwords are not included in the backup.</li>
+<li><strong>Backups</strong>: create and restore backups, and whether keys go in the Android backup. Explained below.</li>
+<li><strong>Library and sync</strong>: watched folders and sync with your server (WebDAV).</li>
 </ul>
 <h3>TalkBack actions</h3>
 <p>Here you choose, for each place in the app, which actions appear when you swipe up or down with TalkBack and in what order. The places are: books and folders in the library, reader paragraphs, bookmarks and notes, online catalogs, news articles, feeds and folders, podcasts and search results, podcast episodes, podcast folders, radio stations, station folders, songs, recordings, and alarms and scheduled recordings. Each place says how many actions appear.</p>
@@ -387,6 +388,31 @@
 <li>“Reset”, in More options, goes back to the usual actions.</li>
 </ul>
 <p>For example, you can remove AI from paragraphs, or put “Refresh” directly on each podcast or “Move to a folder” on each feed.</p>
+
+<h2>Backups</h2>
+<p>In Settings, Backups. A backup saves what you choose to a single file, so you can have the app exactly the same on another phone, or go back if something goes wrong. You save the file wherever you want (on the phone, on a card, in Google Drive or on your Synology, with the Android file picker); the app does not send it anywhere.</p>
+<h3>Create a backup</h3>
+<p>First you choose what to save. Each part is a checkbox that says what it contains and its current size:</p>
+<ul>
+<li><strong>Library</strong>: books, folders, positions, bookmarks, notes, collections, series, pronunciation and reading statistics.</li>
+<li><strong>Books saved in the app</strong>: what is inside the app itself (catalog downloads, web pages, clipboard or shared texts and scanned documents).</li>
+<li><strong>Podcasts</strong>: subscriptions, folders, played episodes and where you were, queue and favourites. Not downloads: they are downloaded again.</li>
+<li><strong>News</strong>: feeds, folders, articles, read, favourites and read later.</li>
+<li><strong>Radio</strong>: favourites, history, songs, alarms and scheduled recordings.</li>
+<li><strong>Radio recordings</strong>: the recorded audio files.</li>
+<li><strong>Listening statistics</strong>: time with podcasts, news and radio.</li>
+<li><strong>Settings</strong>: every app setting.</li>
+<li><strong>Keys and passwords</strong>: the cloud AI keys and the passwords for sync, catalogs and private podcasts.</li>
+</ul>
+<p>Then, the password. With a password, nobody can open the backup without it: it is encrypted with 256-bit AES and the key comes from your password with PBKDF2 and 600,000 rounds, so guessing passwords is very slow. It must have at least 8 characters and you type it twice. If the backup contains keys and passwords, the password is required; otherwise you can choose “No password”, but whoever has the file will be able to see your data. If you forget the password there is no way to recover it.</p>
+<p>Finally, you choose where to save the file (it ends in .lucopia). While it saves, the wait window says which part it is saving; when it finishes, it says its size, what it contains and whether it has a password.</p>
+<h3>Restore a backup</h3>
+<p>Choose the file; if it has a password, type it. The app says when the backup was made, on which phone, with which version and what it contains. With “Choose what to restore” you check what to recover: what you check replaces what you have now on this phone, and what you leave unchecked stays as it is. Before changing anything, the app checks the whole backup; if it is damaged, cut short or the password is wrong, nothing is touched. When it finishes, the app restarts with what was restored.</p>
+<p>Books you opened from the phone's folders are not inside the backup: the library remembers where they were, so copy those files to the new phone as well. Books inside the app are included, in “Books saved in the app”. Older backups (.json file, up to version 1.0.9) can also be restored.</p>
+<h3>Undo the last restore</h3>
+<p>Before restoring, the app saves how everything was (except books saved in the app and recordings), on the phone. If you are not happy with what was restored, “Undo the last restore” puts it back. This option only appears when there is something to undo.</p>
+<h3>Android backup</h3>
+<p>Android also saves automatically, in your Google account, the library, podcasts, radio, statistics and settings, and moves them to your new phone when you set it up (when transferring data from one phone to another, also the news and the books saved in the app). Keys and passwords are not included in that backup unless you turn on “Include keys and passwords in the Android backup”. You can change it at any time: when you turn it off, they stop leaving this phone.</p>
 
 <h2>Updates</h2>
 <p>The app checks for new versions when it opens (at most every 6 hours; turn it off in Settings, General). To check whenever you want, use About, Check for updates, or Settings, General, Check for updates. If there is one, it shows what it brings with the Update and Later buttons (in the automatic check, also Skip this version). When you update, it downloads it, checks that it is genuine and opens the Android installer; the first time, Android asks you to allow installing apps from this source. What's new in each version is in About, What's new.</p>

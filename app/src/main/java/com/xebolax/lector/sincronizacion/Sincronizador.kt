@@ -135,7 +135,7 @@ object Sincronizador {
 		conexion.readTimeout = 30_000
 		conexion.setRequestProperty("User-Agent", "LectorUniversal/${BuildConfig.VERSION_NAME}")
 		val usuario = prefs(c).getString("sinc_usuario", "").orEmpty()
-		val clave = prefs(c).getString("sinc_clave", "").orEmpty()
+		val clave = com.xebolax.lector.datos.Secretos.leer(c, "sinc_clave")
 		if (usuario.isNotBlank()) {
 			conexion.setRequestProperty("Authorization", "Basic " + Base64.encodeToString("$usuario:$clave".toByteArray(), Base64.NO_WRAP))
 		}

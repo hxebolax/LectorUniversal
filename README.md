@@ -53,7 +53,7 @@ Las **estadísticas** (menú lateral) son de todas las secciones: tiempo leyendo
 - **Formatos**: EPUB 2 y 3, PDF (también escaneados, con reconocimiento de texto sin internet), Word (DOCX y DOC antiguo), OpenDocument (ODT, ODS, ODP), RTF, texto, HTML, Markdown, FictionBook (FB2), Kindle (MOBI, AZW, AZW3, PRC, PDB), CHM, PowerPoint, Excel, CSV, cómics (CBZ), ZIP, **DAISY 2.02 y 3** y audiolibros **M4B y MP3** con capítulos.
 - Pestañas Leyendo, Biblioteca (con carpetas), Marcadores y Catálogos (OPDS y bibliotecas web como Tiflolibros o la Biblioteca Digital de la ONCE).
 - Abrir una página web como libro, leer el portapapeles y escanear documentos con la cámara con guía de voz.
-- Carpetas vigiladas, colecciones, series, estadísticas de lectura, copia de seguridad y sincronización con tu propio servidor (WebDAV).
+- Carpetas vigiladas, colecciones, series, estadísticas de lectura y sincronización con tu propio servidor (WebDAV).
 
 #### Lectura
 
@@ -86,6 +86,13 @@ Las **estadísticas** (menú lateral) son de todas las secciones: tiempo leyendo
 
 El **manual completo** está dentro de la app (menú lateral, Manual de uso) y en [`app/src/main/assets/manual-es.html`](app/src/main/assets/manual-es.html). Las novedades de cada versión están en [`NOVEDADES.txt`](NOVEDADES.txt).
 
+#### Copias de seguridad
+
+- Gestor de copias completo, para cambiar de móvil y tenerlo todo igual: se elige qué guardar (biblioteca, libros guardados en la app, podcasts, noticias, radio, grabaciones, estadísticas, ajustes, y claves y contraseñas) y, al restaurar, qué recuperar.
+- Protección con contraseña: AES-256-GCM por bloques, con la clave derivada con PBKDF2-HMAC-SHA256 (600.000 vueltas). Las claves y contraseñas solo se guardan en copias con contraseña.
+- La copia se comprueba entera antes de cambiar nada, y antes de restaurar se guarda cómo estaba todo para poder deshacerlo.
+- En la copia de seguridad de Android (cuenta de Google y paso a un móvil nuevo), las claves y contraseñas solo van si el usuario lo elige.
+
 ### Accesibilidad
 
 La accesibilidad no es un añadido: cada pantalla se diseña y se prueba con TalkBack.
@@ -111,7 +118,8 @@ Después **se actualiza sola**: al abrirse busca versiones nuevas, muestra qué 
 ### Privacidad
 
 - Sin publicidad, sin estadísticas de uso y sin cuentas propias. La telemetría que traen las bibliotecas de ML Kit (Google Data Transport) está desactivada: sus eventos se descartan en el propio móvil.
-- Los libros, las posiciones, las notas y los ajustes se quedan en el móvil. Solo salen de él si configuras tu propia sincronización (WebDAV, una cuenta de noticias o de podcasts) o usas una IA en la nube con tu clave.
+- Los libros, las posiciones, las notas y los ajustes se quedan en el móvil. Solo salen de él si configuras tu propia sincronización (WebDAV, una cuenta de noticias o de podcasts), usas una IA en la nube con tu clave, guardas una copia de seguridad donde tú elijas, o con la copia de seguridad de Android en tu cuenta de Google.
+- Las claves y contraseñas se guardan aparte del resto de ajustes y no van en la copia de seguridad de Android, salvo que lo actives.
 - Los permisos se piden al usar cada función (cámara para escanear, avisos para el despertador…) y la app sigue funcionando si los deniegas.
 
 ---
@@ -205,6 +213,7 @@ Código en Kotlin, en `app/src/main/java/com/xebolax/lector/`, con identificador
 | `podcast/` | Sección Podcasts (base de datos propia `podcasts.db`). |
 | `rss/` | Sección Noticias (base de datos propia `rss.db`), artículo completo y sincronización. |
 | `radio/` | Sección Radio: cliente de radio-browser.info, base de datos `radio.db`, reproductor en directo, grabación y despertador. |
+| `copias/` | Gestor de copias de seguridad (`CopiaSeguridad`) y su cifrado (`Cifrado`: PBKDF2 + AES-256-GCM por bloques). Las claves y contraseñas, aparte, en `datos/Secretos.kt`. |
 | `ia/`, `ocr/` | Inteligencia artificial y reconocimiento de texto. |
 | `sincronizacion/`, `actualizaciones/` | Sincronización WebDAV y actualizaciones de la app (servidor propio, GitHub o una dirección personalizada). |
 | `ui/` | Portada (`PortadaActivity`), Biblioteca (`BibliotecaActivity`), secciones, orden y menú lateral (`Secciones.kt`), estadísticas, ajustes, acciones de TalkBack, foco y ayudantes comunes. |

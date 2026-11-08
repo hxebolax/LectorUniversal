@@ -11,7 +11,7 @@ import org.json.JSONArray
  * Ajustes de la app con valores por defecto. Las claves son las mismas que
  * las de las pantallas de Ajustes (res/xml/ajustes_*.xml).
  */
-class Preferencias(contexto: Context) {
+class Preferencias(private val contexto: Context) {
 
 	val p: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(contexto.applicationContext)
 
@@ -126,9 +126,10 @@ class Preferencias(contexto: Context) {
 	// --- Inteligencia artificial
 	/** "auto" (el móvil si puede, si no la primera clave), "dispositivo", "gemini", "openai", "claude" o "ninguno". */
 	val iaProveedor get() = texto("ia_proveedor", "auto")
-	val iaClaveGemini get() = texto("ia_clave_gemini", "").trim()
-	val iaClaveOpenai get() = texto("ia_clave_openai", "").trim()
-	val iaClaveClaude get() = texto("ia_clave_claude", "").trim()
+	// Las claves están aparte, con las demás contraseñas (Secretos)
+	val iaClaveGemini get() = Secretos.leer(contexto, "ia_clave_gemini").trim()
+	val iaClaveOpenai get() = Secretos.leer(contexto, "ia_clave_openai").trim()
+	val iaClaveClaude get() = Secretos.leer(contexto, "ia_clave_claude").trim()
 	val iaModeloGemini get() = texto("ia_modelo_gemini", "").trim().ifBlank { com.xebolax.lector.ia.AsistenteIA.MODELO_GEMINI }
 	val iaModeloOpenai get() = texto("ia_modelo_openai", "").trim().ifBlank { com.xebolax.lector.ia.AsistenteIA.MODELO_OPENAI }
 	val iaModeloClaude get() = texto("ia_modelo_claude", "").trim().ifBlank { com.xebolax.lector.ia.AsistenteIA.MODELO_CLAUDE }

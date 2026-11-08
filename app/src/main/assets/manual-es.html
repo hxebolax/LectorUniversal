@@ -345,7 +345,7 @@
 <li><strong>PDF escaneados</strong>: al abrirlos, la app avisa y ofrece reconocer el texto de todo el PDF (OCR, sin internet). El resultado es un documento nuevo en la biblioteca. También está en el botón IA.</li>
 <li><strong>Cómics</strong> (CBZ): cada página es un encabezado con su imagen. «Describir la imagen» la describe con IA o lee el texto de sus bocadillos, y en el botón IA, «Reconocer el texto de todas las páginas» saca un documento con todo el texto.</li>
 <li><strong>Exportar a audio</strong>: botón Exportar, «Exportar a audio». Eliges una carpeta y se crea un archivo M4A por capítulo con la voz de ese libro; el progreso sale en la notificación.</li>
-<li><strong>Sincronizar con tu servidor (WebDAV)</strong>: en Ajustes, Biblioteca y copia de seguridad, pon la dirección de una carpeta WebDAV (por ejemplo el paquete WebDAV Server del Synology o Nextcloud), tu usuario y tu contraseña. Por dónde vas y los marcadores de cada libro se comparten entre tus dispositivos.</li>
+<li><strong>Sincronizar con tu servidor (WebDAV)</strong>: en Ajustes, Biblioteca y sincronización, pon la dirección de una carpeta WebDAV (por ejemplo el paquete WebDAV Server del Synology o Nextcloud), tu usuario y tu contraseña. Por dónde vas y los marcadores de cada libro se comparten entre tus dispositivos.</li>
 <li><strong>Widget</strong> «Seguir leyendo» para la pantalla de inicio.</li>
 </ul>
 
@@ -376,7 +376,8 @@
 <li><strong>Radio</strong>: abrir el reproductor al escuchar una emisora o seguir en la lista, decir la canción que suena, guardar las canciones, ocultar las emisoras que no funcionan, preguntar antes de escuchar con datos móviles, qué hacer si se corta la conexión, y del despertador, subir el volumen poco a poco y los minutos de Posponer.</li>
 <li><strong>Inteligencia artificial</strong>: qué IA usar, la IA descargada, usar la tarjeta gráfica, comprobar la IA y tus claves.</li>
 <li><strong>Documentos</strong>: tablas con encabezados («Columna: valor»), descripciones de las imágenes, dividir párrafos largos, unir las líneas de los PDF, texto línea a línea y vaciar la caché de documentos.</li>
-<li><strong>Biblioteca y copia de seguridad</strong>: carpetas vigiladas, sincronizar con tu servidor (WebDAV), y exportar o importar una copia de seguridad con la biblioteca, carpetas, posiciones, marcadores, notas, estadísticas, pronunciación, ajustes, tus fuentes de noticias y tus podcasts. Las claves de la IA y las contraseñas de las cuentas de sincronización no van en la copia.</li>
+<li><strong>Copias de seguridad</strong>: crear y restaurar copias de seguridad, y si las claves van en la copia de Android. Explicado más abajo.</li>
+<li><strong>Biblioteca y sincronización</strong>: carpetas vigiladas y sincronizar con tu servidor (WebDAV).</li>
 </ul>
 <h3>Acciones de TalkBack</h3>
 <p>Aquí eliges, para cada sitio de la app, qué acciones salen al deslizar arriba o abajo con TalkBack y en qué orden. Los sitios son: libros y carpetas de la biblioteca, párrafos del lector, marcadores y notas, catálogos en línea, artículos, fuentes y carpetas de noticias, podcasts y resultados de búsqueda, episodios de podcast, carpetas de podcasts, emisoras de radio, carpetas de emisoras, canciones, grabaciones, y despertadores y grabaciones programadas. Cada sitio dice cuántas acciones salen.</p>
@@ -387,6 +388,31 @@
 <li>«Restablecer», en Más opciones, vuelve a las acciones de siempre.</li>
 </ul>
 <p>Por ejemplo, puedes quitar la IA de los párrafos, o poner «Actualizar» directamente en cada podcast o «Mover a una carpeta» en cada fuente.</p>
+
+<h2>Copias de seguridad</h2>
+<p>En Ajustes, Copias de seguridad. Una copia guarda en un solo archivo lo que elijas, para tener la app exactamente igual en otro móvil o volver atrás si algo sale mal. El archivo lo guardas tú donde quieras (en el móvil, en una tarjeta, en Google Drive o en tu Synology, con el selector de archivos de Android); la app no lo envía a ningún sitio.</p>
+<h3>Crear una copia</h3>
+<p>Primero eliges qué guardar. Cada parte es una casilla que dice qué lleva y lo que ocupa ahora:</p>
+<ul>
+<li><strong>Biblioteca</strong>: libros, carpetas, posiciones, marcadores, notas, colecciones, series, pronunciación y estadísticas de lectura.</li>
+<li><strong>Libros guardados en la app</strong>: lo que está dentro de la propia app (descargas de los catálogos, páginas web, textos del portapapeles o compartidos y documentos escaneados).</li>
+<li><strong>Podcasts</strong>: suscripciones, carpetas, episodios escuchados y por dónde ibas, cola y favoritos. Las descargas no: se vuelven a descargar.</li>
+<li><strong>Noticias</strong>: fuentes, carpetas, artículos, leídos, favoritos y para más tarde.</li>
+<li><strong>Radio</strong>: favoritas, historial, canciones, despertadores y grabaciones programadas.</li>
+<li><strong>Grabaciones de radio</strong>: los archivos de audio grabados.</li>
+<li><strong>Estadísticas de escucha</strong>: el tiempo con los podcasts, las noticias y la radio.</li>
+<li><strong>Ajustes</strong>: todos los de la app.</li>
+<li><strong>Claves y contraseñas</strong>: las claves de la IA en la nube y las contraseñas de sincronización, de los catálogos y de los podcasts privados.</li>
+</ul>
+<p>Después, la contraseña. Con contraseña, nadie puede abrir la copia sin ella: se cifra con AES de 256 bits y la clave sale de tu contraseña con PBKDF2 y 600.000 vueltas, para que probar contraseñas a ciegas sea muy lento. Tiene que tener al menos 8 caracteres y se escribe dos veces. Si la copia lleva las claves y contraseñas, la contraseña es obligatoria; si no, puedes elegir «Sin contraseña», pero quien tenga el archivo podrá ver tus datos. Si olvidas la contraseña no hay forma de recuperarla.</p>
+<p>Por último, eliges dónde guardar el archivo (termina en .lucopia). Mientras se guarda, la ventana de espera dice qué parte va guardando; al terminar, dice lo que ocupa, lo que lleva y si tiene contraseña.</p>
+<h3>Restaurar una copia</h3>
+<p>Eliges el archivo; si tiene contraseña, la escribes. La app dice de cuándo es la copia, de qué móvil, con qué versión se hizo y qué lleva. Con «Elegir qué restaurar» marcas qué recuperar: lo que marques sustituirá a lo que tienes ahora en este móvil, y lo que no marques se queda como está. Antes de cambiar nada, la app comprueba la copia entera; si está dañada, cortada o la contraseña no es la buena, no toca nada. Al terminar, la app se reinicia con lo restaurado.</p>
+<p>Los libros que abriste desde las carpetas del móvil no van dentro de la copia: la biblioteca recuerda dónde estaban, así que en el móvil nuevo copia también esos archivos. Los que están dentro de la app sí van, en «Libros guardados en la app». Las copias antiguas (archivo .json, hasta la versión 1.0.9) también se pueden restaurar.</p>
+<h3>Deshacer la última restauración</h3>
+<p>Antes de restaurar, la app guarda cómo estaba todo (menos los libros guardados en la app y las grabaciones), dentro del móvil. Si no te convence lo restaurado, «Deshacer la última restauración» lo deja como estaba. Esta opción solo aparece si hay algo que deshacer.</p>
+<h3>Copia de seguridad de Android</h3>
+<p>Además, Android guarda solo, en tu cuenta de Google, la biblioteca, los podcasts, la radio, las estadísticas y los ajustes, y los pasa al móvil nuevo cuando lo configuras (al pasar los datos de un móvil a otro, también las noticias y los libros guardados en la app). Las claves y contraseñas no van en esa copia, salvo que actives «Incluir claves y contraseñas en la copia de Android». Puedes cambiarlo cuando quieras: al desactivarlo, dejan de salir de este móvil.</p>
 
 <h2>Actualizaciones</h2>
 <p>La app busca versiones nuevas al abrirse (como mucho cada 6 horas; se desactiva en Ajustes, General). Para buscarlas cuando quieras, usa Acerca de, Buscar actualizaciones, o Ajustes, General, Buscar actualizaciones. Si hay una, muestra lo que trae con los botones Actualizar y Más tarde (en la búsqueda automática, también Omitir esta versión). Al actualizar, la descarga, comprueba que es auténtica y abre el instalador de Android; la primera vez, Android pide permitir instalar aplicaciones de esta fuente. Las novedades de cada versión están en Acerca de, Novedades.</p>

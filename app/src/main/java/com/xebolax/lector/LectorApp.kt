@@ -31,6 +31,8 @@ class LectorApp : Application() {
 		// Al cerrar un diálogo o volver a una pantalla, el foco de TalkBack vuelve a donde estaba
 		registerActivityLifecycleCallbacks(com.xebolax.lector.ui.MemoriaFoco)
 		Preferencias(this).migrar()
+		// Claves y contraseñas, aparte de los ajustes (copias de seguridad)
+		com.xebolax.lector.datos.Secretos.migrar(this)
 		aplicarTema(Preferencias(this).temaApp)
 		LectorVoz.iniciar(this)
 		ControlAudio.iniciar(this)
