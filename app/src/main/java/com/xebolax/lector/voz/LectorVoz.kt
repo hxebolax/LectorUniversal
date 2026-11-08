@@ -600,9 +600,11 @@ object LectorVoz {
 		val desde = bloque
 		val base = doc.idioma.ifBlank { Locale.getDefault().language }.substringBefore('-').lowercase()
 		deteccion = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
-			val cliente = com.google.mlkit.nl.languageid.LanguageIdentification.getClient(
-				com.google.mlkit.nl.languageid.LanguageIdentificationOptions.Builder().setConfidenceThreshold(0.85f).build()
-			)
+			val cliente = runCatching {
+				com.google.mlkit.nl.languageid.LanguageIdentification.getClient(
+					com.google.mlkit.nl.languageid.LanguageIdentificationOptions.Builder().setConfidenceThreshold(0.85f).build()
+				)
+			}.getOrNull() ?: return@launch
 			try {
 				for (b in (desde until doc.bloques.size) + (0 until desde)) {
 					ensureActive()
