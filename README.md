@@ -4,7 +4,7 @@
 
 Lector Universal es una app Android hecha por y para personas ciegas o con baja visión. Lee casi cualquier formato de libro o documento, los lee en voz alta, reproduce audiolibros y libros DAISY, y además tiene un cliente de podcasts, un lector de noticias (RSS) y una radio con más de 50.000 emisoras de todo el mundo. Todo funciona igual en cada sección y todo se maneja con TalkBack, un teclado o Switch Access.
 
-- Versión actual: **1.0.9** · [Descargar el APK](https://github.com/hxebolax/LectorUniversal/releases/latest)
+- Versión actual: **1.0.10** · [Descargar el APK](https://github.com/hxebolax/LectorUniversal/releases/latest)
 - Android 7.0 (API 24) o posterior. Probada en Android 15.
 - Idiomas: español (principal) e inglés.
 - Autor: Héctor J. Benítez Corredera.
