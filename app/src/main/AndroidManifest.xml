@@ -362,5 +362,10 @@
 				android:name="android.support.FILE_PROVIDER_PATHS"
 				android:resource="@xml/rutas_archivos" />
 		</provider>
+		<!-- ML Kit trae Google Data Transport, que sube telemetria de uso a firebaselogging.googleapis.com sin que el usuario lo sepa.
+		     Sin este servicio no hay ningun destino registrado y los eventos se descartan en el propio movil. -->
+		<service
+			android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+			tools:node="remove" />
 	</application>
 </manifest>
