@@ -30,6 +30,7 @@ Lector Universal es una app Android hecha por y para personas ciegas o con baja 
   - [Normas del proyecto](#normas-del-proyecto)
   - [Traducir la app](#traducir-la-app)
 - [Licencia](#licencia)
+- [Colaborar](#colaborar)
 - [Créditos y licencias de terceros](#créditos-y-licencias-de-terceros)
 - [English summary](#english-summary)
 
@@ -109,7 +110,7 @@ Después **se actualiza sola**: al abrirse busca versiones nuevas, muestra qué 
 
 ### Privacidad
 
-- Sin publicidad, sin estadísticas de uso y sin cuentas propias.
+- Sin publicidad, sin estadísticas de uso y sin cuentas propias. La telemetría que traen las bibliotecas de ML Kit (Google Data Transport) está desactivada: sus eventos se descartan en el propio móvil.
 - Los libros, las posiciones, las notas y los ajustes se quedan en el móvil. Solo salen de él si configuras tu propia sincronización (WebDAV, una cuenta de noticias o de podcasts) o usas una IA en la nube con tu clave.
 - Los permisos se piden al usar cada función (cámara para escanear, avisos para el despertador…) y la app sigue funcionando si los deniegas.
 
@@ -236,6 +237,10 @@ Copyright (C) 2026 Héctor J. Benítez Corredera
 ### Permiso adicional (sección 7 de la GPL)
 
 La app usa bibliotecas de Google que no son libres: ML Kit (reconocimiento de texto, identificación del idioma, escáner de documentos e inteligencia artificial del móvil) y los servicios de Google Play de los que dependen. Como permiso adicional según la sección 7 de la GPL-3.0, el autor permite combinar Lector Universal con esas bibliotecas y distribuir el resultado, aunque sus licencias no sean compatibles con la GPL. El resto de requisitos de la GPL siguen aplicándose a todo el código de Lector Universal. Quien distribuya una versión modificada puede quitar este permiso de su versión.
+
+## Colaborar
+
+Las sugerencias, los avisos de errores y las mejoras son bienvenidos: abre una [incidencia](https://github.com/hxebolax/LectorUniversal/issues) o una solicitud de cambios (pull request). Antes de proponer código, lee las [normas del proyecto](#normas-del-proyecto): cada cambio tiene que seguir funcionando bien con TalkBack. Gracias a Jesús Pavón Abián por las primeras contribuciones.
 
 ## Créditos y licencias de terceros
 
