@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos de Compartidos, Biblioteca, catálogos e importar (en un archivo aparte de strings.xml). -->
+<resources>
+	<!-- Lo recibido de otra app ya estaba guardado: dónde está de verdad -->
+	<string name="comp_ya_biblioteca_x">Ya estaba en tu biblioteca: %1$s</string>
+	<string name="comp_ya_compartidos_x">Ya estaba en Compartidos: %1$s</string>
+	<plurals name="comp_ya_biblioteca_n">
+		<item quantity="one">%1$d ya estaba en tu biblioteca</item>
+		<item quantity="many">%1$d ya estaban en tu biblioteca</item>
+		<item quantity="other">%1$d ya estaban en tu biblioteca</item>
+	</plurals>
+	<!-- Libros del dispositivo: lo que está en Compartidos se puede pasar a la biblioteca -->
+	<string name="disp_ya_compartidos_abrir">Ya está en Compartidos: abrirlo</string>
+	<string name="zona_dispositivo">Libros del dispositivo</string>
+	<!-- Widget: un audiolibro se escucha en su pantalla -->
+	<string name="widget_escuchar_x">Escuchar %1$s</string>
+</resources>

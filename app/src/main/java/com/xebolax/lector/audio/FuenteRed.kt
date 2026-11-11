@@ -17,7 +17,9 @@ import com.xebolax.lector.radio.Flujos
  * - agente de usuario propio (algunos servidores rechazan el de Android);
  * - redirecciones también entre http y https (radiojar, servidores que pasan a https);
  * - tiempos de espera holgados (15 s para conectar, 20 para leer);
- * - y, si el certificado de un https no vale, la misma dirección con http.
+ * - y, solo con la radio en directo, si el certificado de un https no vale, la
+ *   misma dirección con http (los podcasts y el audio de las noticias nunca
+ *   bajan a http: alguien en medio podría forzar el fallo).
  * Los archivos del móvil (libros, descargas) se siguen leyendo igual.
  */
 @UnstableApi
@@ -41,7 +43,7 @@ object FuenteRed {
 		} catch (e: HttpDataSource.HttpDataSourceException) {
 			val u = dataSpec.uri
 			val esCertificado = generateSequence<Throwable>(e) { it.cause }.any { it is javax.net.ssl.SSLException }
-			if (u.scheme.equals("https", true) && esCertificado) {
+			if (u.scheme.equals("https", true) && esCertificado && ControlAudio.permitirHttp) {
 				runCatching { base.close() }
 				base.open(dataSpec.withUri(u.buildUpon().scheme("http").build()))
 			} else throw e

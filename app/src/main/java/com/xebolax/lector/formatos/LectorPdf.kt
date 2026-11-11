@@ -96,8 +96,8 @@ object LectorPdf : LectorFormato {
 		val etiquetas: Array<String>? = runCatching { doc.documentCatalog.pageLabels?.labelsByPageIndices }.getOrNull()
 		fun etiqueta(i: Int) = etiquetas?.getOrNull(i)?.takeIf { it.isNotBlank() } ?: (i + 1).toString()
 
-		// 2. Cabeceras y pies repetidos, y números de página sueltos
-		val limpias = quitarCabecerasYPies(paginas)
+		// 2. Cabeceras y pies repetidos, y números de página sueltos (sin quitar títulos como «I» o «12», de letra más grande)
+		val limpias = quitarCabecerasYPies(paginas, tamanoNormal(paginas))
 		val conTexto = paginas.count { it.isNotEmpty() }
 		val escaneado = conTexto * 10 < total
 		if (escaneado) {
@@ -105,9 +105,7 @@ object LectorPdf : LectorFormato {
 		}
 
 		// 3. Tamaño de letra del texto normal (el más usado, por caracteres)
-		val histograma = HashMap<Float, Int>()
-		for (lineas in limpias) for (l in lineas) histograma[l.tamano] = (histograma[l.tamano] ?: 0) + l.texto.length
-		val cuerpo = histograma.maxByOrNull { it.value }?.key ?: 0f
+		val cuerpo = tamanoNormal(limpias)
 
 		// 4. Párrafos
 		val unir = ctx.opciones.pdfUnirLineas
@@ -270,7 +268,14 @@ object LectorPdf : LectorFormato {
 		return k.takeIf { it.isNotEmpty() && it.length <= 200 }
 	}
 
-	private fun quitarCabecerasYPies(paginas: List<List<Linea>>): List<List<Linea>> {
+	/** El tamaño de letra más usado (por caracteres): el del texto normal. 0 si no hay texto. */
+	private fun tamanoNormal(paginas: List<List<Linea>>): Float {
+		val histograma = HashMap<Float, Int>()
+		for (lineas in paginas) for (l in lineas) histograma[l.tamano] = (histograma[l.tamano] ?: 0) + l.texto.length
+		return histograma.maxByOrNull { it.value }?.key ?: 0f
+	}
+
+	private fun quitarCabecerasYPies(paginas: List<List<Linea>>, cuerpo: Float): List<List<Linea>> {
 		val total = paginas.size
 		val repetidas = HashSet<String>()
 		if (total >= 3) {
@@ -286,7 +291,10 @@ object LectorPdf : LectorFormato {
 		return paginas.map { lineas ->
 			val ext = extremos(lineas)
 			lineas.filter { l ->
-				!(l in ext && (clave(l.texto)?.let { it in repetidas } == true || NUMERO_PAGINA.matches(l.texto.trim())))
+				val numero = NUMERO_PAGINA.matches(l.texto.trim())
+				// Un número suelto de letra más grande que el texto es un título («I», «IV», «12»), no el número de página
+				val titulo = numero && cuerpo > 0f && l.tamano >= cuerpo * 1.15f
+				!(l in ext && !titulo && (numero || clave(l.texto)?.let { it in repetidas } == true))
 			}
 		}
 	}
@@ -398,6 +406,8 @@ object LectorPdf : LectorFormato {
 
 		override fun endPage(page: PDPage?) {
 			cerrarLinea()
+			// Las páginas sin contenido no pasan por aquí: se rellenan vacías para que la numeración no se mueva
+			while (paginas.size < currentPageNo - 1) paginas += emptyList<Linea>()
 			paginas += actual
 			super.endPage(page)
 		}

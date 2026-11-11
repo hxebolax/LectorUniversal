@@ -20,13 +20,42 @@ import java.io.InputStream
 /** Texto de las imágenes sin descripción (igual en todos los formatos). */
 const val SIN_DESCRIPCION = "Imagen sin descripción"
 
+/**
+ * Los XML de Office (DOCX, XLSX, PPTX, ODT…) nunca declaran entidades. Si
+ * uno trae «<!ENTITY» antes del elemento raíz, es un archivo manipulado
+ * (entidades que se expanden hasta llenar la memoria, «billion laughs») y no
+ * se lee. Solo se mira hasta que empieza el elemento raíz.
+ */
+internal class SinEntidadesXml(entrada: InputStream) : java.io.FilterInputStream(entrada) {
+	private var comprobando = true
+	private val ventana = StringBuilder()
+
+	private fun ver(b: Int) {
+		if (!comprobando || b <= 0) return
+		val c = b.toChar()
+		ventana.append(c)
+		if (ventana.length > 16) ventana.deleteCharAt(0)
+		if (ventana.endsWith("<!ENTITY", ignoreCase = true)) throw ExcepcionFormato("El documento está dañado o manipulado: declara entidades XML.")
+		// Empieza el elemento raíz («<w:document…»): ya no puede haber declaraciones
+		if (ventana.length >= 2 && ventana[ventana.length - 2] == '<' && c.isLetter()) comprobando = false
+	}
+
+	override fun read(): Int = super.read().also { ver(it) }
+
+	override fun read(b: ByteArray, off: Int, len: Int): Int {
+		val n = super.read(b, off, len)
+		if (comprobando) for (i in off until off + maxOf(n, 0)) ver(b[i].toInt() and 0xFF)
+		return n
+	}
+}
+
 private object AyudaOffice {
 
 	class Relacion(val tipo: String, val destino: String, val externa: Boolean)
 
 	fun parser(entrada: InputStream): XmlPullParser = Xml.newPullParser().apply {
 		setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-		setInput(entrada, null)
+		setInput(SinEntidadesXml(entrada), null)
 	}
 
 	/** Nombre sin prefijo ("w:p" → "p"). */

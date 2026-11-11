@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Podcasts, Radio and audio player texts (English). -->
+<resources>
+	<!-- Name of the long-press action on list rows («Double-tap and hold for more actions») -->
+	<string name="audio_mas_acciones">More actions</string>
+	<!-- Player: volume boost of an episode whose podcast has its own volume -->
+	<string name="audio_refuerzo_podcast">Volume boost for this podcast</string>
+	<!-- Radio: wait dialog while importing an M3U or PLS list -->
+	<string name="audio_importando">Importing stations…</string>
+	<!-- Radio: wait dialog while saving a recording to the library -->
+	<string name="audio_guardando_biblioteca">Saving the recording to the library…</string>
+	<!-- Radio: notice when a recording could not be made (the text says why) -->
+	<string name="audio_grabacion_fallida">Could not record %1$s</string>
+	<!-- Radio: notice when a recording was cut off and could not continue (what was recorded is kept) -->
+	<string name="audio_grabacion_cortada">The recording of %1$s was cut off</string>
+	<!-- Radio: confirm before deleting a song from the history -->
+	<string name="audio_confirmar_borrar_cancion">Delete «%1$s» from the songs? This cannot be undone.</string>
+</resources>

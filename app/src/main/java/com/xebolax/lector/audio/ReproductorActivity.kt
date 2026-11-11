@@ -167,7 +167,8 @@ class ReproductorActivity : AppCompatActivity() {
 			val nuevo = !ControlAudio.esActual(e.id)
 			ControlAudio.cargarExterno(e)
 			libro = ControlAudio.libro
-			unidad = if (e.capitulos.isNotEmpty()) UnidadAudio.CAPITULO else UnidadAudio.M5
+			// Los capítulos pueden haber llegado ya (se buscan en segundo plano)
+			unidad = if ((ControlAudio.libro?.capitulos?.size ?: 0) > 0) UnidadAudio.CAPITULO else UnidadAudio.M5
 			actualizarUnidad()
 			actualizar()
 			if (nuevo) ControlAudio.reproducir()
@@ -264,6 +265,8 @@ class ReproductorActivity : AppCompatActivity() {
 		b.botonIr.setOnClickListener { irATiempo() }
 		b.botonTemporizador.setOnClickListener { temporizador() }
 		b.botonTexto.setOnClickListener { abrirTexto() }
+		describirAlPedir(b.tiempo) { descripcionTiempo }
+		describirAlPedir(b.tiempoCapitulo) { descripcionTiempoCapitulo }
 		b.barraPosicion.alMover = { ms -> ControlAudio.irA(ControlAudio.posicion().first, ms) }
 		b.barraPosicion.describir = { pos, dur -> describirPosicion(pos, dur) }
 	}
@@ -378,6 +381,22 @@ class ReproductorActivity : AppCompatActivity() {
 		if (v.contentDescription?.toString() != texto.toString()) v.contentDescription = texto
 	}
 
+	/**
+	 * El tiempo cambia cada segundo: su nombre hablado se da al pedirlo TalkBack (al llegar
+	 * a él), sin cambiar contentDescription cada segundo, que TalkBack volvería a leer.
+	 */
+	private var descripcionTiempo = ""
+	private var descripcionTiempoCapitulo = ""
+
+	private fun describirAlPedir(v: android.view.View, texto: () -> String) {
+		ViewCompat.setAccessibilityDelegate(v, object : androidx.core.view.AccessibilityDelegateCompat() {
+			override fun onInitializeAccessibilityNodeInfo(host: android.view.View, info: androidx.core.view.accessibility.AccessibilityNodeInfoCompat) {
+				super.onInitializeAccessibilityNodeInfo(host, info)
+				texto().takeIf { it.isNotBlank() }?.let { info.contentDescription = it }
+			}
+		})
+	}
+
 	private fun actualizar() {
 		// Podcast: al terminar un episodio empieza el siguiente de la cola; la pantalla pasa a él
 		val ext = ControlAudio.externo
@@ -425,7 +444,7 @@ class ReproductorActivity : AppCompatActivity() {
 		val queda = if (finTotal > 0) ((finTotal - transcurrido).coerceAtLeast(0) / velocidad).toLong() else 0L
 		if (queda > 0 && total > 0) textoTiempo += " · " + getString(R.string.quedan_x, tiempoCorto(queda))
 		poner(b.tiempo, textoTiempo)
-		ponerDescripcion(b.tiempo, getString(R.string.tiempo_de, tiempoHablado(transcurrido), tiempoHablado(finTotal)) +
+		descripcionTiempo = (getString(R.string.tiempo_de, tiempoHablado(transcurrido), tiempoHablado(finTotal)) +
 			(if (l.pistas.size > 1) ". " + getString(R.string.pista_de, pista + 1, l.pistas.size) else "") +
 			". " + getString(R.string.porcentaje_n, ControlAudio.progreso().toInt()) +
 			(if (queda > 0 && total > 0) ". " + getString(R.string.quedan_x, tiempoHablado(queda, conSegundos = false)) else ""))
@@ -436,7 +455,7 @@ class ReproductorActivity : AppCompatActivity() {
 			val finMs = if (finCap != null && finCap.pista == pista) finCap.ms else duracion
 			val queda = (finMs - ms).coerceAtLeast(0)
 			poner(b.tiempoCapitulo, getString(R.string.capitulo_tiempo, tiempoCorto(dentro), tiempoCorto(queda)))
-			ponerDescripcion(b.tiempoCapitulo, getString(R.string.capitulo_tiempo, tiempoHablado(dentro), tiempoHablado(queda)))
+			descripcionTiempoCapitulo = getString(R.string.capitulo_tiempo, tiempoHablado(dentro), tiempoHablado(queda))
 			b.tiempoCapitulo.isVisible = true
 		} else b.tiempoCapitulo.isVisible = false
 		b.barraPosicion.poner(ms, duracion)
@@ -617,7 +636,9 @@ class ReproductorActivity : AppCompatActivity() {
 			if (minutos != 0) append("<li>").append(esc(getString(R.string.temporizador_queda,
 				if (minutos > 0) resources.getQuantityString(R.plurals.minutos, minutos, minutos) else nombreTemporizador(minutos)))).append("</li>")
 			if (p.saltarSilencios) append("<li>").append(getString(R.string.saltar_silencios)).append("</li>")
-			if (p.refuerzoVolumen > 0) append("<li>").append(esc(getString(R.string.refuerzo_volumen) + ": +" + p.refuerzoVolumen + " dB")).append("</li>")
+			// El refuerzo que se aplica: el propio del podcast si tiene, si no el general
+			val refuerzo = ControlAudio.externo?.takeIf { it.id == ControlAudio.idLibro }?.refuerzo ?: p.refuerzoVolumen
+			if (refuerzo > 0) append("<li>").append(esc(getString(R.string.refuerzo_volumen) + ": +" + refuerzo + " dB")).append("</li>")
 			append("</ul>")
 			if (e != null) {
 				val db = com.xebolax.lector.podcast.PodcastsBaseDatos.obtener(this@ReproductorActivity)
@@ -689,9 +710,17 @@ class ReproductorActivity : AppCompatActivity() {
 			}
 			R.id.menu_refuerzo -> {
 				val valores = listOf(0, 3, 6, 9, 12, 15)
-				elegirUno(getString(R.string.refuerzo_volumen), valores.map { if (it == 0) getString(R.string.sin_refuerzo) else "+$it dB" },
-					valores.indexOf(p.refuerzoVolumen).coerceAtLeast(0)) { i ->
-					p.p.edit().putInt("refuerzo_volumen", valores[i]).apply()
+				// Un episodio de un podcast con volumen propio: se cambia el suyo (el general no le afecta)
+				val ext = ControlAudio.externo?.takeIf { it.refuerzo != null && it.id == ControlAudio.idLibro }
+				val idPodcast = if (ext != null) episodio()?.podcast else null
+				val actual = if (idPodcast != null) ext?.refuerzo ?: 0 else p.refuerzoVolumen
+				val titulo = if (idPodcast != null) getString(R.string.audio_refuerzo_podcast) else getString(R.string.refuerzo_volumen)
+				elegirUno(titulo, valores.map { if (it == 0) getString(R.string.sin_refuerzo) else "+$it dB" }, valores.indexOf(actual).coerceAtLeast(0)) { i ->
+					if (ext != null && idPodcast != null) {
+						ext.refuerzo = valores[i]
+						val db = com.xebolax.lector.podcast.PodcastsBaseDatos.obtener(this)
+						lifecycleScope.launch(Dispatchers.IO) { db.guardarVolumen(idPodcast, valores[i]) }
+					} else p.p.edit().putInt("refuerzo_volumen", valores[i]).apply()
 					ControlAudio.aplicarRefuerzo()
 				}
 			}

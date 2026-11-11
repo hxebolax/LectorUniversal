@@ -2,6 +2,7 @@ package com.xebolax.lector.catalogo
 
 import android.util.Base64
 import com.xebolax.lector.BuildConfig
+import kotlinx.coroutines.ensureActive
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.parser.Parser
@@ -47,9 +48,19 @@ object Feed {
 		c.inputStream.use { com.xebolax.lector.modelo.Textos.decodificar(it.readBytes(), "utf-8") }
 	}
 
-	/** Descarga un archivo (libro) a destino; devuelve el tipo que dice el servidor. */
-	fun descargarArchivo(url: String, destino: File, credenciales: Credenciales?): String? = abrir(url, credenciales).use { c ->
-		c.inputStream.use { e -> destino.outputStream().use { e.copyTo(it, 256 * 1024) } }
+	/** Descarga un archivo (libro) a destino; devuelve el tipo que dice el servidor. Cancelar (la espera) la para de verdad. */
+	suspend fun descargarArchivo(url: String, destino: File, credenciales: Credenciales?): String? = abrir(url, credenciales).use { c ->
+		c.inputStream.use { e ->
+			destino.outputStream().use { s ->
+				val bloque = ByteArray(256 * 1024)
+				while (true) {
+					kotlin.coroutines.coroutineContext.ensureActive()
+					val n = e.read(bloque)
+					if (n < 0) break
+					s.write(bloque, 0, n)
+				}
+			}
+		}
 		c.contentType
 	}
 

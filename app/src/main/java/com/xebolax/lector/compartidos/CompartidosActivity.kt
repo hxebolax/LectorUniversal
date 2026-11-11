@@ -125,36 +125,59 @@ class CompartidosActivity : AppCompatActivity() {
 				@Suppress("DEPRECATION")
 				val lista = i.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty()
 				if (lista.isNotEmpty()) lifecycleScope.launch {
-					val ids = try {
-						conEspera(getString(R.string.compartidos), getString(R.string.comp_guardando)) {
-							lista.mapNotNull { runCatching { Compartidos.guardarArchivo(this@CompartidosActivity, it) }.getOrNull() }
+					val guardados = conEspera(getString(R.string.compartidos), getString(R.string.comp_guardando)) {
+						lista.mapNotNull { uri ->
+							try {
+								Compartidos.guardarArchivo(this@CompartidosActivity, uri)
+							} catch (e: kotlinx.coroutines.CancellationException) {
+								throw e
+							} catch (e: Exception) {
+								null
+							}
 						}
-					} catch (e: kotlinx.coroutines.CancellationException) {
-						throw e
 					}
-					TareasInicio.completar(this@CompartidosActivity, ids)
-					avisar(resources.getQuantityString(R.plurals.comp_recibidos, ids.size, ids.size), mostrar = true)
+					val ids = guardados.map { it.first }
+					TareasInicio.completar(this@CompartidosActivity, guardados.filter { it.second }.map { it.first })
+					// Lo que ya estaba en la biblioteca sigue ahí: se dice aparte
+					val enBiblioteca = withContext(kotlinx.coroutines.Dispatchers.IO) {
+						val db = BaseDatos.obtener(this@CompartidosActivity)
+						ids.count { db.libro(it)?.compartido == false }
+					}
+					val enCompartidos = ids.size - enBiblioteca
+					avisar(listOfNotNull(
+						resources.getQuantityString(R.plurals.comp_recibidos, enCompartidos, enCompartidos).takeIf { enCompartidos > 0 || enBiblioteca == 0 },
+						resources.getQuantityString(R.plurals.comp_ya_biblioteca_n, enBiblioteca, enBiblioteca).takeIf { enBiblioteca > 0 },
+					).joinToString(". "), mostrar = true)
 				}
 			}
 		}
 		i.action = null
 	}
 
-	/** Tras guardarlo: abrirlo, abrirlo y leerlo en voz alta, o solo avisar (Ajustes). */
-	private fun recibido(id: Long) {
+	/**
+	 * Tras guardarlo: abrirlo, abrirlo y leerlo en voz alta, o solo avisar
+	 * (Ajustes). Si ya estaba, se dice dónde está de verdad. nuevo: no estaba.
+	 */
+	private suspend fun recibido(id: Long, nuevo: Boolean = true) {
+		val l = withContext(kotlinx.coroutines.Dispatchers.IO) { BaseDatos.obtener(this@CompartidosActivity).libro(id) } ?: return
+		val guardar = Compartidos.alRecibir(this) == "guardar"
+		// Ya estaba en la biblioteca: sigue ahí, no en Compartidos
+		if (!l.compartido) {
+			avisar(getString(R.string.comp_ya_biblioteca_x, l.tituloVisible), mostrar = true)
+			if (!guardar) Compartidos.abrir(this, id)
+			return
+		}
 		b.paginas.setCurrentItem(0, false)
-		if (Compartidos.alRecibir(this) == "guardar") {
-			val titulo = BaseDatos.obtener(this).libro(id)?.tituloVisible.orEmpty()
-			avisar(getString(R.string.comp_guardado_x, titulo), mostrar = true)
-		} else Compartidos.abrir(this, id)
+		if (guardar) avisar(getString(if (nuevo) R.string.comp_guardado_x else R.string.comp_ya_compartidos_x, l.tituloVisible), mostrar = true)
+		else Compartidos.abrir(this, id)
 	}
 
 	private fun recibirArchivo(uri: Uri) {
 		lifecycleScope.launch {
 			try {
-				val id = conEspera(getString(R.string.compartidos), getString(R.string.comp_guardando)) { Compartidos.guardarArchivo(this@CompartidosActivity, uri) }
-				TareasInicio.completar(this@CompartidosActivity, listOf(id))
-				recibido(id)
+				val (id, nuevo) = conEspera(getString(R.string.compartidos), getString(R.string.comp_guardando)) { Compartidos.guardarArchivo(this@CompartidosActivity, uri) }
+				if (nuevo) TareasInicio.completar(this@CompartidosActivity, listOf(id))
+				recibido(id, nuevo)
 			} catch (e: kotlinx.coroutines.CancellationException) {
 				throw e
 			} catch (e: Exception) {
@@ -308,30 +331,28 @@ class CompartidosActivity : AppCompatActivity() {
 					supportFragmentManager.fragments.filterIsInstance<CompartidosFragment>().forEach { it.recargar() }
 				}
 			}
-			2 -> {
-				val db = BaseDatos.obtener(this)
-				val leidos = db.compartidos().filter { it.estado == Estado.TERMINADO }
-				if (leidos.isEmpty()) return avisar(getString(R.string.comp_sin_leidos)).let { true }
-				confirmar(resources.getQuantityString(R.plurals.comp_confirmar_borrar_leidos, leidos.size, leidos.size), getString(R.string.borrar)) {
-					lifecycleScope.launch {
-						withContext(kotlinx.coroutines.Dispatchers.IO) { leidos.forEach { Compartidos.borrar(this@CompartidosActivity, it) } }
-						avisar(resources.getQuantityString(R.plurals.comp_borrados, leidos.size, leidos.size))
-					}
-				}
-			}
-			3 -> {
-				val todos = BaseDatos.obtener(this).compartidos()
-				if (todos.isEmpty()) return avisar(getString(R.string.comp_vacio_corto)).let { true }
-				confirmar(resources.getQuantityString(R.plurals.comp_confirmar_borrar_todo, todos.size, todos.size), getString(R.string.borrar)) {
-					lifecycleScope.launch {
-						withContext(kotlinx.coroutines.Dispatchers.IO) { todos.forEach { Compartidos.borrar(this@CompartidosActivity, it) } }
-						avisar(resources.getQuantityString(R.plurals.comp_borrados, todos.size, todos.size))
-					}
-				}
-			}
+			2 -> borrarVarios(soloLeidos = true)
+			3 -> borrarVarios(soloLeidos = false)
 			else -> return super.onOptionsItemSelected(item)
 		}
 		return true
+	}
+
+	/** Borrar los leídos o todo: la lista y el borrado, fuera del hilo principal (con muchos, tarda). */
+	private fun borrarVarios(soloLeidos: Boolean) {
+		lifecycleScope.launch {
+			val lista = withContext(kotlinx.coroutines.Dispatchers.IO) {
+				BaseDatos.obtener(this@CompartidosActivity).compartidos().filter { !soloLeidos || it.estado == Estado.TERMINADO }
+			}
+			if (lista.isEmpty()) return@launch avisar(getString(if (soloLeidos) R.string.comp_sin_leidos else R.string.comp_vacio_corto))
+			val pregunta = if (soloLeidos) R.plurals.comp_confirmar_borrar_leidos else R.plurals.comp_confirmar_borrar_todo
+			confirmar(resources.getQuantityString(pregunta, lista.size, lista.size), getString(R.string.borrar)) {
+				lifecycleScope.launch {
+					withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) { lista.forEach { Compartidos.borrar(applicationContext, it) } }
+					avisar(resources.getQuantityString(R.plurals.comp_borrados, lista.size, lista.size))
+				}
+			}
+		}
 	}
 
 	private fun leerPortapapeles() {

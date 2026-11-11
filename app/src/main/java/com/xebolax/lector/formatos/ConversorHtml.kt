@@ -57,6 +57,8 @@ class ConversorHtml(
 	private val idiomas = ArrayDeque<String>()
 	private var prefijoLista = ""
 	private var marcaListaPendiente = false
+	/** Destino de un enlace que envuelve bloques enteros (<a><p>…</p></a>). */
+	private var enlaceEnvolvente: String? = null
 
 	fun convertir(raiz: Element) {
 		recorrer(raiz)
@@ -104,6 +106,16 @@ class ConversorHtml(
 	}
 
 	private fun procesar(e: Element, nombre: String, tipo: String) {
+		// Encabezado hecho con ARIA (role="heading" y aria-level): como un h1-h6
+		if (e.attr("role").trim().equals("heading", ignoreCase = true) && nombre !in ENCABEZADOS) {
+			volcar()
+			registrarAnclas(e)
+			nivelEncabezado = e.attr("aria-level").trim().toIntOrNull()?.coerceIn(1, 6) ?: 2
+			hijos(e)
+			volcar()
+			nivelEncabezado = 0
+			return
+		}
 		when (nombre) {
 			// En XHTML mal cerrado (<br> sin «/», leído como XML) el texto que sigue queda dentro: se recorre también
 			"br" -> {
@@ -132,12 +144,21 @@ class ConversorHtml(
 			"svg" -> {
 				registrarAnclas(e)
 				val titulo = e.selectFirst("title")?.text().orEmpty().ifBlank { e.attr("aria-label") }
-				if (titulo.isNotBlank()) anadirImagen(titulo)
+					.ifBlank { e.selectFirst("desc")?.text().orEmpty() }.trim()
+				// Una imagen dentro del SVG (las portadas de muchos EPUB)
+				val dentro = e.getAllElements().firstOrNull { nombre(it) == "image" }?.let { recursoImagen(it) }
+				when {
+					titulo.isNotBlank() -> anadirImagen(titulo, dentro)
+					dentro != null && opciones.leerImagenes && texto.isBlank() && !esAdorno(e) && !imagenDeAdorno(dentro) -> anadirImagen(null, dentro)
+					// Un dibujo con texto (un esquema, un título dibujado): se lee su texto
+					else -> e.getAllElements().filter { nombre(it) == "text" }.joinToString(" ") { it.text() }.trim()
+						.takeIf { it.isNotEmpty() }?.let { anadirTexto(" $it ") }
+				}
 			}
 			"math" -> {
 				registrarAnclas(e)
 				// Lo que puso el autor; si no, la fórmula dicha con palabras; si no, su TeX o su texto
-				val alt = e.attr("alttext").ifBlank { runCatching { Matematicas.hablar(e) }.getOrDefault("") }.ifBlank {
+				val alt = e.attr("alttext").ifBlank { runCatching { Matematicas.hablar(e, idiomaActual()) }.getOrDefault("") }.ifBlank {
 					e.selectFirst("annotation[encoding*=TeX], annotation")?.text().orEmpty()
 				}.ifBlank { e.text() }
 				if (alt.isNotBlank()) {
@@ -237,6 +258,9 @@ class ConversorHtml(
 		}
 	}
 
+	/** Idioma de lo que se está leyendo (el del elemento o el del libro; vacío si no se sabe). */
+	private fun idiomaActual(): String = idiomas.lastOrNull()?.takeIf { it.isNotBlank() } ?: idiomaDocumento
+
 	// --- Texto en línea --------------------------------------------------------
 
 	private fun anadirTexto(crudo: String) {
@@ -279,9 +303,16 @@ class ConversorHtml(
 
 	/** Dónde está la imagen: ruta dentro del libro, dirección web o "data:" (si no es enorme). */
 	private fun recursoImagen(e: Element): String? {
-		val src = e.attr("src").ifBlank { e.attr("xlink:href") }.ifBlank { e.attr("href") }.trim()
+		val atributo = listOf("src", "xlink:href", "href").firstOrNull { e.attr(it).isNotBlank() }
+		val src = atributo?.let { e.attr(it) }.orEmpty().trim()
+		// Página web: la dirección completa (la relativa no se encontraría luego)
+		val absoluta = atributo?.let { runCatching { e.absUrl(it) }.getOrNull() }.orEmpty()
 		return when {
+			// MOBI 6: la imagen es un registro del libro (recindex); KF8: «kindle:embed:XXXX» (número en base 32)
+			e.hasAttr("recindex") -> e.attr("recindex").trim().toIntOrNull()?.let { "${PREFIJO_MOBI}6:$it" }
+			src.startsWith("kindle:embed:", ignoreCase = true) -> src.substring(13).substringBefore('?').toIntOrNull(32)?.let { "${PREFIJO_MOBI}8:$it" }
 			src.isEmpty() -> null
+			ruta.isEmpty() && (absoluta.startsWith("http://") || absoluta.startsWith("https://")) -> absoluta
 			src.startsWith("data:") -> src.takeIf { it.length < 700_000 }
 			src.contains("://") -> src
 			src.lowercase().substringBefore('?').endsWith(".svg") -> null
@@ -320,22 +351,35 @@ class ConversorHtml(
 			hijos(e)
 			return
 		}
+		val destino = destinoDe(href)
+		// Enlace que envuelve párrafos o encabezados (una tarjeta, una entrada del índice): cada bloque de dentro lo lleva entero
+		if (e.getAllElements().any { it !== e && nombre(it) in BLOQUES_DENTRO_DE_ENLACE }) {
+			val antes = enlaceEnvolvente
+			volcar()
+			enlaceEnvolvente = destino
+			hijos(e)
+			volcar()
+			enlaceEnvolvente = antes
+			return
+		}
 		separarSiHaceFalta()
 		val inicio = texto.length
 		hijos(e)
 		val fin = texto.length
 		if (fin <= inicio) return
-		val destino = when {
-			href.contains("://") || href.startsWith("mailto:") || href.startsWith("tel:") -> href
-			href.startsWith("#") -> "$ruta$href"
-			else -> {
-				val archivo = Contenedor.resolver(ruta, href)
-				val fragmento = href.substringAfter('#', "")
-				if (fragmento.isEmpty()) archivo else "$archivo#$fragmento"
-			}
-		}
 		enlaces += Enlace(inicio, fin, destino)
 		if (esLlamadaNota(e, tipo, texto.substring(inicio, fin))) marcas = marcas or Marca.LLAMADA_NOTA
+	}
+
+	/** Destino de un enlace: tal cual si es externo; si no, la ruta dentro del libro con su fragmento. */
+	private fun destinoDe(href: String): String = when {
+		href.contains("://") || href.startsWith("mailto:") || href.startsWith("tel:") -> href
+		href.startsWith("#") -> "$ruta$href"
+		else -> {
+			val archivo = Contenedor.resolver(ruta, href)
+			val fragmento = href.substringAfter('#', "")
+			if (fragmento.isEmpty()) archivo else "$archivo#$fragmento"
+		}
 	}
 
 	/** Llamada a nota: declarada (noteref) o por su forma ("[12]", "³", "*" en superíndice). */
@@ -356,8 +400,10 @@ class ConversorHtml(
 		registrarAnclas(t)
 		val filas = t.select("tr").filter { fila -> fila.parents().firstOrNull { nombre(it) == "table" } == t }
 		val columnas = filas.maxOfOrNull { fila -> fila.children().count { nombre(it) == "td" || nombre(it) == "th" } } ?: 0
-		// Tabla de maquetación (una columna): se lee como texto normal
-		if (columnas <= 1) {
+		// Tabla de maquetación (una columna, o con títulos dentro de las celdas): se lee como texto normal,
+		// para no perder sus encabezados al navegar
+		val conTitulos = filas.any { fila -> fila.select("h1, h2, h3, h4, h5, h6, [role=heading]").any { h -> h.parents().firstOrNull { nombre(it) == "table" } == t } }
+		if (columnas <= 1 || conTitulos) {
 			hijos(t)
 			volcar()
 			return
@@ -370,7 +416,7 @@ class ConversorHtml(
 		val primeraFila = filas.firstOrNull()
 		val conEncabezado = primeraFila != null && (celdasDe(primeraFila).all { nombre(it) == "th" } ||
 			primeraFila.parents().any { nombre(it) == "thead" })
-		val encabezados = if (conEncabezado) celdasDe(primeraFila!!).map { textoCelda(it) } else emptyList()
+		val encabezados = if (conEncabezado) celdasDe(primeraFila!!).map { celda(it).first } else emptyList()
 		if (c.tamano == primero) {
 			c.bloque(TipoBloque.PARRAFO, "Tabla de ${filas.size} filas y $columnas columnas")
 		}
@@ -378,19 +424,31 @@ class ConversorHtml(
 			registrarAnclas(fila)
 			val celdas = celdasDe(fila)
 			celdas.forEach { registrarAnclas(it) }
-			val textos = celdas.map { textoCelda(it) }
-			val linea = if (i == 0 && conEncabezado) {
-				textos.joinToString(" | ")
-			} else if (opciones.tablasConEncabezados && encabezados.isNotEmpty()) {
-				textos.mapIndexed { j, valor ->
-					val cabecera = encabezados.getOrNull(j).orEmpty()
-					if (cabecera.isBlank() || valor.isBlank()) valor else "$cabecera: $valor"
-				}.filter { it.isNotBlank() }.joinToString("; ")
-			} else {
-				textos.joinToString(" | ")
+			val cabeceraFila = i == 0 && conEncabezado
+			val conNombres = !cabeceraFila && opciones.tablasConEncabezados && encabezados.isNotEmpty()
+			// (prefijo «Columna: », texto de la celda, sus enlaces)
+			var partes = celdas.mapIndexed { j, cel ->
+				val (valor, enlacesCelda) = celda(cel)
+				val cabecera = if (conNombres) encabezados.getOrNull(j).orEmpty() else ""
+				Triple(if (cabecera.isBlank() || valor.isBlank()) "" else "$cabecera: ", valor, enlacesCelda)
 			}
-			// Enlaces de la fila (solo los de la primera celda que tenga uno, para no complicar)
-			c.bloque(TipoBloque.FILA_TABLA, linea.ifBlank { "(fila vacía)" }, marcas = if (i == 0 && conEncabezado) Marca.ENCABEZADO_TABLA else 0)
+			if (conNombres) partes = partes.filter { it.second.isNotBlank() }
+			val separador = if (conNombres) "; " else " | "
+			val linea = StringBuilder()
+			val enlacesFila = ArrayList<Enlace>()
+			for ((k, p) in partes.withIndex()) {
+				if (k > 0) linea.append(separador)
+				linea.append(p.first)
+				val base = linea.length
+				linea.append(p.second)
+				for (en in p.third) enlacesFila += Enlace(base + en.inicio, base + en.fin, en.destino)
+			}
+			val vacia = linea.isBlank()
+			c.bloque(
+				TipoBloque.FILA_TABLA, if (vacia) "(fila vacía)" else linea.toString(),
+				enlaces = if (vacia) emptyList() else enlacesFila,
+				marcas = if (cabeceraFila) Marca.ENCABEZADO_TABLA else 0,
+			)
 		}
 		if (c.tamano > primero) c.anadirMarca(primero, Marca.INICIO_TABLA)
 	}
@@ -403,13 +461,31 @@ class ConversorHtml(
 		}
 		// Fórmulas dentro de la celda: dichas con palabras, como fuera de las tablas (no sus símbolos sueltos)
 		for (m in celda.select("math")) {
-			val alt = m.attr("alttext").ifBlank { runCatching { Matematicas.hablar(m) }.getOrDefault("") }.ifBlank {
+			val alt = m.attr("alttext").ifBlank { runCatching { Matematicas.hablar(m, idiomaActual()) }.getOrDefault("") }.ifBlank {
 				m.selectFirst("annotation[encoding*=TeX], annotation")?.text().orEmpty()
 			}.ifBlank { m.text() }
 			m.replaceWith(TextNode(if (alt.isBlank()) " " else " [Fórmula: ${alt.trim()}] "))
 		}
 		partes.append(celda.text())
 		return ESPACIOS.replace(partes.toString(), " ").trim()
+	}
+
+	/** Texto de una celda y sus enlaces (posiciones dentro de ese texto). */
+	private fun celda(e: Element): Pair<String, List<Enlace>> {
+		val texto = textoCelda(e)
+		val propios = ArrayList<Enlace>()
+		var desde = 0
+		for (a in e.select("a[href]")) {
+			val href = a.attr("href").trim()
+			if (href.isEmpty() || href.startsWith("javascript:")) continue
+			val t = ESPACIOS.replace(a.text(), " ").trim()
+			if (t.isEmpty()) continue
+			val i = texto.indexOf(t, desde)
+			if (i < 0) continue
+			propios += Enlace(i, i + t.length, destinoDe(href))
+			desde = i + t.length
+		}
+		return texto to propios
 	}
 
 	// --- Volcado de bloques --------------------------------------------------------
@@ -454,6 +530,8 @@ class ConversorHtml(
 			idiomaDocumento.isNotBlank() && !it.substringBefore('-').equals(idiomaDocumento.substringBefore('-'), ignoreCase = true)
 		}
 		val contenido = if (enPre > 0) texto.toString().trimEnd() else texto.toString()
+		// Dentro de un enlace que envuelve bloques: el bloque entero es el enlace (si no tiene otros propios)
+		enlaceEnvolvente?.let { if (enlaces.isEmpty()) enlaces += Enlace(0, contenido.length, it) }
 		val n = c.bloque(tipo, contenido, nivel, enlaces.toList(), m, idioma)
 		imagenBloque?.let { if (n >= 0) c.imagen(n, it) }
 		// Un elemento de lista partido en varios bloques: solo el primero lleva el número
@@ -471,9 +549,12 @@ class ConversorHtml(
 	}
 
 	companion object {
+		/** Imágenes de MOBI: «mobi:6:n» (recindex) o «mobi:8:n» (kindle:embed); las saca LectorMobi.imagen. */
+		const val PREFIJO_MOBI = "mobi:"
 		private val ESPACIOS = Regex("[ \t\r\n\u000C]+")
 		private val IGNORAR = setOf(
-			"head", "script", "style", "noscript", "template", "title", "meta", "link", "object", "embed",
+			// «object» no: lo de dentro es el texto alternativo (si no se puede mostrar el objeto)
+			"head", "script", "style", "noscript", "template", "title", "meta", "link", "embed", "param",
 			"iframe", "audio", "video", "source", "track", "canvas", "map", "input", "select", "textarea", "button",
 		)
 		private val BLOQUES = setOf(
@@ -484,6 +565,11 @@ class ConversorHtml(
 			"level", "level1", "level2", "level3", "level4", "level5", "level6", "frontmatter", "bodymatter",
 			"rearmatter", "doctitle", "docauthor", "sidebar", "prodnote", "poem", "linegroup", "line", "stanza",
 			"epigraph", "v", "subtitle", "text-author", "annotation", "cite",
+		)
+		private val ENCABEZADOS = setOf("h1", "h2", "h3", "h4", "h5", "h6")
+		/** Lo que, dentro de un enlace, hace que el enlace envuelva bloques y no texto. */
+		private val BLOQUES_DENTRO_DE_ENLACE = BLOQUES + ENCABEZADOS + setOf(
+			"ul", "ol", "li", "pre", "blockquote", "figure", "aside", "section", "footer", "table", "hr",
 		)
 		private val NOTA = Regex("footnote|endnote|rearnote|doc-note|doc-footnote|doc-endnote|\\bnote\\b")
 		private val NOTA_CLASE = Regex("(?i)\\b(footnote|endnote|nota|notas|note|noteref|fn)\\b")

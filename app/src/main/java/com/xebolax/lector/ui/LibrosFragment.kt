@@ -82,6 +82,15 @@ class LibrosFragment : Fragment() {
 	private val seleccionados = linkedSetOf<Long>()
 	private var carga: Job? = null
 
+	/** De la última carga (calculado fuera del hilo principal): la ruta, el padre y el tipo de la carpeta abierta, y el nombre del grupo abierto. */
+	private var cargada: Long? = null
+	private var rutaActual = ""
+	private var padreActual: Long? = null
+	private var tipoCarpetaActual = ""
+	private var nombreGrupoActual = ""
+	/** Al terminar de cargar, decir en qué carpeta se está (tras abrir una o subir). */
+	private var anunciarAlCargar = false
+
 	/** Carpeta abierta (null = raíz de la biblioteca). Los libros que se añaden van a ella. */
 	var carpetaActual: Long? = null
 		private set
@@ -231,7 +240,7 @@ class LibrosFragment : Fragment() {
 		if (tipo == tipoActual) return
 		tipoActual = tipo
 		grupo = null
-		carpetaActual?.let { id -> db.carpeta(id)?.tipo?.let { t -> if (t.isNotEmpty() && t != tipo && tipo != Tipos.TODO) carpetaActual = null } }
+		if (carpetaActual != null && tipoCarpetaActual.isNotEmpty() && tipoCarpetaActual != tipo && tipo != Tipos.TODO) carpetaActual = null
 		Preferencias(requireContext()).p.edit().putString(PREF_TIPO, tipo).apply()
 		recargar()
 	}
@@ -248,10 +257,10 @@ class LibrosFragment : Fragment() {
 		botonSeleccion?.text = resources.getQuantityString(R.plurals.seleccionados_acciones, seleccionados.size, seleccionados.size)
 		titulo?.text = when {
 			busqueda.isNotBlank() -> getString(R.string.resultados_busqueda_biblioteca)
-			porGrupos && grupo != null -> nombres[filtro.ordinal] + " › " + nombreGrupo(grupo!!)
+			porGrupos && grupo != null -> nombres[filtro.ordinal] + " › " + nombreGrupoActual.ifBlank { grupo!! }
 			filtro != Filtro.CARPETAS -> listOf(nombreVista(), nombres[filtro.ordinal]).joinToString(" › ")
 			else -> listOf(nombreVista()).plus(
-				carpetaActual?.let { db.rutaCarpeta(it) }?.takeIf { it.isNotBlank() }?.let { listOf(it) }.orEmpty()
+				rutaActual.takeIf { carpetaActual != null && carpetaActual == cargada && it.isNotBlank() }?.let { listOf(it) }.orEmpty()
 			).joinToString(" › ")
 		}
 	}
@@ -265,26 +274,21 @@ class LibrosFragment : Fragment() {
 		}
 	}
 
-	private fun nombreGrupo(clave: String): String =
-		if (filtro == Filtro.COLECCIONES) db.colecciones().firstOrNull { it.id.toString() == clave }?.nombre ?: clave else clave
-
 	private fun nuevaColeccion() {
-		requireContext().pedirTexto(getString(R.string.nueva_coleccion), getString(R.string.nombre)) { nombre ->
-			if (nombre.isNotBlank()) {
-				db.crearColeccion(nombre)
-				(activity as? AppCompatActivity)?.avisar(getString(R.string.coleccion_creada, nombre.trim()))
-			}
+		val a = activity as? AppCompatActivity ?: return
+		a.pedirTexto(getString(R.string.nueva_coleccion), getString(R.string.nombre)) { nombre ->
+			if (nombre.isNotBlank()) a.enSegundoPlano({ db.crearColeccion(nombre) }) { a.avisar(a.getString(R.string.coleccion_creada, nombre.trim())) }
 		}
 	}
 
 	private fun nuevaCarpeta() {
 		if (filtro == Filtro.COLECCIONES) return nuevaColeccion()
-		requireContext().pedirTexto(getString(R.string.nueva_carpeta), getString(R.string.nombre)) { nombre ->
-			if (nombre.isNotBlank()) {
-				// En la pestaña de un tipo, la carpeta es de ese tipo (solo se ve ahí y en Todo)
-				db.crearCarpeta(nombre, carpetaActual, tipoVisto.orEmpty())
-				(activity as? AppCompatActivity)?.avisar(getString(R.string.carpeta_creada, nombre))
-			}
+		val a = activity as? AppCompatActivity ?: return
+		val padre = carpetaActual
+		val tipo = tipoVisto.orEmpty()
+		a.pedirTexto(getString(R.string.nueva_carpeta), getString(R.string.nombre)) { nombre ->
+			// En la pestaña de un tipo, la carpeta es de ese tipo (solo se ve ahí y en Todo)
+			if (nombre.isNotBlank()) a.enSegundoPlano({ db.crearCarpeta(nombre, padre, tipo) }) { a.avisar(a.getString(R.string.carpeta_creada, nombre)) }
 		}
 	}
 
@@ -297,25 +301,30 @@ class LibrosFragment : Fragment() {
 			return true
 		}
 		if (!porCarpetas || carpetaActual == null) return false
-		carpetaActual = db.carpeta(carpetaActual!!)?.padre
+		// El padre se sabe de la última carga; si aún no ha llegado la de esta carpeta, se mira (es una consulta pequeña)
+		carpetaActual = if (cargada == carpetaActual) padreActual else carpetaActual?.let { db.carpeta(it) }?.padre
+		anunciarAlCargar = true
 		recargar()
-		anunciarCarpeta()
 		return true
 	}
 
-	private fun anunciarCarpeta() {
-		val nombre = carpetaActual?.let { db.carpeta(it)?.nombre } ?: nombreVista()
-		(activity as? AppCompatActivity)?.avisar(getString(R.string.carpeta_x, nombre), mostrar = false)
-	}
-
-	/** Lo que se ve, ya calculado fuera del hilo principal. */
-	private class Vista(val filas: List<Fila>, val estado: String)
+	/** Lo que se ve, ya calculado fuera del hilo principal. carpeta: la abierta (null si ya no existe). */
+	private class Vista(
+		val filas: List<Fila>,
+		val estado: String,
+		val carpeta: Long? = null,
+		val ruta: String = "",
+		val padre: Long? = null,
+		val tipoCarpeta: String = "",
+		val nombreCarpeta: String = "",
+		val nombreGrupo: String = "",
+	)
 
 	fun recargar() {
 		if (_b == null) return
 		val c = requireContext()
 		val orden = Preferencias(c).ordenBiblioteca
-		val carpeta = carpetaActual
+		val pedida = carpetaActual
 		val vistaCarpetas = porCarpetas
 		val texto = busqueda.trim()
 		val filtroActual = filtro
@@ -332,6 +341,8 @@ class LibrosFragment : Fragment() {
 				val carpetas = db.todasLasCarpetas()
 				val porId = carpetas.associateBy { it.id }
 				val hijas = carpetas.groupBy { it.padre }
+				// La carpeta abierta puede haberse borrado (desde una búsqueda o en otra pantalla): se vuelve a la raíz
+				val carpeta = pedida?.takeIf { porId.containsKey(it) }
 				val rutas = HashMap<Long, String>()
 				fun ruta(id: Long?): String {
 					if (id == null) return ""
@@ -358,7 +369,33 @@ class LibrosFragment : Fragment() {
 				val todos = db.todos(orden)
 				val delTipo = if (tipo == null) todos else todos.filter { it.claveTipo == tipo }
 
-				when {
+				// Cuántos hay de este tipo en cada carpeta, contando sus subcarpetas (y cuántos de cualquier tipo)
+				val directos = delTipo.groupingBy { it.carpeta }.eachCount()
+				val cualquiera = todos.groupingBy { it.carpeta }.eachCount()
+				val total = HashMap<Long, Pair<Int, Int>>()
+				fun cuenta(id: Long): Pair<Int, Int> = total.getOrPut(id) {
+					var deTipo = directos[id] ?: 0
+					var todo = cualquiera[id] ?: 0
+					hijas[id].orEmpty().forEach { h -> cuenta(h.id).let { deTipo += it.first; todo += it.second } }
+					deTipo to todo
+				}
+				// Cada tipo, sus carpetas: las creadas en su pestaña y las de cualquier tipo que tienen algo de este
+				// (o están vacías, para poder llenarlas). En «Todo», todas.
+				fun seVe(h: Carpeta): Boolean {
+					if (tipo == null || h.tipo == tipo) return true
+					if (h.tipo.isNotEmpty()) return false
+					val (deTipo, todo) = cuenta(h.id)
+					return deTipo > 0 || todo == 0
+				}
+				fun deCarpeta(h: Carpeta) = Fila.DeCarpeta(h, cuenta(h.id).first, hijas[h.id].orEmpty().count { seVe(it) }, if (tipo == null) nombresTipos[h.tipo].orEmpty() else "")
+				// El nombre del grupo abierto (de una colección, su nombre; de un autor o una serie, el mismo)
+				val nombreGrupo = when {
+					grupoActual == null -> ""
+					filtroActual == Filtro.COLECCIONES -> db.colecciones().firstOrNull { it.id.toString() == grupoActual }?.nombre ?: grupoActual
+					else -> grupoActual
+				}
+
+				val (filasVista, estadoVista) = when {
 					grupos && grupoActual == null -> {
 						val filas = when (filtroActual) {
 							Filtro.AUTORES -> delTipo.filter { it.autor.isNotBlank() }.groupBy { it.autor.trim().lowercase() }.values
@@ -375,7 +412,7 @@ class LibrosFragment : Fragment() {
 							Filtro.SERIES -> R.string.sin_series
 							else -> R.string.sin_libros
 						}) else contar(res, filas.sumOf { it.libros }, tipo)
-						Vista(filas, estado)
+						filas to estado
 					}
 					grupos -> {
 						val lista = when (filtroActual) {
@@ -384,31 +421,13 @@ class LibrosFragment : Fragment() {
 							else -> db.deColeccion(grupoActual!!.toLongOrNull() ?: -1, orden).filter { tipo == null || it.claveTipo == tipo }
 						}
 						val nombre = res.getStringArray(R.array.filtros_biblioteca)[filtroActual.ordinal]
-						Vista(listOf<Fila>(Fila.Subir(nombre)) + lista.map { deLibro(it) }, if (lista.isEmpty()) res.getString(R.string.sin_libros) else contar(res, lista.size, tipo))
+						(listOf<Fila>(Fila.Subir(nombre)) + lista.map { deLibro(it) }) to (if (lista.isEmpty()) res.getString(R.string.sin_libros) else contar(res, lista.size, tipo))
 					}
 					vistaCarpetas -> {
-						// Cuántos hay de este tipo en cada carpeta, contando sus subcarpetas
-						val directos = delTipo.groupingBy { it.carpeta }.eachCount()
-						val cualquiera = todos.groupingBy { it.carpeta }.eachCount()
-						val total = HashMap<Long, Pair<Int, Int>>()
-						fun cuenta(id: Long): Pair<Int, Int> = total.getOrPut(id) {
-							var deTipo = directos[id] ?: 0
-							var todo = cualquiera[id] ?: 0
-							hijas[id].orEmpty().forEach { h -> cuenta(h.id).let { deTipo += it.first; todo += it.second } }
-							deTipo to todo
-						}
 						val filas = mutableListOf<Fila>()
 						if (carpeta != null) filas += Fila.Subir(porId[carpeta]?.padre?.let { porId[it]?.nombre } ?: subirA)
-						// Cada tipo, sus carpetas: las creadas en su pestaña y las de cualquier tipo que tienen algo de este
-						// (o están vacías, para poder llenarlas). En «Todo», todas.
-						fun seVe(h: Carpeta): Boolean {
-							if (tipo == null || h.tipo == tipo) return true
-							if (h.tipo.isNotEmpty()) return false
-							val (deTipo, todo) = cuenta(h.id)
-							return deTipo > 0 || todo == 0
-						}
 						hijas[carpeta].orEmpty().sortedWith(compareBy<Carpeta>({ it.orden }, { it.nombre.lowercase() })).forEach { h ->
-							if (seVe(h)) filas += Fila.DeCarpeta(h, cuenta(h.id).first, hijas[h.id].orEmpty().count { seVe(it) }, if (tipo == null) nombresTipos[h.tipo].orEmpty() else "")
+							if (seVe(h)) filas += deCarpeta(h)
 						}
 						val libros = delTipo.filter { it.carpeta == carpeta }
 						libros.forEach { filas += deLibro(it, conRuta = false) }
@@ -422,16 +441,16 @@ class LibrosFragment : Fragment() {
 								contar(res, libros.size, tipo),
 							).joinToString(", ")
 						}
-						Vista(filas, estado)
+						filas to estado
 					}
 					else -> {
 						val base = if (texto.isBlank()) delTipo else delTipo.filter { l ->
 							l.titulo.contains(texto, true) || l.autor.contains(texto, true) || l.nombre.contains(texto, true)
 						}
 						val filas = mutableListOf<Fila>()
-						// Al buscar también salen las carpetas cuyo nombre coincide
-						if (texto.isNotBlank()) carpetas.filter { it.nombre.contains(texto, ignoreCase = true) && (tipo == null || it.tipo.isEmpty() || it.tipo == tipo) }
-							.forEach { h -> filas += Fila.DeCarpeta(h, delTipo.count { it.carpeta == h.id }, hijas[h.id].orEmpty().size) }
+						// Al buscar también salen las carpetas cuyo nombre coincide (solo las que se verían en esta pestaña, con lo que tienen de este tipo)
+						if (texto.isNotBlank()) carpetas.filter { it.nombre.contains(texto, ignoreCase = true) && seVe(it) }
+							.forEach { h -> filas += deCarpeta(h) }
 						val libros = base.filter { l ->
 							when (filtroActual) {
 								Filtro.FAVORITOS -> l.favorito
@@ -445,18 +464,28 @@ class LibrosFragment : Fragment() {
 							}
 						}
 						libros.forEach { filas += deLibro(it) }
-						Vista(filas, if (filas.isEmpty()) res.getString(R.string.sin_resultados_tipo, vistaNombre.lowercase()) else listOfNotNull(
+						filas to (if (filas.isEmpty()) res.getString(R.string.sin_resultados_tipo, vistaNombre.lowercase()) else listOfNotNull(
 							filas.count { it is Fila.DeCarpeta }.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.carpetas, it, it) },
 							contar(res, libros.size, tipo),
 						).joinToString(", "))
 					}
 				}
+				val abierta = carpeta?.let { porId[it] }
+				Vista(filasVista, estadoVista, carpeta, ruta(carpeta), abierta?.padre, abierta?.tipo.orEmpty(), abierta?.nombre.orEmpty(), nombreGrupo)
 			}
 			if (_b == null) return@launch
+			// La carpeta abierta ya no existe: se está en la raíz
+			if (modo == Modo.BIBLIOTECA && carpetaActual == pedida) carpetaActual = vista.carpeta
+			cargada = vista.carpeta
+			rutaActual = vista.ruta
+			padreActual = vista.padre
+			tipoCarpetaActual = vista.tipoCarpeta
+			nombreGrupoActual = vista.nombreGrupo
 			// Los libros quitados de la biblioteca dejan de estar seleccionados
 			if (seleccionados.isNotEmpty()) {
 				val existen = vista.filas.mapNotNull { (it as? Fila.DeLibro)?.libro?.id }.toSet()
-				val quitados = withContext(Dispatchers.IO) { seleccionados.filter { it !in existen && db.libro(it)?.takeIf { l -> !l.compartido } == null } }
+				val antes = seleccionados.toList()
+				val quitados = withContext(Dispatchers.IO) { antes.filter { it !in existen && db.libro(it)?.takeIf { l -> !l.compartido } == null } }
 				seleccionados.removeAll(quitados.toSet())
 			}
 			adaptador.seleccionados = seleccionados.toSet()
@@ -464,6 +493,11 @@ class LibrosFragment : Fragment() {
 			actualizarCabecera()
 			// Solo si cambia: la línea de estado es una región viva y TalkBack la leería en cada recarga
 			if (b.estado.text.toString() != vista.estado) b.estado.text = vista.estado
+			// Tras abrir una carpeta o subir: dónde se está
+			if (anunciarAlCargar) {
+				anunciarAlCargar = false
+				(activity as? AppCompatActivity)?.avisar(getString(R.string.carpeta_x, vista.nombreCarpeta.ifBlank { nombreVista() }), mostrar = false)
+			}
 		}
 	}
 
@@ -490,12 +524,13 @@ class LibrosFragment : Fragment() {
 					busqueda = ""
 					campoBusqueda?.setText("")
 				}
+				anunciarAlCargar = true
 				recargar()
-				anunciarCarpeta()
 			}
 			is Fila.Subir -> subir()
 			is Fila.Grupo -> {
 				grupo = fila.clave
+				nombreGrupoActual = fila.nombre
 				recargar()
 				a.avisar(fila.nombre, mostrar = false)
 			}
@@ -523,22 +558,25 @@ class LibrosFragment : Fragment() {
 			seleccionados.clear()
 			recargar()
 		}
+		// La base de datos, fuera del hilo principal; después se avisa y se quita la selección
+		fun hacer(trabajo: () -> Unit, texto: () -> String) = a.enSegundoPlano(trabajo) { hecho(texto()) }
 		val n = ids.size
 		a.elegir(resources.getQuantityString(R.plurals.seleccionados_acciones, n, n), listOf(
 			getString(R.string.mover_a_carpeta) to {
 				AccionesLibro.elegirCarpeta(a, getString(R.string.mover_a_carpeta), null) { destino ->
-					ids.forEach { db.moverLibro(it, destino) }
-					hecho(getString(R.string.movido_a, if (destino == null) getString(R.string.biblioteca_raiz) else db.rutaCarpeta(destino)))
+					a.enSegundoPlano({
+						ids.forEach { db.moverLibro(it, destino) }
+						destino?.let { db.rutaCarpeta(it) }
+					}) { ruta -> hecho(a.getString(R.string.movido_a, ruta ?: a.getString(R.string.biblioteca_raiz))) }
 				}
 			},
 			getString(R.string.cambiar_tipo) to {
 				AccionesLibro.elegirTipo(a, null) { tipo ->
-					db.cambiarTipo(ids, tipo)
-					hecho(getString(R.string.tipo_cambiado, AccionesLibro.nombreTipo(a, tipo)))
+					hacer({ db.cambiarTipo(ids, tipo) }) { a.getString(R.string.tipo_cambiado, AccionesLibro.nombreTipo(a, tipo)) }
 				}
 			},
-			getString(R.string.anadir_favoritos) to { ids.forEach { db.cambiarFavorito(it, true) }; hecho(getString(R.string.anadido_favoritos)) },
-			getString(R.string.quitar_favoritos) to { ids.forEach { db.cambiarFavorito(it, false) }; hecho(getString(R.string.quitado_favoritos)) },
+			getString(R.string.anadir_favoritos) to { hacer({ ids.forEach { db.cambiarFavorito(it, true) } }) { a.getString(R.string.anadido_favoritos) } },
+			getString(R.string.quitar_favoritos) to { hacer({ ids.forEach { db.cambiarFavorito(it, false) } }) { a.getString(R.string.quitado_favoritos) } },
 			getString(R.string.estado_de_lectura) to {
 				AccionesLibro.elegirEstado(a, ids) {
 					seleccionados.clear()
@@ -546,21 +584,15 @@ class LibrosFragment : Fragment() {
 				}
 			},
 			getString(R.string.colecciones_puntos) to { AccionesLibro.elegirColecciones(a, ids, resources.getQuantityString(R.plurals.libros, n, n)) },
-			getString(R.string.marcar_terminado) to { ids.forEach { db.cambiarEstado(it, Estado.TERMINADO) }; hecho(getString(R.string.hecho)) },
+			getString(R.string.marcar_terminado) to { hacer({ ids.forEach { db.cambiarEstado(it, Estado.TERMINADO) } }) { a.getString(R.string.hecho) } },
 			getString(R.string.marcar_no_leido) to {
 				a.confirmar(getString(R.string.confirmar_no_leido), getString(R.string.marcar_no_leido)) {
-					ids.forEach { db.cambiarEstado(it, Estado.NUEVO) }
-					hecho(getString(R.string.hecho))
+					hacer({ ids.forEach { db.cambiarEstado(it, Estado.NUEVO) } }) { a.getString(R.string.hecho) }
 				}
 			},
 			getString(R.string.quitar_de_biblioteca) to {
 				a.confirmar(resources.getQuantityString(R.plurals.confirmar_quitar_varios, n, n), getString(R.string.quitar)) {
-					for (id in ids) {
-						val uri = db.libro(id)?.uri?.let { android.net.Uri.parse(it) }
-						if (uri?.scheme == "file" && uri.path?.startsWith(a.filesDir.absolutePath) == true) runCatching { java.io.File(uri.path!!).delete() }
-						db.quitarLibro(id)
-					}
-					hecho(getString(R.string.quitado_de_biblioteca))
+					hacer({ ids.forEach { id -> db.libro(id)?.let { AccionesLibro.quitar(a, id, it.uri) } } }) { a.getString(R.string.quitado_de_biblioteca) }
 				}
 			},
 			getString(R.string.seleccionar_todos) to {
@@ -590,13 +622,14 @@ class LibrosFragment : Fragment() {
 					getString(R.string.abrir) to { alAbrir(fila) },
 					getString(R.string.renombrar) to {
 						a.pedirTexto(getString(R.string.renombrar), getString(R.string.nombre), fila.nombre) { n ->
-							if (n.isNotBlank() && !db.renombrarColeccion(id, n)) a.avisar(getString(R.string.coleccion_ya_existe, n.trim()))
+							if (n.isNotBlank()) a.enSegundoPlano({ db.renombrarColeccion(id, n) }) { hecho ->
+								if (!hecho) a.avisar(a.getString(R.string.coleccion_ya_existe, n.trim()))
+							}
 						}
 					},
 					getString(R.string.borrar_coleccion) to {
 						a.confirmar(getString(R.string.confirmar_borrar_coleccion, fila.nombre), getString(R.string.borrar)) {
-							db.borrarColeccion(id)
-							a.avisar(getString(R.string.coleccion_borrada, fila.nombre))
+							a.enSegundoPlano({ db.borrarColeccion(id) }) { a.avisar(a.getString(R.string.coleccion_borrada, fila.nombre)) }
 						}
 					},
 				)

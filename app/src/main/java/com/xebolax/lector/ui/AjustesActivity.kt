@@ -334,11 +334,14 @@ class AjustesFragment : PreferenceFragmentCompat() {
 					}
 				}.getOrNull()
 			}
-			if (nombre == null) return@launch a.avisar(getString(R.string.aj_letra_no_valida))
+			// Tras esperar, los textos de la Activity: el fragment puede haberse quitado mientras tanto
+			if (nombre == null) return@launch a.avisar(a.getString(R.string.aj_letra_no_valida))
 			PreferenceManager.getDefaultSharedPreferences(c).edit().putString("letra_propia_nombre", nombre).putString("fuente", "propia").apply()
-			findPreference<ListPreference>("fuente")?.value = "propia"
-			resumenesAspecto()
-			a.avisar(getString(R.string.aj_letra_lista, nombre))
+			if (isAdded) {
+				findPreference<ListPreference>("fuente")?.value = "propia"
+				resumenesAspecto()
+			}
+			a.avisar(a.getString(R.string.aj_letra_lista, nombre))
 		}
 	}
 
@@ -453,14 +456,19 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			true
 		}
 		fun cache() {
-			val ocupa = el.tamanoCache(c)
-			findPreference<Preference>("el_cache")?.summary = if (ocupa > 0) getString(R.string.el_cache_ocupa, tamanoLegible(ocupa)) else getString(R.string.el_cache_vacia)
+			lifecycleScope.launch {
+				val ocupa = withContext(Dispatchers.IO) { el.tamanoCache(c) }
+				if (!isAdded) return@launch
+				findPreference<Preference>("el_cache")?.summary = if (ocupa > 0) getString(R.string.el_cache_ocupa, tamanoLegible(ocupa)) else getString(R.string.el_cache_vacia)
+			}
 		}
 		cache()
 		alPulsar("el_cache") {
-			el.vaciarCache(c)
-			cache()
-			(activity as? AppCompatActivity)?.avisar(getString(R.string.el_cache_vaciada))
+			lifecycleScope.launch {
+				withContext(Dispatchers.IO) { el.vaciarCache(c) }
+				cache()
+				(activity as? AppCompatActivity)?.avisar(getString(R.string.el_cache_vaciada))
+			}
 		}
 		LectorVoz.ultimoAvisoNube.takeIf { it.isNotBlank() }?.let { findPreference<Preference>("el_comprobar")?.summary = it }
 		alPulsar("el_comprobar") {
@@ -694,7 +702,8 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				idioma?.entryValues = (listOf("") + idiomas).toTypedArray()
 				val filtro = idioma?.value.orEmpty()
 				idioma?.summary = if (filtro.isEmpty()) getString(R.string.todos_los_idiomas) else Locale(filtro).displayLanguage
-				val visibles = voces.filter { filtro.isEmpty() || it.locale.language == filtro }
+				val elegida = PreferenceManager.getDefaultSharedPreferences(requireContext()).getString("voz", "").orEmpty()
+				val visibles = voces.filter { filtro.isEmpty() || it.locale.language == filtro || it.name == elegida }
 				voz?.entries = (listOf(getString(R.string.voz_por_defecto)) + visibles.map { v -> com.xebolax.lector.voz.VocesMotor.etiqueta(requireContext(), v) }).toTypedArray()
 				voz?.entryValues = (listOf("") + visibles.map { it.name }).toTypedArray()
 				voz?.let { it.summary = it.entry ?: getString(R.string.voz_por_defecto) }
@@ -722,15 +731,18 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			}
 			true
 		}
-		for (clave in listOf("velocidad_voz", "tono_voz", "pausa_parrafos", "pausa_frases", "saltar_notas", "leer_paginas", "destacar_encabezados", "voz_segun_idioma", "pronunciacion_activa")) {
+		for (clave in listOf("velocidad_voz", "tono_voz", "pausa_parrafos", "pausa_frases", "saltar_notas", "saltar_urls", "saltar_parentesis", "saltar_corchetes", "leer_paginas", "destacar_encabezados", "pronunciacion_activa")) {
 			findPreference<Preference>(clave)?.setOnPreferenceChangeListener { _, _ ->
 				view?.post { LectorVoz.ajustesCambiados() }
 				true
 			}
 		}
-		findPreference<Preference>("detectar_idioma")?.setOnPreferenceChangeListener { _, _ ->
-			view?.post { LectorVoz.idiomasCambiados() }
-			true
+		// Según el idioma y detectar el idioma: se vuelve a detectar y se aplica desde la frase actual
+		for (clave in listOf("voz_segun_idioma", "detectar_idioma")) {
+			findPreference<Preference>(clave)?.setOnPreferenceChangeListener { _, _ ->
+				view?.post { LectorVoz.idiomasCambiados() }
+				true
+			}
 		}
 		alPulsar("probar_voz") {
 			// La voz de Ajustes, aunque se esté leyendo un libro con voz propia
@@ -748,14 +760,23 @@ class AjustesFragment : PreferenceFragmentCompat() {
 
 	private fun configurarDocumentos() {
 		val cache = findPreference<Preference>("vaciar_cache")
-		val ocupa = CacheContenido.tamano(requireContext())
-		cache?.summary = if (ocupa > 0) getString(R.string.cache_ocupa, tamanoLegible(ocupa)) else getString(R.string.cache_vacia)
+		val app = requireContext().applicationContext
+		// Medir y vaciar la caché toca el disco: fuera del hilo principal
+		lifecycleScope.launch {
+			val ocupa = withContext(Dispatchers.IO) { CacheContenido.tamano(app) }
+			if (isAdded) cache?.summary = if (ocupa > 0) getString(R.string.cache_ocupa, tamanoLegible(ocupa)) else getString(R.string.cache_vacia)
+		}
 		cache?.setOnPreferenceClickListener {
-			CacheContenido.borrar(requireContext())
 			Abiertos.olvidar()
-			requireContext().cacheDir.resolve("fuentes").listFiles()?.forEach { it.delete() }
-			cache.summary = getString(R.string.cache_vacia)
-			(activity as? AppCompatActivity)?.avisar(getString(R.string.cache_vaciada))
+			lifecycleScope.launch {
+				withContext(Dispatchers.IO) {
+					CacheContenido.borrar(app)
+					app.cacheDir.resolve("fuentes").listFiles()?.forEach { it.delete() }
+				}
+				if (!isAdded) return@launch
+				cache.summary = getString(R.string.cache_vacia)
+				(activity as? AppCompatActivity)?.avisar(getString(R.string.cache_vaciada))
+			}
 			true
 		}
 		// Cambiar cómo se convierten los documentos: se olvida el que está en memoria
@@ -774,12 +795,18 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		p.carpetasVigiladas = (p.carpetasVigiladas + uri.toString()).distinct()
 		val a = activity as? AppCompatActivity ?: return@registerForActivityResult
 		a.lifecycleScope.launch {
-			val r = runCatching {
-				a.conEspera(getString(R.string.carpetas_vigiladas), getString(R.string.buscando_libros)) {
+			val r = try {
+				a.conEspera(a.getString(R.string.carpetas_vigiladas), a.getString(R.string.buscando_libros)) {
 					com.xebolax.lector.biblioteca.Importador.anadirCarpeta(c, uri, null, crearCarpetas = true)
 				}
-			}.getOrNull() ?: return@launch
-			a.avisar(resources.getQuantityString(R.plurals.libros_anadidos, r.anadidos.size, r.anadidos.size))
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				a.mensaje(a.getString(R.string.carpetas_vigiladas), a.getString(R.string.error_carpeta, e.message ?: ""))
+				return@launch
+			}
+			// Tras esperar, los textos de la Activity: el fragment puede haberse quitado mientras tanto
+			a.avisar(a.resources.getQuantityString(R.plurals.libros_anadidos, r.anadidos.size, r.anadidos.size))
 			if (r.anadidos.isNotEmpty()) LectorApp.ambito.launch { com.xebolax.lector.biblioteca.Importador.completarDatos(c, r.anadidos) }
 		}
 		actualizarVigiladas()
@@ -802,8 +829,9 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			val a = activity as? AppCompatActivity
 			val app = c.applicationContext
 			a?.lifecycleScope?.launch {
-				val n = runCatching { a.conEspera(getString(R.string.revisar_carpetas), getString(R.string.buscando_libros)) { com.xebolax.lector.biblioteca.Importador.revisarVigiladas(app) } }.getOrNull() ?: return@launch
-				a.avisar(if (n == 0) getString(R.string.sin_libros_nuevos) else resources.getQuantityString(R.plurals.libros_anadidos, n, n))
+				val n = a.conEspera(a.getString(R.string.revisar_carpetas), a.getString(R.string.buscando_libros)) { com.xebolax.lector.biblioteca.Importador.revisarVigiladas(app) }
+				// Tras esperar, los textos de la Activity: el fragment puede haberse quitado mientras tanto
+				a.avisar(if (n == 0) a.getString(R.string.sin_libros_nuevos) else a.resources.getQuantityString(R.plurals.libros_anadidos, n, n))
 			}
 		}
 		p.carpetasVigiladas.forEach { uri ->

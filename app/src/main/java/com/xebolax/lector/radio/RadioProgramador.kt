@@ -80,7 +80,14 @@ object RadioProgramador {
 			if (cuando == null) pendiente(c, p.id.toInt(), p.id, crear = false)?.let { am.cancel(it); it.cancel() }
 			else poner(c, cuando, pendiente(c, p.id.toInt(), p.id, crear = true)!!)
 		}
+		// El despertador pospuesto también (al reiniciar el móvil se pierden todas las alarmas)
+		val pospuesto = Radio.prefs(c).getLong("radio_pospuesta_cuando", 0)
+		if (pospuesto > System.currentTimeMillis()) poner(c, pospuesto, pendientePospuesto(c))
 	}
+
+	private fun pendientePospuesto(c: Context): PendingIntent =
+		PendingIntent.getBroadcast(c, POSPUESTA, Intent(c, RadioReceptorAlarma::class.java).setAction(ACCION_PROGRAMADA).putExtra(EXTRA_ID, -1L),
+			PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
 	fun quitar(c: Context, id: Long) {
 		pendiente(c, id.toInt(), id, crear = false)?.let { alarmas(c).cancel(it); it.cancel() }
@@ -128,10 +135,13 @@ object RadioProgramador {
 
 	/** Suena un despertador: empieza la emisora y sale el aviso con Apagar y Posponer (y la pantalla, si está bloqueado). */
 	fun despertar(c: Context, p: Programacion) {
+		// Sus minutos, para cuando se posponga
+		Radio.prefs(c).edit().putInt("radio_despertador_duracion", p.duracion).apply()
 		Radio.escuchar(c, p.emisora, abrirPantalla = false, despertador = true)
 		ControlAudio.conectar(c) {
 			// Para solo al cabo de los minutos elegidos (con bajada de volumen al final)
 			if (p.duracion > 0) ControlAudio.temporizador(p.duracion)
+			vigilarDespertador(c)
 		}
 		canal(c)
 		val pantalla = Intent(c, RadioReproductorActivity::class.java).putExtra(RadioReproductorActivity.EXTRA_DESPERTADOR, true)
@@ -157,29 +167,58 @@ object RadioProgramador {
 
 	fun posponerMinutos(c: Context) = Radio.prefs(c).getString("radio_posponer", "10")?.toIntOrNull() ?: 10
 
+	/** ¿Suena todavía el despertador? (no lo que se escuche después: un audiolibro, otra emisora) */
+	private fun suenaDespertador() = ControlAudio.externo?.despertador == true
+
+	/** Quita el aviso del despertador en cuanto deja de sonar (apagado, en pausa, terminado u otra cosa en el reproductor). */
+	private var vigilante: ControlAudio.Oyente? = null
+
+	private fun vigilarDespertador(c: Context) {
+		vigilante?.let { ControlAudio.desregistrar(it) }
+		val app = c.applicationContext
+		var visto = false
+		val o = object : ControlAudio.Oyente {
+			override fun alCambiar() {
+				if (suenaDespertador() && ControlAudio.reproduciendo) {
+					visto = true
+					return
+				}
+				if (!visto) return
+				NotificationManagerCompat.from(app).cancel(NOTIFICACION)
+				ControlAudio.desregistrar(this)
+				if (vigilante === this) vigilante = null
+			}
+		}
+		vigilante = o
+		ControlAudio.registrar(o)
+	}
+
 	fun apagar(c: Context) {
-		ControlAudio.detener()
+		// Solo si sigue sonando el despertador: el aviso olvidado no para lo que suene horas después
+		if (suenaDespertador()) ControlAudio.detener()
 		NotificationManagerCompat.from(c).cancel(NOTIFICACION)
 	}
 
 	/** Calla y vuelve a sonar al cabo de unos minutos (con la misma emisora). */
 	fun posponer(c: Context) {
+		NotificationManagerCompat.from(c).cancel(NOTIFICACION)
+		if (!suenaDespertador()) return
 		val e = Radio.actual
 		ControlAudio.detener()
-		NotificationManagerCompat.from(c).cancel(NOTIFICACION)
 		e ?: return
-		Radio.prefs(c).edit().putString("radio_pospuesta", e.json().toString()).apply()
-		val pi = PendingIntent.getBroadcast(c, POSPUESTA, Intent(c, RadioReceptorAlarma::class.java).setAction(ACCION_PROGRAMADA).putExtra(EXTRA_ID, -1L),
-			PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-		poner(c, System.currentTimeMillis() + posponerMinutos(c) * 60_000L, pi)
+		val cuando = System.currentTimeMillis() + posponerMinutos(c) * 60_000L
+		Radio.prefs(c).edit().putString("radio_pospuesta", e.json().toString()).putLong("radio_pospuesta_cuando", cuando).apply()
+		poner(c, cuando, pendientePospuesto(c))
 	}
 
 	/** Ha llegado la hora de una programación. */
 	internal fun alSonar(c: Context, id: Long) {
 		if (id == -1L) {
-			// Despertador pospuesto
-			val e = Emisora.deJson(Radio.prefs(c).getString("radio_pospuesta", "").orEmpty()) ?: return
-			despertar(c, Programacion(0, Programacion.DESPERTADOR, e, 0, 0, 0, 30, true))
+			// Despertador pospuesto (con los minutos del despertador original)
+			val pr = Radio.prefs(c)
+			pr.edit().remove("radio_pospuesta_cuando").apply()
+			val e = Emisora.deJson(pr.getString("radio_pospuesta", "").orEmpty()) ?: return
+			despertar(c, Programacion(0, Programacion.DESPERTADOR, e, 0, 0, 0, pr.getInt("radio_despertador_duracion", 30), true))
 			return
 		}
 		val db = RadioBaseDatos.obtener(c)

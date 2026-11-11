@@ -165,7 +165,9 @@ object CapitulosAudio {
 			val desde = i * bloque
 			val c = abrir(desde, minOf(desde + bloque, tamano) - 1)
 			try {
-				c.inputStream.use { it.readBytes() }
+				// Solo el trozo pedido: si el servidor manda el archivo entero, no se lee
+				if (c.responseCode != 206) error("El servidor no permite leer por partes")
+				c.inputStream.use { Fuente.leerConLimite(it, bloque.toLong()) } ?: error("Respuesta demasiado grande")
 			} finally {
 				c.disconnect()
 			}

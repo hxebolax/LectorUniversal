@@ -112,8 +112,8 @@ object ControlAudio {
 		val despertador: Boolean = false,
 		/** Sección en cuyas estadísticas cuenta el tiempo (vacío: radio si es en directo, si no podcasts). */
 		val seccion: String = "",
-		/** Refuerzo de volumen propio en dB (el de su podcast); null = el general del reproductor. */
-		val refuerzo: Int? = null,
+		/** Refuerzo de volumen propio en dB (el de su podcast); null = el general del reproductor. Se cambia desde el reproductor. */
+		var refuerzo: Int? = null,
 	) {
 		val seccionActividad: String
 			get() = seccion.ifEmpty { if (directo) com.xebolax.lector.datos.Actividad.RADIO else com.xebolax.lector.datos.Actividad.PODCASTS }
@@ -136,6 +136,11 @@ object ControlAudio {
 	@Volatile
 	var externoPendiente: Externo? = null
 
+	/** ¿Puede FuenteRed pasar de https a http si el certificado falla? Solo con la radio en directo (sonido público). */
+	@Volatile
+	var permitirHttp = false
+		private set
+
 	/** El reproductor al que ya se le puso el oyente (si el servicio se vuelve a crear, hay que ponérselo al nuevo). */
 	private var escuchandoA: ExoPlayer? = null
 
@@ -148,8 +153,11 @@ object ControlAudio {
 		}
 		guardar(forzar = true)
 		usarAlarma(e.despertador)
+		// Solo la radio en directo puede pasar de https a http si el certificado falla
+		permitirHttp = e.directo
 		externo = e
 		idLibro = e.id
+		terminadoId = 0
 		cancion = ""
 		problema = ""
 		reintentos = 0
@@ -339,29 +347,48 @@ object ControlAudio {
 	private val subida = object : Runnable {
 		var paso = 0
 		var pasos = 1
+		/** Está subiendo el volumen (el temporizador no debe ponerlo al máximo de golpe). */
+		var activa = false
 		override fun run() {
-			val j = jugador ?: return
+			val j = jugador ?: return run { activa = false }
 			paso++
 			j.volume = (0.08f + 0.92f * paso / pasos).coerceAtMost(1f)
-			if (paso < pasos && reproduciendo) principal.postDelayed(this, 1000)
+			activa = paso < pasos && reproduciendo
+			if (activa) principal.postDelayed(this, 1000)
 		}
+	}
+
+	/** Volumen al máximo, salvo si el despertador lo está subiendo poco a poco. */
+	private fun volumenNormal() {
+		if (!subida.activa) jugador?.volume = 1f
 	}
 
 	/** Despertador: el volumen empieza bajo y sube poco a poco durante esos segundos. */
 	fun subirPocoAPoco(segundos: Int) {
 		val j = jugador ?: return
 		principal.removeCallbacks(subida)
+		subida.activa = false
 		if (segundos <= 0) return
 		j.volume = 0.08f
 		subida.paso = 0
 		subida.pasos = segundos
+		subida.activa = true
 		principal.postDelayed(subida, 1000)
 	}
 
+	/** El externo que ya ha terminado (al saltar el final): no se vuelve a terminar si se reanuda. */
+	private var terminadoId = 0L
+
+	/** Lo que decidió el temporizador por episodios al terminar el último audio externo: true = parar ahí. */
+	private var paradoTrasEpisodio = false
+
 	private fun terminarExterno() {
 		val e = externo ?: return
-		if (idLibro != e.id) return
+		if (idLibro != e.id || terminadoId == e.id) return
+		terminadoId = e.id
 		e.alGuardar(0, duracionPista())
+		// El temporizador «al final del episodio» cuenta cualquier audio que termina (también una noticia o un episodio sin suscribirse)
+		paradoTrasEpisodio = contarEpisodioTerminado()
 		e.alTerminar()
 	}
 
@@ -415,6 +442,7 @@ object ControlAudio {
 		val j = jugador ?: return
 		if (esActual(id)) return
 		guardar(forzar = true)
+		permitirHttp = false
 		idLibro = id
 		libro = l
 		externo = null
@@ -456,6 +484,9 @@ object ControlAudio {
 
 	val reproduciendo: Boolean get() = jugador?.let { it.playWhenReady && it.playbackState != Player.STATE_ENDED } == true
 
+	/** ¿Suena de verdad? (no cargando ni reconectando, ni el tono de alarma de reserva): para las estadísticas. */
+	val sonandoDeVerdad: Boolean get() = jugador?.isPlaying == true && !alarmaDeReserva
+
 	fun alternar() = if (reproduciendo) pausar() else reproducir()
 
 	fun reproducir() {
@@ -481,7 +512,7 @@ object ControlAudio {
 			if (j.playbackState == Player.STATE_ENDED) j.seekTo(0, 0)
 			if (j.playbackState == Player.STATE_IDLE) j.prepare()
 		}
-		j.volume = 1f
+		volumenNormal()
 		j.play()
 		pausadoPorDesconexion = 0
 		// El temporizador que se paró con la pausa vuelve a contar desde donde estaba
@@ -507,6 +538,7 @@ object ControlAudio {
 		principal.removeCallbacks(dejarDeAgitar)
 		principal.removeCallbacks(reintentar)
 		principal.removeCallbacks(subida)
+		subida.activa = false
 		j.pause()
 		pausadoEn = SystemClock.elapsedRealtime()
 		if (finTemporizador > 0) {
@@ -656,6 +688,12 @@ object ControlAudio {
 		jugador?.skipSilenceEnabled = activo
 	}
 
+	/** Suelta el refuerzo de volumen (al cerrarse el servicio de audio). */
+	fun soltarRefuerzo() {
+		runCatching { refuerzo?.release() }
+		refuerzo = null
+	}
+
 	fun aplicarRefuerzo() {
 		val j = jugador ?: return
 		// El del podcast si tiene uno propio; si no, el general
@@ -736,10 +774,16 @@ object ControlAudio {
 	private var episodiosTemporizador = 0
 
 	/**
-	 * Ha terminado un episodio: si el temporizador es por episodios, cuenta uno y, si era el
+	 * Al terminar el último audio externo, ¿lo paró el temporizador por episodios? (Podcasts
+	 * lo consulta para no seguir con la cola; el contador ya lo ha gastado terminarExterno.)
+	 */
+	fun pararTrasEpisodio(): Boolean = paradoTrasEpisodio
+
+	/**
+	 * Ha terminado un audio externo: si el temporizador es por episodios, cuenta uno y, si era el
 	 * último, devuelve true (no se sigue con la cola) y queda como parada por temporizador.
 	 */
-	fun pararTrasEpisodio(): Boolean {
+	private fun contarEpisodioTerminado(): Boolean {
 		if (episodiosTemporizador <= 0) return false
 		episodiosTemporizador--
 		if (episodiosTemporizador > 0) return false.also { avisar() }
@@ -776,7 +820,8 @@ object ControlAudio {
 		finTemporizador = 0
 		restanteTemporizador = 0
 		alFinalDelCapitulo = false
-		jugador?.volume = 1f
+		// Con el despertador subiendo poco a poco, no se pone al máximo de golpe
+		volumenNormal()
 		when {
 			minutos > 0 -> finTemporizador = SystemClock.elapsedRealtime() + minutos * 60_000L
 			minutos == -1 -> alFinalDelCapitulo = true
@@ -800,7 +845,7 @@ object ControlAudio {
 	private fun quitarTemporizador() {
 		finTemporizador = 0
 		alFinalDelCapitulo = false
-		jugador?.volume = 1f
+		volumenNormal()
 	}
 
 	/** Minutos que quedan (0 = sin temporizador, -1 = al final del capítulo, -2 = al final del episodio, -10N = tras N episodios). */
@@ -836,8 +881,10 @@ object ControlAudio {
 			val dur = duracionPista()
 			val ms = posicion().second
 			e.alGuardar(ms, dur)
-			// Saltar el final (por ejemplo, la despedida del podcast)
-			if (e.saltarFinal > 0 && dur > 0 && reproduciendo && ms >= dur - e.saltarFinal * 1000L) {
+			// Ha vuelto atrás tras terminar: puede volver a terminar
+			if (terminadoId == e.id && dur > 0 && ms < dur - e.saltarFinal * 1000L - 10_000) terminadoId = 0
+			// Saltar el final (por ejemplo, la despedida del podcast), una sola vez: si se reanuda, sigue sonando
+			if (e.saltarFinal > 0 && dur > 0 && reproduciendo && terminadoId != e.id && ms >= dur - e.saltarFinal * 1000L) {
 				jugador?.pause()
 				principal.post { terminarExterno() }
 			}

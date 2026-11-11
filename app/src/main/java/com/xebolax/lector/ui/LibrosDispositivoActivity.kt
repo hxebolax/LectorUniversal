@@ -169,9 +169,13 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 	private fun acciones(e: BuscadorDispositivo.Encontrado): List<Accion> {
 		val id = ya(e)
 		val r = mutableListOf<Accion>()
-		r += if (id != null) getString(R.string.disp_ya_abrir) to { Abiertos.abrirPantalla(this, id) }
-		else getString(R.string.disp_abrir_anadir) to { abrir(e) }
-		if (id == null) {
+		r += when {
+			id == null -> getString(R.string.disp_abrir_anadir) to { abrir(e) }
+			enCompartidos(e) -> getString(R.string.disp_ya_compartidos_abrir) to { Abiertos.abrirPantalla(this, id) }
+			else -> getString(R.string.disp_ya_abrir) to { Abiertos.abrirPantalla(this, id) }
+		}
+		// Lo que está en Compartidos también se puede pasar a la biblioteca
+		if (id == null || enCompartidos(e)) {
 			r += getString(R.string.disp_anadir) to { lifecycleScope.launch { anadir(listOf(e), null); avisar(getString(R.string.disp_anadido, e.nombre)) } }
 			r += getString(R.string.disp_anadir_carpeta) to {
 				AccionesLibro.elegirCarpeta(this, getString(R.string.mover_a_carpeta), null) { carpeta ->
@@ -184,7 +188,7 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 				getString(R.string.info_archivo, e.nombre),
 				getString(R.string.disp_ruta, e.archivo.parent.orEmpty()),
 				getString(R.string.info_formato, e.formato.nombre),
-				getString(R.string.info_tamano, tamanoLegible(e.archivo.length())),
+				getString(R.string.info_tamano, tamanoLegible(e.tamano)),
 			).joinToString("\n"))
 		}
 		return r
@@ -202,7 +206,8 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 	override fun onOptionsItemSelected(item: MenuItem): Boolean {
 		when (item.itemId) {
 			1 -> {
-				val faltan = visibles.filter { ya(it) == null }
+				// Los que no están en la biblioteca (los de Compartidos pasan a ella)
+				val faltan = visibles.filter { ya(it) == null || enCompartidos(it) }
 				if (faltan.isEmpty()) return avisar(getString(R.string.disp_todos_ya)).let { true }
 				confirmar(resources.getQuantityString(R.plurals.disp_confirmar_todos, faltan.size, faltan.size), getString(R.string.disp_anadir)) {
 					lifecycleScope.launch {
@@ -244,7 +249,7 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 				(if (enCompartidos(e)) getString(R.string.disp_en_compartidos) else getString(R.string.disp_en_biblioteca)).takeIf { ya(e) != null },
 				e.formato.nombre,
 				carpeta.takeIf { it.isNotBlank() }?.let { getString(R.string.en_carpeta, it) },
-				tamanoLegible(e.archivo.length()),
+				tamanoLegible(e.tamano),
 			)
 			b.icono.setImageResource(if (e.formato.audio) R.drawable.ic_voz else if (e.formato == com.xebolax.lector.formatos.Formato.EPUB) R.drawable.ic_libro else R.drawable.ic_documento)
 			b.titulo.text = titulo
@@ -253,7 +258,7 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 			b.root.contentDescription = (listOfNotNull(partes.firstOrNull().takeIf { ya(e) != null }, titulo) + partes.drop(if (ya(e) != null) 1 else 0)).joinToString(", ")
 			b.root.setOnClickListener { abrir(e) }
 			val lista = acciones(e)
-			b.root.accionesAccesibles(lista)
+			b.root.accionesAccesibles(lista, ZonaAcciones.DISPOSITIVO)
 			b.root.setOnLongClickListener {
 				elegir(titulo, lista)
 				true

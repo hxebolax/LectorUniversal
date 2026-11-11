@@ -38,9 +38,19 @@ object ListaLectura {
 		leer(a.applicationContext, textos.first())
 	}
 
+	/** El siguiente libro, que empieza unos segundos después de terminar el anterior. */
+	private var arranque: Runnable? = null
+
 	fun cancelar() {
+		arranque?.let { principal.removeCallbacks(it) }
+		arranque = null
 		pendientes.clear()
 		actual = -1
+	}
+
+	/** Se pausó mientras se esperaba al siguiente: no empieza (la lista se olvida). */
+	fun pararEspera() {
+		if (arranque != null) cancelar()
 	}
 
 	/** Lo llama LectorVoz al cambiar de libro: si no es el de la lista, la lista se olvida. */
@@ -58,7 +68,13 @@ object ListaLectura {
 		while (pendientes.isNotEmpty()) {
 			val l = db.libro(pendientes.removeFirst()) ?: continue
 			// Un momento para que se oiga «Siguiente: …» antes de empezar
-			principal.postDelayed({ leer(c, l) }, 2500)
+			arranque?.let { principal.removeCallbacks(it) }
+			val r = Runnable {
+				arranque = null
+				leer(c, l)
+			}
+			arranque = r
+			principal.postDelayed(r, 2500)
 			return l.tituloVisible
 		}
 		cancelar()

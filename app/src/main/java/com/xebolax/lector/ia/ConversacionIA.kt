@@ -5,7 +5,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.xebolax.lector.R
-import com.xebolax.lector.ui.avisar
+import com.xebolax.lector.ui.Avance
+import com.xebolax.lector.ui.conEspera
 import com.xebolax.lector.ui.copiar
 import com.xebolax.lector.ui.pedirTexto
 import kotlinx.coroutines.CancellationException
@@ -26,29 +27,20 @@ fun AppCompatActivity.conversarConIA(titulo: String, pregunta: String, imagen: F
 }
 
 private fun AppCompatActivity.pedirRespuesta(titulo: String, conversacion: MutableList<AsistenteIA.Mensaje>, imagen: File?) {
-	val espera = MaterialAlertDialogBuilder(this)
-		.setTitle(titulo)
-		.setMessage(R.string.ia_pensando)
-		.setNegativeButton(R.string.cancelar, null)
-		.setCancelable(true)
-		.create()
-	val trabajo = lifecycleScope.launch {
+	lifecycleScope.launch {
+		// La ventana de espera de toda la app (con Cancelar); sus avisos («Cargando el modelo…») los dice TalkBack sin mover el foco
+		val avance = Avance()
 		val proveedor = AsistenteIA.elegir(this@pedirRespuesta)
-		if (proveedor != null) espera.setMessage(getString(R.string.ia_pensando_con, AsistenteIA.nombre(this@pedirRespuesta, proveedor)))
+		avance.decir(if (proveedor != null) getString(R.string.ia_pensando_con, AsistenteIA.nombre(this@pedirRespuesta, proveedor)) else getString(R.string.ia_pensando))
 		try {
-			val respuesta = AsistenteIA.preguntar(this@pedirRespuesta, conversacion, imagen) { aviso ->
-				runOnUiThread {
-					espera.setMessage(aviso)
-					avisar(aviso)
-				}
+			val respuesta = conEspera(titulo, getString(R.string.ia_pensando), avance) {
+				AsistenteIA.preguntar(this@pedirRespuesta, conversacion, imagen) { aviso -> avance.decir(aviso) }
 			}
-			espera.dismiss()
 			conversacion += AsistenteIA.Mensaje(false, respuesta)
 			mostrarRespuesta(titulo, conversacion, imagen, respuesta)
 		} catch (e: CancellationException) {
 			throw e
 		} catch (e: Exception) {
-			espera.dismiss()
 			MaterialAlertDialogBuilder(this@pedirRespuesta)
 				.setTitle(titulo)
 				.setMessage(e.message ?: getString(R.string.ia_sin_respuesta))
@@ -56,9 +48,6 @@ private fun AppCompatActivity.pedirRespuesta(titulo: String, conversacion: Mutab
 				.show()
 		}
 	}
-	espera.setOnCancelListener { trabajo.cancel() }
-	espera.setOnDismissListener { if (trabajo.isActive) trabajo.cancel() }
-	espera.show()
 }
 
 private fun AppCompatActivity.mostrarRespuesta(titulo: String, conversacion: MutableList<AsistenteIA.Mensaje>, imagen: File?, respuesta: String) {

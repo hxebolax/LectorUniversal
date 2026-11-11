@@ -55,15 +55,22 @@ object Matematicas {
 		),
 	)
 
-	/** La fórmula dicha con palabras (vacío si no es MathML de presentación). */
-	fun hablar(math: Element, idioma: String = Locale.getDefault().language): String {
-		val p = if (idioma.startsWith("es")) ES else EN
+	/**
+	 * La fórmula dicha con palabras (vacío si no es MathML de presentación),
+	 * en el idioma del libro; si no se sabe, en el del móvil.
+	 */
+	fun hablar(math: Element, idioma: String = ""): String {
+		val lengua = idioma.ifBlank { Locale.getDefault().language }.lowercase()
+		val p = if (lengua.startsWith("es")) ES else EN
 		return decir(math, p).replace(Regex("\\s+"), " ").replace(" ,", ",").trim()
 	}
 
+	/** Nombre sin prefijo («m:mi» es «mi»). */
+	private fun local(e: Element) = e.tagName().substringAfter(':')
+
 	/** ¿Es un solo elemento sencillo (para no decir «fin de...» en «x al cuadrado»)? */
-	private fun simple(e: Element?): Boolean = e != null && (e.tagName() in setOf("mi", "mn", "mo", "mtext") ||
-		(e.tagName() == "mrow" && e.children().size == 1 && simple(e.child(0))))
+	private fun simple(e: Element?): Boolean = e != null && (local(e) in setOf("mi", "mn", "mo", "mtext") ||
+		(local(e) == "mrow" && e.children().size == 1 && simple(e.child(0))))
 
 	private fun decir(e: Element?, p: Palabras): String {
 		e ?: return ""

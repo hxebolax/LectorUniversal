@@ -13,6 +13,7 @@ import com.xebolax.lector.formatos.Fuente
 import com.xebolax.lector.formatos.Lectores
 import com.xebolax.lector.modelo.Contenido
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -95,17 +96,59 @@ object Importador {
 		val nombre = Fuente.nombreDe(contexto, uri).ifBlank { "documento" }
 		val carpeta = File(contexto.filesDir, "biblioteca").apply { mkdirs() }
 		var destino = File(carpeta, nombre.replace(Regex("[\\\\/:*?\"<>|]"), "_"))
-		val tamano = Fuente.tamanoDe(contexto, uri)
-		if (destino.exists() && destino.length() != tamano) {
-			destino = File(carpeta, "${System.currentTimeMillis()}_${destino.name}")
-		}
-		if (!destino.exists()) {
-			contexto.contentResolver.openInputStream(uri)?.use { e -> destino.outputStream().use { e.copyTo(it) } }
-				?: throw IllegalStateException(contexto.getString(com.xebolax.lector.R.string.error_leer_archivo))
+		// Se copia aparte y, si ya había una copia con ese nombre, solo se reutiliza si es el mismo archivo
+		// (mismo contenido): dos «documento.pdf» distintos del mismo tamaño no se confunden
+		val temporal = File(carpeta, "${System.currentTimeMillis()}_${destino.name}.parte")
+		try {
+			val copiado = contexto.contentResolver.openInputStream(uri)?.use { e ->
+				temporal.outputStream().use { s ->
+					val bloque = ByteArray(256 * 1024)
+					while (true) {
+						ensureActive()
+						val n = e.read(bloque)
+						if (n < 0) break
+						s.write(bloque, 0, n)
+					}
+				}
+			}
+			if (copiado == null) throw IllegalStateException(contexto.getString(com.xebolax.lector.R.string.error_leer_archivo))
+			if (destino.exists() && !mismoContenido(destino, temporal)) destino = File(carpeta, "${System.currentTimeMillis()}_${destino.name}")
+			if (!destino.exists() && !temporal.renameTo(destino)) throw java.io.IOException(contexto.getString(com.xebolax.lector.R.string.error_guardar_archivo))
+		} finally {
+			temporal.delete()
 		}
 		val local = Uri.fromFile(destino)
 		db.libroPorUri(local.toString())?.let { return@withContext it.id }
 		anadir(contexto, local, nombre, null)
+	}
+
+	/** ¿Tienen los dos archivos exactamente lo mismo? */
+	private fun mismoContenido(a: File, b: File): Boolean {
+		if (a.length() != b.length()) return false
+		a.inputStream().buffered().use { x ->
+			b.inputStream().buffered().use { y ->
+				val ba = ByteArray(64 * 1024)
+				val bb = ByteArray(64 * 1024)
+				var n: Int
+				do {
+					n = x.leerBloque(ba)
+					if (n != y.leerBloque(bb)) return false
+					for (i in 0 until n) if (ba[i] != bb[i]) return false
+				} while (n > 0)
+			}
+		}
+		return true
+	}
+
+	/** Lee hasta llenar el bloque (o hasta el final): así los dos archivos se comparan por trozos iguales. */
+	private fun java.io.InputStream.leerBloque(bloque: ByteArray): Int {
+		var total = 0
+		while (total < bloque.size) {
+			val n = read(bloque, total, bloque.size - total)
+			if (n < 0) break
+			total += n
+		}
+		return total
 	}
 
 	/** ¿Es un archivo de dentro de la app (file:// en su carpeta de datos)? No se acepta desde otras apps. */

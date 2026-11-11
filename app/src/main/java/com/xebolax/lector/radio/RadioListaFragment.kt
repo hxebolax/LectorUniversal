@@ -96,8 +96,8 @@ class RadioListaFragment : Fragment() {
 
 		fun nuevo(modo: Modo) = RadioListaFragment().apply { arguments = bundleOf("modo" to modo.name) }
 
-		/** Géneros, países e idiomas ya descargados (no cambian en una sesión). */
-		private val categorias = HashMap<TipoCategoria, List<Categoria>>()
+		/** Géneros, países e idiomas ya descargados (no cambian en una sesión), con y sin las emisoras que no funcionan. */
+		private val categorias = HashMap<Pair<TipoCategoria, Boolean>, List<Categoria>>()
 
 		/** Órdenes que se ofrecen en una lista de emisoras. */
 		private val ORDENES = listOf(RadioBrowser.Orden.CLICS, RadioBrowser.Orden.VOTOS, RadioBrowser.Orden.TENDENCIA, RadioBrowser.Orden.NOMBRE, RadioBrowser.Orden.CALIDAD)
@@ -142,7 +142,28 @@ class RadioListaFragment : Fragment() {
 	// Historial
 	private var vista = VistaHistorial.EMISORAS
 
-	private val oyenteDb = RadioBaseDatos.Oyente { view?.post { recargar() } }
+	// Explorar y Buscar: si se está descargando una lista y si falló (para no quedarse en «Cargando…» para siempre)
+	private var cargando = false
+	private var falloCarga = false
+
+	// Lo que las filas consultan al dibujarse, leído en cada recarga fuera del hilo principal
+	private var misFavoritas: List<Favorita> = emptyList()
+	private var uuidsFavoritas: Set<String> = emptySet()
+	private var misCarpetas: List<String> = emptyList()
+	/** Canciones: las emisoras conocidas (favoritas o escuchadas) por su id. */
+	private var conocidas: Map<String, Emisora> = emptyMap()
+	private var proximaProgramacion: Pair<Long, Programacion>? = null
+
+	/** Lo que lee una recarga fuera del hilo principal. */
+	private class Datos(val filas: List<Fila>, val favoritas: List<Favorita>, val carpetas: List<String>, val conocidas: Map<String, Emisora>, val proxima: Pair<Long, Programacion>?)
+
+	/** El botón de la cabecera que se pulsó (pauta 34: si la cabecera se rehace, el foco vuelve a su equivalente). */
+	private var clavePulsada: String? = null
+	/** Lo que se está grabando según la cabecera (para rehacerla si la grabación empieza o acaba sola). */
+	private var cabeceraGrabando: String? = null
+
+	// Cambios en segundo plano (una canción nueva, una grabación): se recarga sin anunciar el recuento
+	private val oyenteDb = RadioBaseDatos.Oyente { view?.post { recargar(anunciar = false) } }
 	// Lo que suena cambia el estado de las filas («Sonando»)
 	private var ultimoSonando: String? = null
 	private val oyenteAudio = ControlAudio.Oyente {
@@ -194,10 +215,14 @@ class RadioListaFragment : Fragment() {
 
 	// --- Cabecera ----------------------------------------------------------------------------
 
-	private fun boton(texto: String, accion: () -> Unit) = MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+	private fun boton(texto: String, clave: String = texto, accion: () -> Unit) = MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
 		text = texto
+		tag = clave
 		minHeight = dp(requireContext(), 48)
-		setOnClickListener { accion() }
+		setOnClickListener {
+			clavePulsada = clave
+			accion()
+		}
 	}
 
 	private fun fila(vararg vistas: View) = LinearLayout(requireContext()).apply {
@@ -216,7 +241,11 @@ class RadioListaFragment : Fragment() {
 
 	private fun construirCabecera() {
 		val c = _b?.cabecera ?: return
+		// Se rehace mientras hay un diálogo encima (se eligió algo en él): el foco volverá al botón equivalente
+		val volverA = clavePulsada?.takeIf { activity?.hasWindowFocus() == false }
+		clavePulsada = null
 		c.removeAllViews()
+		cabeceraGrabando = ServicioGrabacion.grabando?.uuid
 		when (modo) {
 			Modo.FAVORITAS -> {
 				val nombres = resources.getStringArray(R.array.radio_ordenes_favoritas).toList()
@@ -224,7 +253,7 @@ class RadioListaFragment : Fragment() {
 				c.addView(fila(
 					if (carpeta != null) boton(getString(R.string.opciones_carpeta)) { carpeta?.let { n -> actividad?.elegir(n, accionesCarpeta(n)) } }
 					else boton(getString(R.string.nueva_carpeta)) { nuevaCarpeta() },
-					boton(getString(R.string.etiqueta_valor, getString(R.string.orden), nombres[actual])) {
+					boton(getString(R.string.etiqueta_valor, getString(R.string.orden), nombres[actual]), "orden") {
 						requireContext().elegirUno(getString(R.string.orden), nombres, actual) { i ->
 							Radio.prefs(requireContext()).edit().putInt("radio_orden_favoritas", i).apply()
 							construirCabecera()
@@ -234,13 +263,13 @@ class RadioListaFragment : Fragment() {
 				))
 			}
 			Modo.EXPLORAR -> when (val n = nivel) {
-				is Nivel.Raiz -> c.addView(boton(getString(R.string.radio_tu_pais, nombrePais(paisElegido()))) { elegirPais() })
+				is Nivel.Raiz -> c.addView(boton(getString(R.string.radio_tu_pais, nombrePais(paisElegido())), "pais") { elegirPais() })
 				is Nivel.Categorias -> c.addView(campoFiltro(getString(n.tipo.ayuda), filtroCategorias) {
 					filtroCategorias = it
 					recargar()
 				})
 				is Nivel.DeCategoria, is Nivel.DeLista -> if (n !is Nivel.DeLista || n.lista in setOf(Lista.DE_TU_PAIS)) {
-					c.addView(boton(getString(R.string.etiqueta_valor, getString(R.string.orden), nombreOrden(orden))) {
+					c.addView(boton(getString(R.string.etiqueta_valor, getString(R.string.orden), nombreOrden(orden)), "orden") {
 						requireContext().elegirUno(getString(R.string.orden), ORDENES.map { nombreOrden(it) }, ORDENES.indexOf(orden)) { i ->
 							orden = ORDENES[i]
 							construirCabecera()
@@ -272,11 +301,11 @@ class RadioListaFragment : Fragment() {
 				c.addView(contenedor)
 				c.addView(fila(
 					boton(getString(R.string.radio_buscar_emisoras)) { buscar() },
-					boton(getString(R.string.radio_filtros_x, resumenFiltro())) { elegirFiltros() },
+					boton(getString(R.string.radio_filtros_x, resumenFiltro()), "filtros") { elegirFiltros() },
 				))
 			}
 			Modo.HISTORIAL -> {
-				val botones = mutableListOf<View>(boton(getString(R.string.etiqueta_valor, getString(R.string.radio_ver), getString(vista.nombre))) {
+				val botones = mutableListOf<View>(boton(getString(R.string.etiqueta_valor, getString(R.string.radio_ver), getString(vista.nombre)), "ver") {
 					val vistas = VistaHistorial.entries
 					requireContext().elegirUno(getString(R.string.radio_ver), vistas.map { getString(it.nombre) }, vistas.indexOf(vista)) { i ->
 						vista = vistas[i]
@@ -306,6 +335,12 @@ class RadioListaFragment : Fragment() {
 				boton(getString(R.string.radio_nueva_grabacion)) { editarProgramacion(null, Programacion.GRABACION, null) },
 			))
 		}
+		// Pauta 34: los botones son nuevos y MemoriaFoco no encuentra el que se pulsó; se lleva el foco al que lo sustituye
+		if (volverA != null) c.findViewWithTag<View>(volverA)?.let { v ->
+			v.postDelayed({
+				if (v.isAttachedToWindow && v.isShown) v.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+			}, 700)
+		}
 	}
 
 	private fun campoFiltro(pista: String, inicial: String, alCambiar: (String) -> Unit): View {
@@ -329,25 +364,35 @@ class RadioListaFragment : Fragment() {
 
 	private fun nombrePais(codigo: String) = Locale("", codigo).displayCountry.ifBlank { codigo }
 
+	private fun ocultarRotas() = Radio.prefs(requireContext()).getBoolean("radio_ocultar_rotas", true)
+
+	/** Los géneros, países o idiomas ya descargados con el ajuste «Ocultar las que no funcionan» de ahora. */
+	private fun categoriasDe(tipo: TipoCategoria): List<Categoria>? = categorias[tipo to ocultarRotas()]
+
 	/** Lista de países (descargada una vez) para elegir el tuyo o filtrar una búsqueda. */
 	private fun conCategorias(tipo: TipoCategoria, hacer: (List<Categoria>) -> Unit) {
-		categorias[tipo]?.let { return hacer(it) }
+		categoriasDe(tipo)?.let { return hacer(it) }
 		val a = actividad ?: return
 		viewLifecycleOwner.lifecycleScope.launch {
 			val lista = runCatching { a.conEspera(getString(tipo.nombre), getString(R.string.cargando)) { cargarCategorias(tipo) } }
 				.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
-			if (lista.isNullOrEmpty()) return@launch a.mensaje(getString(tipo.nombre), getString(R.string.radio_sin_directorio))
+			if (lista.isNullOrEmpty()) {
+				// No se quedan en «Cargando…»: se dice que no se pudo
+				falloCarga = true
+				recargar()
+				return@launch a.mensaje(getString(tipo.nombre), getString(R.string.radio_sin_directorio))
+			}
 			hacer(lista)
 		}
 	}
 
 	private suspend fun cargarCategorias(tipo: TipoCategoria): List<Categoria> {
-		val ocultar = Radio.prefs(requireContext()).getBoolean("radio_ocultar_rotas", true)
-		return categorias[tipo] ?: when (tipo) {
+		val ocultar = ocultarRotas()
+		return categorias[tipo to ocultar] ?: when (tipo) {
 			TipoCategoria.GENERO -> RadioBrowser.generos(ocultar)
 			TipoCategoria.PAIS -> RadioBrowser.paises(ocultar)
 			TipoCategoria.IDIOMA -> RadioBrowser.idiomas(ocultar)
-		}.also { categorias[tipo] = it }
+		}.also { categorias[tipo to ocultar] = it }
 	}
 
 	private fun elegirPais() {
@@ -364,7 +409,7 @@ class RadioListaFragment : Fragment() {
 	private fun resumenFiltro(): String {
 		val partes = listOfNotNull(
 			filtro.codigoPais.takeIf { it.isNotBlank() }?.let { nombrePais(it) },
-			filtro.idioma.takeIf { it.isNotBlank() }?.let { i -> categorias[TipoCategoria.IDIOMA]?.firstOrNull { it.clave == i }?.nombre ?: i },
+			filtro.idioma.takeIf { it.isNotBlank() }?.let { i -> categoriasDe(TipoCategoria.IDIOMA)?.firstOrNull { it.clave == i }?.nombre ?: i },
 			filtro.genero.takeIf { it.isNotBlank() },
 			filtro.bitrateMin.takeIf { it > 0 }?.let { getString(R.string.radio_desde_kbps, it) },
 		)
@@ -453,10 +498,24 @@ class RadioListaFragment : Fragment() {
 				else -> return
 			}
 		}
+		cargando = true
+		falloCarga = false
 		viewLifecycleOwner.lifecycleScope.launch {
 			val r = runCatching { a.conEspera(titulo(), getString(R.string.radio_buscando_emisoras)) { RadioBrowser.buscar(f, desde) } }
-				.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-			val nuevas = r.getOrNull() ?: return@launch a.mensaje(titulo(), getString(R.string.radio_sin_directorio))
+				.onFailure {
+					cargando = false
+					if (it is kotlinx.coroutines.CancellationException) {
+						if (_b != null) recargar()
+						throw it
+					}
+				}
+			cargando = false
+			val nuevas = r.getOrNull() ?: run {
+				// No se queda en «Cargando…»: la línea de estado dice que no se pudo
+				falloCarga = true
+				recargar()
+				return@launch a.mensaje(titulo(), getString(R.string.radio_sin_directorio))
+			}
 			if (_b == null) return@launch
 			val antes = emisoras.size
 			emisoras = if (desde == 0) nuevas else (emisoras + nuevas).distinctBy { it.uuid }
@@ -485,6 +544,7 @@ class RadioListaFragment : Fragment() {
 		pila.add(n)
 		emisoras = emptyList()
 		hayMas = false
+		falloCarga = false
 		filtroCategorias = ""
 		orden = RadioBrowser.Orden.CLICS
 		atras.isEnabled = true
@@ -533,7 +593,8 @@ class RadioListaFragment : Fragment() {
 
 	private fun accionesCarpeta(n: String): List<Accion> {
 		val a = actividad ?: return emptyList()
-		val carpetas = db.carpetas()
+		// De la última recarga (esto se llama al dibujar cada fila)
+		val carpetas = misCarpetas
 		return listOf<Accion>(
 			getString(R.string.abrir) to { entrarCarpeta(n) },
 			getString(R.string.radio_escuchar_carpeta) to {
@@ -590,55 +651,104 @@ class RadioListaFragment : Fragment() {
 
 	// --- Datos ------------------------------------------------------------------------------------
 
-	private fun ordenarFavoritas(l: List<Favorita>): List<Favorita> = when (Radio.prefs(requireContext()).getInt("radio_orden_favoritas", 0)) {
+	/** Las favoritas en el orden elegido. Sin contexto: se llama fuera del hilo principal. */
+	private fun ordenarFavoritas(l: List<Favorita>, orden: Int, base: RadioBaseDatos): List<Favorita> = when (orden) {
 		1 -> l.sortedWith(compareBy(java.text.Collator.getInstance()) { it.emisora.nombre })
-		2 -> db.historial().associate { it.emisora.uuid to it.segundos }.let { s -> l.sortedByDescending { s[it.emisora.uuid] ?: 0L } }
+		2 -> base.historial().associate { it.emisora.uuid to it.segundos }.let { s -> l.sortedByDescending { s[it.emisora.uuid] ?: 0L } }
 		else -> l
 	}
 
-	private fun recargar() {
+	private fun recargar(anunciar: Boolean = true) {
 		if (_b == null) return
+		val app = requireContext().applicationContext
+		val m = modo
 		val car = carpeta
 		val texto = filtroCategorias.trim()
 		val n = nivel
+		// Copias de lo que el hilo principal puede cambiar mientras se lee (la pila de Explorar, las emisoras descargadas…)
+		val lista = emisoras
+		val mas = hayMas
+		val vistaH = vista
+		val ordenFav = Radio.prefs(app).getInt("radio_orden_favoritas", 0)
+		val cats = (n as? Nivel.Categorias)?.let { categoriasDe(it.tipo) }.orEmpty()
+		val subirExplorar = if (pila.size > 2) titulo(pila[pila.size - 2]) else getString(R.string.radio_pestana_explorar)
+		val base = db
 		carga?.cancel()
 		carga = viewLifecycleOwner.lifecycleScope.launch {
-			val nuevas: List<Fila> = withContext(Dispatchers.IO) {
-				when (modo) {
+			// Todo lo que las filas consultan al dibujarse se lee aquí, una vez por recarga (sin base de datos en el hilo principal)
+			val datos = withContext(Dispatchers.IO) {
+				val favoritas = base.favoritas()
+				val carpetas = base.carpetas()
+				var porUuid: Map<String, Emisora> = emptyMap()
+				val nuevas: List<Fila> = when (m) {
 					Modo.FAVORITAS -> {
-						val todas = ordenarFavoritas(db.favoritas())
-						val carpetas = db.carpetas()
-						if (car != null) listOf<Fila>(Fila.Subir(getString(R.string.radio_pestana_favoritas))) +
+						val todas = ordenarFavoritas(favoritas, ordenFav, base)
+						if (car != null) listOf<Fila>(Fila.Subir(app.getString(R.string.radio_pestana_favoritas))) +
 							todas.filter { it.carpeta.equals(car, true) }.map { Fila.DeEmisora(it.emisora) }
 						else carpetas.map { c -> Fila.Carpeta(c, todas.count { it.carpeta.equals(c, true) }) } +
 							todas.filter { f -> f.carpeta.isBlank() || carpetas.none { it.equals(f.carpeta, true) } }.map { Fila.DeEmisora(it.emisora) }
 					}
 					Modo.EXPLORAR -> when (n) {
 						Nivel.Raiz -> Lista.entries.map { Fila.DeLista(it) } + TipoCategoria.entries.map { Fila.DeTipo(it) }
-						is Nivel.Categorias -> listOf<Fila>(Fila.Subir(getString(R.string.radio_pestana_explorar))) +
-							categorias[n.tipo].orEmpty().filter { texto.length < 2 || it.nombre.contains(texto, true) }.map { Fila.DeCategoria(n.tipo, it) }
-						else -> listOf<Fila>(Fila.Subir(if (pila.size > 2) titulo(pila[pila.size - 2]) else getString(R.string.radio_pestana_explorar))) +
-							emisoras.map { Fila.DeEmisora(it) } + (if (hayMas) listOf(Fila.CargarMas) else emptyList())
+						is Nivel.Categorias -> listOf<Fila>(Fila.Subir(app.getString(R.string.radio_pestana_explorar))) +
+							cats.filter { texto.length < 2 || it.nombre.contains(texto, true) }.map { Fila.DeCategoria(n.tipo, it) }
+						else -> listOf<Fila>(Fila.Subir(subirExplorar)) +
+							lista.map { Fila.DeEmisora(it) } + (if (mas) listOf(Fila.CargarMas) else emptyList())
 					}
-					Modo.BUSCAR -> emisoras.map { Fila.DeEmisora(it) } + (if (hayMas) listOf(Fila.CargarMas) else emptyList())
-					Modo.HISTORIAL -> when (vista) {
-						VistaHistorial.EMISORAS -> db.historial().map { h ->
-							Fila.DeEmisora(h.emisora, getString(R.string.radio_escuchada_hace, RadioAcciones.cuando(h.ultima)))
+					Modo.BUSCAR -> lista.map { Fila.DeEmisora(it) } + (if (mas) listOf(Fila.CargarMas) else emptyList())
+					Modo.HISTORIAL -> when (vistaH) {
+						VistaHistorial.EMISORAS -> base.historial().map { h ->
+							Fila.DeEmisora(h.emisora, app.getString(R.string.radio_escuchada_hace, RadioAcciones.cuando(h.ultima)))
 						}
-						VistaHistorial.CANCIONES -> db.canciones().map { Fila.DeCancion(it) }
-						VistaHistorial.GRABACIONES -> db.grabaciones().map { Fila.DeGrabacion(it) }
+						VistaHistorial.CANCIONES -> {
+							// La emisora de cada canción (favorita o escuchada), para «Escuchar…» sin consultar al dibujar
+							porUuid = base.historial().associate { it.emisora.uuid to it.emisora } + favoritas.associate { it.emisora.uuid to it.emisora }
+							base.canciones().map { Fila.DeCancion(it) }
+						}
+						VistaHistorial.GRABACIONES -> base.grabaciones().map { Fila.DeGrabacion(it) }
 					}
-					Modo.PROGRAMAR -> db.programaciones().map { Fila.DeProgramacion(it) }
+					Modo.PROGRAMAR -> base.programaciones().map { Fila.DeProgramacion(it) }
 				}
+				val proxima = if (m == Modo.PROGRAMAR) nuevas.mapNotNull { f ->
+					(f as? Fila.DeProgramacion)?.programacion?.let { p -> RadioProgramador.proxima(p)?.let { it to p } }
+				}.minByOrNull { it.first } else null
+				Datos(nuevas, favoritas, carpetas, porUuid, proxima)
 			}
 			if (_b == null) return@launch
-			filas = nuevas
+			misFavoritas = datos.favoritas
+			uuidsFavoritas = datos.favoritas.mapTo(HashSet()) { it.emisora.uuid }
+			misCarpetas = datos.carpetas
+			conocidas = datos.conocidas
+			proximaProgramacion = datos.proxima
+			filas = datos.filas
 			@Suppress("NotifyDataSetChanged")
 			b.recycler.adapter?.notifyDataSetChanged()
 			// Solo si cambia: la línea de estado es una región viva y TalkBack la repetiría en cada recarga
-			estado().let { if (b.estado.text.toString() != it) b.estado.text = it }
+			ponerEstado(estado(), anunciar)
+			// La grabación ha empezado o acabado sola: el botón «Detener la grabación de…» de la cabecera, al día
+			if (modo == Modo.HISTORIAL && vista == VistaHistorial.GRABACIONES && ServicioGrabacion.grabando?.uuid != cabeceraGrabando) construirCabecera()
 		}
 	}
+
+	/**
+	 * La línea de estado es una región viva. Si la recarga viene de un cambio en segundo plano
+	 * (una canción nueva, una actualización), el texto cambia sin que TalkBack lo anuncie (pauta 10).
+	 */
+	private fun ponerEstado(texto: String, anunciar: Boolean) {
+		val v = _b?.estado ?: return
+		if (v.text.toString() == texto) return
+		v.removeCallbacks(regionViva)
+		if (anunciar) {
+			v.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+			v.text = texto
+			return
+		}
+		v.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+		v.text = texto
+		v.postDelayed(regionViva, 1000)
+	}
+
+	private val regionViva = Runnable { _b?.estado?.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
 
 	private fun titulo(n: Nivel): String = when (n) {
 		is Nivel.DeLista -> nombreLista(n.lista)
@@ -651,7 +761,7 @@ class RadioListaFragment : Fragment() {
 		val nEmisoras = filas.count { it is Fila.DeEmisora }
 		return when (modo) {
 			Modo.FAVORITAS -> {
-				val total = db.favoritas().size
+				val total = misFavoritas.size
 				when {
 					total == 0 -> getString(R.string.radio_sin_favoritas)
 					carpeta != null && nEmisoras == 0 -> getString(R.string.carpeta_vacia_corto)
@@ -663,9 +773,18 @@ class RadioListaFragment : Fragment() {
 				Nivel.Raiz -> getString(R.string.radio_explorar_ayuda)
 				is Nivel.Categorias -> {
 					val c = filas.count { it is Fila.DeCategoria }
-					if (categorias[n.tipo] == null) getString(R.string.cargando) else resources.getQuantityString(R.plurals.radio_n_categorias, c, c, getString(n.tipo.nombre))
+					when {
+						categoriasDe(n.tipo) != null -> resources.getQuantityString(R.plurals.radio_n_categorias, c, c, getString(n.tipo.nombre))
+						falloCarga -> getString(R.string.radio_sin_directorio)
+						else -> getString(R.string.cargando)
+					}
 				}
-				else -> if (nEmisoras == 0) getString(R.string.cargando) else getString(R.string.radio_n_de, resources.getQuantityString(R.plurals.radio_n_emisoras, nEmisoras, nEmisoras), titulo(n))
+				else -> when {
+					nEmisoras > 0 -> getString(R.string.radio_n_de, resources.getQuantityString(R.plurals.radio_n_emisoras, nEmisoras, nEmisoras), titulo(n))
+					cargando -> getString(R.string.cargando)
+					falloCarga -> getString(R.string.radio_sin_directorio)
+					else -> getString(R.string.rss_sin_resultados)
+				}
 			}
 			Modo.BUSCAR -> when {
 				!buscado -> getString(R.string.radio_buscar_ayuda)
@@ -681,7 +800,7 @@ class RadioListaFragment : Fragment() {
 				}
 			}
 			Modo.PROGRAMAR -> {
-				val proximas = db.programaciones().mapNotNull { p -> RadioProgramador.proxima(p)?.let { it to p } }.minByOrNull { it.first }
+				val proximas = proximaProgramacion
 				when {
 					filas.isEmpty() -> getString(R.string.radio_sin_programaciones)
 					proximas == null -> getString(R.string.radio_ninguna_activa)
@@ -821,7 +940,8 @@ class RadioListaFragment : Fragment() {
 	private fun accionesEmisora(e: Emisora): List<Accion> {
 		val a = actividad ?: return emptyList()
 		val extra = mutableListOf<Accion>()
-		val fav = if (modo == Modo.FAVORITAS) db.favorita(e.uuid) else null
+		// De la última recarga (esto se llama al dibujar cada fila)
+		val fav = if (modo == Modo.FAVORITAS) misFavoritas.firstOrNull { it.emisora.uuid == e.uuid } else null
 		if (fav != null) {
 			extra += getString(R.string.mover_a_carpeta) to {
 				a.elegirCarpeta(getString(R.string.mover_a_carpeta), db.carpetas(), fav.carpeta) { destino ->
@@ -831,7 +951,7 @@ class RadioListaFragment : Fragment() {
 			}
 			// Orden a mano entre las de su carpeta (solo con el orden «A mano»)
 			if (Radio.prefs(a).getInt("radio_orden_favoritas", 0) == 0) {
-				val vecinas = db.favoritas().filter { it.carpeta.equals(fav.carpeta, true) }.map { it.emisora.uuid }
+				val vecinas = misFavoritas.filter { it.carpeta.equals(fav.carpeta, true) }.map { it.emisora.uuid }
 				extra += a.accionesOrden(vecinas, e.uuid) { nuevo ->
 					val resto = db.favoritas().map { it.emisora.uuid }.filter { it !in nuevo }
 					db.ordenarFavoritas(nuevo + resto)
@@ -842,15 +962,21 @@ class RadioListaFragment : Fragment() {
 			db.quitarDelHistorial(e.uuid)
 			a.avisar(getString(R.string.radio_quitada_historial, e.nombre))
 		}
-		return RadioAcciones.deEmisora(a, e, emisorasVisibles(), extra)
+		return RadioAcciones.deEmisora(a, e, emisorasVisibles(), extra, esFavorita = e.uuid in uuidsFavoritas)
 	}
 
 	private fun accionesCancion(c: Cancion): List<Accion> {
 		val a = actividad ?: return emptyList()
-		val e = db.conocida(c.uuid)
+		val e = conocidas[c.uuid]
 		return RadioAcciones.deCancion(a, c.titulo) + listOfNotNull(
 			e?.let { getString(R.string.radio_escuchar_x, it.nombre) to { Radio.escuchar(a, it) } },
-			getString(R.string.borrar) to { db.borrarCancion(c.id); a.avisar(getString(R.string.borrado)) },
+			// Borrar no se puede deshacer: se pregunta antes
+			getString(R.string.borrar) to {
+				a.confirmar(getString(R.string.audio_confirmar_borrar_cancion, c.titulo), getString(R.string.borrar)) {
+					db.borrarCancion(c.id)
+					a.avisar(getString(R.string.borrado))
+				}
+			},
 		)
 	}
 
@@ -892,7 +1018,7 @@ class RadioListaFragment : Fragment() {
 		val estado = listOfNotNull(
 			getString(R.string.radio_sonando).takeIf { Radio.suena(e) },
 			getString(R.string.radio_grabando).takeIf { ServicioGrabacion.grabandoEsta(e) },
-			getString(R.string.radio_favorita).takeIf { modo != Modo.FAVORITAS && db.esFavorita(e.uuid) },
+			getString(R.string.radio_favorita).takeIf { modo != Modo.FAVORITAS && e.uuid in uuidsFavoritas },
 			getString(R.string.radio_no_funciona).takeIf { !e.funciona },
 		)
 		val datos = listOf(extra, e.paisLegible(), e.generos(), e.calidad()).filter { it.isNotBlank() }
@@ -912,14 +1038,15 @@ class RadioListaFragment : Fragment() {
 		override fun getItemId(posicion: Int): Long = when (val f = filas[posicion]) {
 			is Fila.Subir -> -1L
 			is Fila.CargarMas -> -2L
-			is Fila.Carpeta -> 1_000_000_000L + (f.nombre.lowercase().hashCode().toLong() and 0x7fffffff)
-			is Fila.DeEmisora -> 3_000_000_000L + (f.emisora.uuid.hashCode().toLong() and 0x7fffffff)
+			// Cada tipo en su propio tramo de 2^32 (antes los tramos de carpetas, emisoras y géneros se pisaban)
+			is Fila.Carpeta -> (1L shl 32) + (f.nombre.lowercase().hashCode().toLong() and 0xffffffffL)
+			is Fila.DeEmisora -> (2L shl 32) + (f.emisora.uuid.hashCode().toLong() and 0xffffffffL)
 			is Fila.DeLista -> 10L + f.lista.ordinal
 			is Fila.DeTipo -> 50L + f.tipo.ordinal
-			is Fila.DeCategoria -> 5_000_000_000L + (f.categoria.clave.hashCode().toLong() and 0x7fffffff)
-			is Fila.DeCancion -> 7_000_000_000L + f.cancion.id
-			is Fila.DeGrabacion -> 8_000_000_000L + f.grabacion.id
-			is Fila.DeProgramacion -> 9_000_000_000L + f.programacion.id
+			is Fila.DeCategoria -> (3L shl 32) + (f.categoria.clave.hashCode().toLong() and 0xffffffffL)
+			is Fila.DeCancion -> (4L shl 32) + f.cancion.id
+			is Fila.DeGrabacion -> (5L shl 32) + f.grabacion.id
+			is Fila.DeProgramacion -> (6L shl 32) + f.programacion.id
 		}
 
 		override fun getItemCount() = filas.size
@@ -949,16 +1076,18 @@ class RadioListaFragment : Fragment() {
 				}
 				is Fila.DeGrabacion -> {
 					val g = fila.grabacion
-					val enMarcha = g.tamano == 0L && ServicioGrabacion.grabando?.uuid == g.uuid
-					val d = listOfNotNull(
-						getString(R.string.radio_grabando).takeIf { enMarcha },
+					val enMarcha = ServicioGrabacion.grabando != null && g.archivo == ServicioGrabacion.archivoActual
+					val estado = listOfNotNull(getString(R.string.radio_grabando).takeIf { enMarcha })
+					val datos = listOfNotNull(
 						g.emisora.takeIf { it.isNotBlank() },
 						com.xebolax.lector.rss.Rss.fechaLegible(g.inicio),
 						g.duracion.takeIf { it > 0 }?.let { tiempoCorto(it) },
 						g.tamano.takeIf { it > 0 }?.let { tamanoLegible(it) },
-					).joinToString(" · ")
+					)
+					val d = (estado + datos).joinToString(" · ")
 					val nombre = java.io.File(g.archivo).nameWithoutExtension
-					Triple(nombre, d, "$nombre, ${d.replace(" · ", ", ")}")
+					// El estado primero (pauta 14): «Grabando, nombre, emisora, fecha…»
+					Triple(nombre, d, (estado + nombre + datos).joinToString(", "))
 				}
 				is Fila.DeProgramacion -> {
 					val p = fila.programacion
@@ -1014,6 +1143,11 @@ class RadioListaFragment : Fragment() {
 					true
 				}
 			}
+			// Mantener pulsado solo donde hace algo («Subir a…», «Cargar más» no), y con su nombre para TalkBack
+			v.f.root.isLongClickable = acciones.isNotEmpty()
+			if (acciones.isNotEmpty()) androidx.core.view.ViewCompat.replaceAccessibilityAction(v.f.root,
+				androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK, getString(R.string.audio_mas_acciones), null)
+			else androidx.core.view.ViewCompat.removeAccessibilityAction(v.f.root, android.view.accessibility.AccessibilityNodeInfo.ACTION_LONG_CLICK)
 		}
 	}
 }

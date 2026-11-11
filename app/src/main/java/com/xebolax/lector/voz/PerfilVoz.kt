@@ -5,10 +5,18 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
 import android.os.Handler
 import android.os.Looper
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.PreferenceManager
 import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.R
 import com.xebolax.lector.datos.Preferencias
+import com.xebolax.lector.ui.conEspera
+import com.xebolax.lector.ui.mensaje
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Locale
 
@@ -151,7 +159,10 @@ object VocesMotor {
 			principal.post {
 				if (hecho) return@post
 				hecho = true
-				hacer(if (estado == TextToSpeech.SUCCESS) tts else null)
+				val ok = estado == TextToSpeech.SUCCESS
+				hacer(if (ok) tts else null)
+				// Si no arranca, se apaga igualmente (si no, queda enganchado al servicio del motor)
+				if (!ok) runCatching { tts?.shutdown() }
 			}
 		}, motor.ifBlank { null })
 		// Si el motor no responde, se sigue sin él
@@ -174,21 +185,51 @@ object VocesMotor {
 		return "${v.locale.getDisplayName(Locale.getDefault())} · ${v.name} · $calidad"
 	}
 
+	/** Las voces de ElevenLabs ya pedidas (con la clave con que se pidieron): cambiar el filtro no vuelve a ir a la red. */
+	@Volatile private var vocesNube: Pair<String, List<Voice>>? = null
+
 	/** Voces de ese motor, ordenadas por idioma (con ElevenLabs, las de la cuenta del usuario). */
 	fun voces(c: Context, motor: String, alObtener: (List<Voice>) -> Unit) {
-		if (ElevenLabs.esMotor(motor)) {
-			val app = c.applicationContext
+		if (ElevenLabs.esMotor(motor)) return vocesDeLaNube(c, alObtener)
+		vocesDelMotor(c, motor, alObtener)
+	}
+
+	/**
+	 * Las voces de la cuenta de ElevenLabs. Van por red: desde una pantalla,
+	 * con la ventana de espera (con Cancelar) y, si fallan, se dice por qué.
+	 */
+	private fun vocesDeLaNube(c: Context, alObtener: (List<Voice>) -> Unit) {
+		val app = c.applicationContext
+		val clave = ElevenLabs.clave(app)
+		vocesNube?.takeIf { it.first == clave }?.let { return alObtener(it.second) }
+		fun pedir(): List<Voice> = ElevenLabs.voces(app).map { v ->
+			// Hablan muchos idiomas: se ponen en el de la app para que salgan con el filtro de idioma
+			val nombre = if (v.descripcion.isBlank()) v.nombre else "${v.nombre}, ${v.descripcion}"
+			Voice(v.id, Locale(Locale.getDefault().language), Voice.QUALITY_VERY_HIGH, Voice.LATENCY_NORMAL, true, setOf(NUBE + nombre))
+		}.also { if (it.isNotEmpty()) vocesNube = clave to it }
+		val a = c as? androidx.appcompat.app.AppCompatActivity
+		if (a == null) {
 			Thread {
-				val lista = runCatching { ElevenLabs.voces(app) }.getOrDefault(emptyList()).map { v ->
-					// Hablan muchos idiomas: se ponen en el de la app para que salgan con el filtro de idioma
-					val nombre = if (v.descripcion.isBlank()) v.nombre else "${v.nombre}, ${v.descripcion}"
-					Voice(v.id, Locale(Locale.getDefault().language), Voice.QUALITY_VERY_HIGH, Voice.LATENCY_NORMAL, true, setOf(NUBE + nombre))
-				}
+				val lista = runCatching { pedir() }.getOrDefault(emptyList())
 				principal.post { alObtener(lista) }
 			}.start()
 			return
 		}
-		vocesDelMotor(c, motor, alObtener)
+		a.lifecycleScope.launch {
+			val lista = try {
+				a.conEspera(a.getString(R.string.el_nombre), a.getString(R.string.lectura_el_voces_cargando)) {
+					withContext(Dispatchers.IO) { pedir() }
+				}
+			} catch (e: CancellationException) {
+				// Cancelado con el botón: la lista queda solo con «por defecto»; si se cerró la pantalla, se para
+				ensureActive()
+				emptyList()
+			} catch (e: Exception) {
+				a.mensaje(a.getString(R.string.el_nombre), a.getString(R.string.lectura_el_voces_error, ElevenLabs.mensaje(a, e)))
+				emptyList()
+			}
+			alObtener(lista)
+		}
 	}
 
 	private fun vocesDelMotor(c: Context, motor: String, alObtener: (List<Voice>) -> Unit) = conMotor(c, motor) { t ->
@@ -203,51 +244,138 @@ object VocesMotor {
 		}.start()
 	}
 
-	/** Dice el texto con ese perfil (lo que no tenga, como en Ajustes). */
+	// --- Pruebas: solo una a la vez y con el turno de audio (la lectura se atenúa o se calla, como con TalkBack) ---
+
+	private var motorPrueba: TextToSpeech? = null
+	private var reproductorPrueba: android.media.MediaPlayer? = null
+	/** Cada prueba nueva invalida las anteriores que aún no han empezado a sonar. */
+	private var numeroPrueba = 0
+	private var focoPrueba: Any? = null
+
+	private fun audio(c: Context) = c.applicationContext.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+
+	/** Para lo que esté sonando de una prueba anterior y suelta su turno de audio. */
+	private fun pararPrueba(c: Context) {
+		motorPrueba?.let { runCatching { it.stop() }; runCatching { it.shutdown() } }
+		motorPrueba = null
+		reproductorPrueba?.let { runCatching { it.release() } }
+		reproductorPrueba = null
+		soltarFoco(c)
+	}
+
+	private fun pedirFoco(c: Context) {
+		soltarFoco(c)
+		val am = audio(c)
+		if (android.os.Build.VERSION.SDK_INT >= 26) {
+			val peticion = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+				.setAudioAttributes(
+					android.media.AudioAttributes.Builder()
+						.setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+						.setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+						.build()
+				)
+				.setOnAudioFocusChangeListener { }
+				.build()
+			focoPrueba = peticion
+			runCatching { am.requestAudioFocus(peticion) }
+		} else {
+			@Suppress("DEPRECATION")
+			runCatching { am.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT) }
+			focoPrueba = true
+		}
+	}
+
+	private fun soltarFoco(c: Context) {
+		val foco = focoPrueba ?: return
+		focoPrueba = null
+		val am = audio(c)
+		if (android.os.Build.VERSION.SDK_INT >= 26 && foco is android.media.AudioFocusRequest) runCatching { am.abandonAudioFocusRequest(foco) }
+		else @Suppress("DEPRECATION") runCatching { am.abandonAudioFocus(null) }
+	}
+
+	/** Un motor de prueba que, al terminar (o fallar o pararse), se apaga y suelta el turno de audio. */
+	private fun oyentePrueba(c: Context, t: TextToSpeech) = object : android.speech.tts.UtteranceProgressListener() {
+		private fun fin() {
+			principal.post {
+				runCatching { t.shutdown() }
+				if (motorPrueba === t) {
+					motorPrueba = null
+					soltarFoco(c)
+				}
+			}
+		}
+		override fun onStart(id: String?) {}
+		override fun onDone(id: String?) = fin()
+		@Deprecated("Deprecated in Java")
+		override fun onError(id: String?) = fin()
+		override fun onError(id: String?, codigo: Int) = fin()
+		override fun onStop(id: String?, interrumpida: Boolean) = fin()
+	}
+
+	/** Dice el texto con ese perfil (lo que no tenga, como en Ajustes). Para la prueba anterior si aún suena. */
 	fun probar(c: Context, perfil: PerfilVoz, texto: String) {
-		val p = Preferencias(c)
-		if (ElevenLabs.esMotor(perfil.motorEfectivo(p))) return probarNube(c, perfil, texto)
-		conMotor(c, perfil.motorEfectivo(p)) { t ->
+		val app = c.applicationContext
+		val p = Preferencias(app)
+		pararPrueba(app)
+		val numero = ++numeroPrueba
+		if (ElevenLabs.esMotor(perfil.motorEfectivo(p))) return probarNube(app, perfil, texto, numero)
+		conMotor(app, perfil.motorEfectivo(p)) { t ->
 			t ?: return@conMotor
+			// Otra prueba empezó mientras arrancaba este motor: no suena
+			if (numero != numeroPrueba) {
+				runCatching { t.shutdown() }
+				return@conMotor
+			}
+			motorPrueba = t
 			t.setSpeechRate(perfil.velocidadEfectiva(p) / 100f)
 			t.setPitch(perfil.tonoEfectivo(p) / 100f)
 			val nombre = perfil.vozEfectiva(p)
-			t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-				override fun onStart(id: String?) {}
-				override fun onDone(id: String?) { principal.post { runCatching { t.shutdown() } } }
-				@Deprecated("Deprecated in Java")
-				override fun onError(id: String?) { principal.post { runCatching { t.shutdown() } } }
-			})
+			t.setOnUtteranceProgressListener(oyentePrueba(app, t))
+			pedirFoco(app)
 			// Buscar la voz también es una llamada al motor: fuera del hilo principal
 			Thread {
 				if (nombre.isNotBlank()) runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull()?.let { runCatching { t.voice = it } }
-				t.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba_perfil")
+				runCatching { t.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba_perfil") }
 			}.start()
 		}
 	}
 
 	/** Prueba con ElevenLabs (a la velocidad y el tono elegidos); si falla, la voz del móvil dice por qué. */
-	private fun probarNube(c: Context, perfil: PerfilVoz, texto: String) {
-		val app = c.applicationContext
+	private fun probarNube(app: Context, perfil: PerfilVoz, texto: String, numero: Int) {
 		val p = Preferencias(app)
 		ElevenLabs.probar(app, texto, perfil.vozEfectiva(p)) { archivo, error ->
 			principal.post {
-				if (archivo != null) runCatching {
-					android.media.MediaPlayer().apply {
-						setDataSource(archivo.path)
-						prepare()
-						playbackParams = playbackParams.setSpeed(perfil.velocidadEfectiva(p) / 100f).setPitch(perfil.tonoEfectivo(p) / 100f)
-						setOnCompletionListener { it.release() }
-						start()
+				if (numero != numeroPrueba) return@post
+				if (archivo != null) {
+					val mp = android.media.MediaPlayer()
+					reproductorPrueba = mp
+					fun soltar() {
+						runCatching { mp.release() }
+						if (reproductorPrueba === mp) {
+							reproductorPrueba = null
+							soltarFoco(app)
+						}
+					}
+					mp.setOnCompletionListener { soltar() }
+					mp.setOnErrorListener { _, _, _ -> soltar(); true }
+					try {
+						mp.setDataSource(archivo.path)
+						mp.prepare()
+						mp.playbackParams = mp.playbackParams.setSpeed(perfil.velocidadEfectiva(p) / 100f).setPitch(perfil.tonoEfectivo(p) / 100f)
+						pedirFoco(app)
+						mp.start()
+					} catch (e: Exception) {
+						soltar()
 					}
 				} else conMotor(app, "") { t ->
 					t ?: return@conMotor
-					t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-						override fun onStart(id: String?) {}
-						override fun onDone(id: String?) { principal.post { runCatching { t.shutdown() } } }
-						@Deprecated("Deprecated in Java")
-						override fun onError(id: String?) { principal.post { runCatching { t.shutdown() } } }
-					})
+					if (numero != numeroPrueba) {
+						runCatching { t.shutdown() }
+						return@conMotor
+					}
+					motorPrueba = t
+					t.setOnUtteranceProgressListener(oyentePrueba(app, t))
+					pedirFoco(app)
 					t.speak(ElevenLabs.mensaje(app, error ?: Exception()), TextToSpeech.QUEUE_FLUSH, null, "error_nube")
 				}
 			}

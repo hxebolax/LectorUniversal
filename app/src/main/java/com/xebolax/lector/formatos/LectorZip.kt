@@ -26,19 +26,26 @@ object LectorZip : LectorFormato {
 
 			if (libros.size == 1) {
 				val (ruta, formato) = libros.entries.first()
-				val destino = File(ctx.app.cacheDir, "fuentes/zip_" + Fuente.hash(fuente.uri.toString() + ruta) + "." + Fuente.extensionDe(ruta))
+				// Con el tamaño del ZIP en la clave: si el archivo cambia, se vuelve a sacar
+				val destino = File(ctx.app.cacheDir, "fuentes/zip_" + Fuente.hash(fuente.uri.toString() + ":" + fuente.tamano + ":" + ruta) + "." + Fuente.extensionDe(ruta))
 				destino.parentFile?.mkdirs()
-				if (!destino.exists()) z.abrir(ruta)?.use { e -> destino.outputStream().use { e.copyTo(it) } }
+				val tamano = z.tamano(ruta)
+				if (!destino.exists() || (tamano >= 0 && destino.length() != tamano)) {
+					// Primero a un temporal y después se renombra: una copia cortada no se queda como buena
+					val parte = File(destino.path + "." + Thread.currentThread().id + ".parte")
+					try {
+						z.abrir(ruta)?.use { e -> parte.outputStream().use { e.copyTo(it) } } ?: throw ExcepcionFormato("No se puede leer $ruta dentro del ZIP.")
+						if (!parte.renameTo(destino) && !destino.exists()) throw ExcepcionFormato("No se puede leer $ruta dentro del ZIP.")
+					} finally {
+						parte.delete()
+					}
+				}
 				val interior = Fuente(ctx.app, Uri.fromFile(destino), ruta.substringAfterLast('/'))
 				return (Lectores.lectorDe(formato) ?: LectorTexto).leer(interior, ctx)
 			}
 			if (audio.isNotEmpty() && textos.size <= 2) {
-				val carpeta = File(ctx.app.filesDir, "audiolibros/" + Fuente.hash(fuente.uri.toString() + fuente.tamano))
-				val marca = File(carpeta, ".completo")
-				if (!marca.exists()) {
-					zip.extraer(carpeta)
-					marca.createNewFile()
-				}
+				// La misma carpeta de siempre, pero sin restos de una extracción cortada ni dos hilos a la vez
+				val carpeta = LectorDaisy.extraerZip(fuente, ctx, "audiolibros")
 				return LectorCarpeta.leer(Fuente(ctx.app, Uri.fromFile(carpeta), fuente.nombre.substringBeforeLast('.')), ctx)
 			}
 			if (textos.isEmpty()) throw ExcepcionFormato("El ZIP no contiene ningún documento que se pueda leer.")

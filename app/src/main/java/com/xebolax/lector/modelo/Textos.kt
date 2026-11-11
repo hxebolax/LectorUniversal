@@ -83,17 +83,23 @@ object Textos {
 				if (pares > muestra * 0.4 && impares < muestra * 0.05) return String(bytes, Charsets.UTF_16BE)
 			}
 		}
-		declarado(bytes)?.let { nombre ->
-			runCatching { Charset.forName(nombre) }.getOrNull()?.let { cs ->
-				if (cs != Charsets.UTF_8) return String(bytes, cs)
-			}
-		}
-		return try {
+		val utf8 = try {
 			Charsets.UTF_8.newDecoder()
 				.onMalformedInput(CodingErrorAction.REPORT)
 				.onUnmappableCharacter(CodingErrorAction.REPORT)
 				.decode(ByteBuffer.wrap(bytes)).toString()
 		} catch (_: CharacterCodingException) {
+			null
+		}
+		declarado(bytes)?.let { nombre ->
+			runCatching { Charset.forName(nombre) }.getOrNull()?.let { cs ->
+				// Lo declarado manda, salvo si el texto es UTF-8 válido con letras fuera del ASCII: un TXT en UTF-8
+				// que habla de «charset=iso-8859-1» no es de esa codificación (y por casualidad no sale UTF-8 válido)
+				val sieteBits = nombre.contains("2022") || nombre.equals("utf-7", ignoreCase = true)
+				if (cs != Charsets.UTF_8 && (utf8 == null || sieteBits || bytes.none { it < 0 })) return String(bytes, cs)
+			}
+		}
+		return utf8 ?: run {
 			// No es UTF-8: Windows (lo habitual) o MS-DOS (TXT antiguos, CP850 o CP437); gana la que dé texto con sentido
 			val candidatas = listOf(alternativa, "IBM850", "IBM437").mapNotNull { runCatching { Charset.forName(it) }.getOrNull() }.distinct()
 			val muestra = bytes.copyOf(minOf(bytes.size, 64 * 1024))

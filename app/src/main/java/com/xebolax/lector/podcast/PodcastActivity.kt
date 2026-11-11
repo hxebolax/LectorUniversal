@@ -84,7 +84,6 @@ class PodcastActivity : AppCompatActivity() {
 		}
 		ponerPestanas(b.barra, b.paginas, b.pestanas, pestanas.map { it.nombre to it.icono }, getString(R.string.podcasts))
 		com.xebolax.lector.rss.RssTrabajo.programar(this)
-		Podcasts.comprobarDescargas(this)
 		if (savedInstanceState == null && System.currentTimeMillis() - Podcasts.prefs(this).getLong("pod_ultima", 0) > 30 * 60_000L) actualizarTodo(silencioso = true)
 		if (savedInstanceState == null) intent.getLongExtra(EXTRA_PODCAST, 0).takeIf { it > 0 }?.let { irAPodcast(it) }
 		if (savedInstanceState == null) compartido(intent)
@@ -112,11 +111,25 @@ class PodcastActivity : AppCompatActivity() {
 	}
 
 	private fun descargasTerminadas() {
-		val estado = Podcasts.comprobarDescargas(this)
-		val terminadas = estado.terminadas
-		if (terminadas.isNotEmpty()) avisar(resources.getQuantityString(R.plurals.pod_descargas_terminadas, terminadas.size, terminadas.size), mostrar = false)
-		// Las que han fallado tres veces se dicen (antes se perdían en silencio)
-		if (estado.fallidas.isNotEmpty()) mensaje(getString(R.string.pod_descargar), getString(R.string.pod_descargas_fallidas, estado.fallidas.joinToString("\n")))
+		val app = applicationContext
+		lifecycleScope.launch {
+			// Gestor de descargas y base de datos: fuera del hilo principal
+			val estado = withContext(Dispatchers.IO) { Podcasts.comprobarDescargas(app) }
+			val terminadas = estado.terminadas
+			if (terminadas.isNotEmpty()) avisar(resources.getQuantityString(R.plurals.pod_descargas_terminadas, terminadas.size, terminadas.size), mostrar = false)
+			// Las que han fallado tres veces se dicen (antes se perdían en silencio)
+			if (estado.fallidas.isNotEmpty()) mensaje(getString(R.string.pod_descargar), getString(R.string.pod_descargas_fallidas, estado.fallidas.joinToString("\n")))
+		}
+	}
+
+	/**
+	 * Hace algo en el fragmento de una pestaña. ViewPager2 lo crea al dibujarse:
+	 * si aún no existe, se espera un poco (si no, se perdía lo que había que hacer).
+	 */
+	private fun enPestana(i: Int, intentos: Int = 20, hacer: (PodcastListaFragment) -> Unit) {
+		val f = supportFragmentManager.findFragmentByTag("f$i") as? PodcastListaFragment
+		if (f != null && f.view != null) hacer(f)
+		else if (intentos > 0 && !isFinishing) b.paginas.postDelayed({ enPestana(i, intentos - 1, hacer) }, 50)
 	}
 
 	// Una descarga termina con la pantalla abierta: pasa a "descargado" en el momento
@@ -158,7 +171,7 @@ class PodcastActivity : AppCompatActivity() {
 	fun irAPodcast(id: Long) {
 		val i = pestanas.indexOf(PodcastListaFragment.Modo.SUSCRIPCIONES)
 		b.paginas.setCurrentItem(i, false)
-		b.paginas.post { (supportFragmentManager.findFragmentByTag("f$i") as? PodcastListaFragment)?.abrirPodcast(id) }
+		b.paginas.post { enPestana(i) { it.abrirPodcast(id) } }
 	}
 
 	fun actualizarTodo(silencioso: Boolean = false) {
@@ -195,7 +208,7 @@ class PodcastActivity : AppCompatActivity() {
 				if (lista.isNullOrEmpty()) return@launch avisar(getString(R.string.rss_sin_resultados))
 				val i = pestanas.indexOf(PodcastListaFragment.Modo.DESCUBRIR)
 				b.paginas.setCurrentItem(i, false)
-				b.paginas.post { (supportFragmentManager.findFragmentByTag("f$i") as? PodcastListaFragment)?.mostrarBusqueda(texto, lista) }
+				b.paginas.post { enPestana(i) { it.mostrarBusqueda(texto, lista) } }
 			}
 		}
 	}

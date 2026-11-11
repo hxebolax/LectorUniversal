@@ -123,7 +123,9 @@ class RssActivity : AppCompatActivity() {
 		if (id <= 0) return
 		i.removeExtra(EXTRA_ARTICULO)
 		RssTrabajo.quitarAviso(this, id)
-		RssBaseDatos.obtener(this).articulo(id)?.let { RssAcciones.abrir(this, it) }
+		lifecycleScope.launch {
+			withContext(Dispatchers.IO) { RssBaseDatos.obtener(this@RssActivity).articulo(id) }?.let { RssAcciones.abrir(this@RssActivity, it) }
+		}
 	}
 
 	/** Llegó una dirección desde Compartir de otra app: se busca su fuente y se suscribe. */
@@ -153,17 +155,7 @@ class RssActivity : AppCompatActivity() {
 		when (item.itemId) {
 			1 -> actualizarTodo()
 			2 -> anadirFuente()
-			3 -> MaterialAlertDialogBuilder(this)
-				.setMessage(R.string.rss_confirmar_todo_leido)
-				.setPositiveButton(R.string.rss_marcar_todo_leido) { _, _ ->
-					val db = RssBaseDatos.obtener(this)
-					val ids = db.sinLeer().map { it.id }
-					db.marcarTodoLeido()
-					conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) { db.marcarLeidos(ids, false) }
-				}
-				.setNeutralButton(R.string.rss_anteriores_a_un_dia) { _, _ -> marcarAntiguos() }
-				.setNegativeButton(R.string.cancelar, null)
-				.show()
+			3 -> marcarTodoLeido()
 			4 -> importar.launch(arrayOf("*/*"))
 			5 -> exportar.launch("noticias.opml")
 			7 -> RssHerramientas.reglas(this)
@@ -191,12 +183,29 @@ class RssActivity : AppCompatActivity() {
 		b.paginas.post { (supportFragmentManager.findFragmentByTag("f$i") as? RssListaFragment)?.abrirFuente(id) }
 	}
 
-	private fun marcarAntiguos() {
-		val limite = System.currentTimeMillis() - 86_400_000L
+	/** «Marcar todo como leído» (o solo lo anterior a un día). Si no hay nada sin leer, se dice en lugar de preguntar. */
+	private fun marcarTodoLeido() {
 		val db = RssBaseDatos.obtener(this)
-		val ids = db.sinLeer().filter { it.fecha < limite }.map { it.id }
-		db.marcarLeidos(ids)
-		conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) { db.marcarLeidos(ids, false) }
+		lifecycleScope.launch {
+			if (!withContext(Dispatchers.IO) { db.haySinLeer() }) return@launch mensaje(getString(R.string.rss_marcar_todo_leido), getString(R.string.noticias_nada_sin_leer))
+			MaterialAlertDialogBuilder(this@RssActivity)
+				.setMessage(R.string.rss_confirmar_todo_leido)
+				.setPositiveButton(R.string.rss_marcar_todo_leido) { _, _ -> marcarLeidos(0L) }
+				.setNeutralButton(R.string.rss_anteriores_a_un_dia) { _, _ -> marcarLeidos(System.currentTimeMillis() - 86_400_000L) }
+				.setNegativeButton(R.string.cancelar, null)
+				.show()
+		}
+	}
+
+	/** Marca como leído todo (antesDe > 0: solo lo publicado antes), sin límite y fuera del hilo principal, con Deshacer. */
+	private fun marcarLeidos(antesDe: Long) {
+		val db = RssBaseDatos.obtener(this)
+		lifecycleScope.launch {
+			val ids = withContext(Dispatchers.IO) { db.marcarTodoLeido(antesDe = antesDe) }
+			conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) {
+				RssAcciones.enFondo(this@RssActivity, { db.marcarLeidos(ids, false) })
+			}
+		}
 	}
 
 	/** Actualiza todas las fuentes y anuncia cuántos artículos nuevos hay. */
@@ -230,11 +239,13 @@ class RssActivity : AppCompatActivity() {
 
 	private fun recomendadas() {
 		val db = RssBaseDatos.obtener(this)
-		val faltan = Rss.PREDETERMINADAS.filter { db.fuentePorUrl(it.second) == null }
-		if (faltan.isEmpty()) return mensaje(getString(R.string.rss_recomendadas), getString(R.string.rss_ya_todas))
-		elegir(getString(R.string.rss_recomendadas), faltan.map { (nombre, url, cat) ->
-			"$nombre ($cat)" to { suscribir(nombre, url, cat) }
-		})
+		lifecycleScope.launch {
+			val faltan = withContext(Dispatchers.IO) { Rss.PREDETERMINADAS.filter { db.fuentePorUrl(it.second) == null } }
+			if (faltan.isEmpty()) return@launch mensaje(getString(R.string.rss_recomendadas), getString(R.string.rss_ya_todas))
+			elegir(getString(R.string.rss_recomendadas), faltan.map { (nombre, url, cat) ->
+				"$nombre ($cat)" to { suscribir(nombre, url, cat) }
+			})
+		}
 	}
 
 	private fun buscarFuentes(categoria: String) {
@@ -245,9 +256,10 @@ class RssActivity : AppCompatActivity() {
 					.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
 				if (lista.isNullOrEmpty()) return@launch mensaje(getString(R.string.rss_buscar_fuentes), getString(R.string.rss_sin_resultados))
 				val db = RssBaseDatos.obtener(this@RssActivity)
+				val suscritas = withContext(Dispatchers.IO) { lista.filter { db.fuentePorUrl(it.url) != null }.map { it.url }.toSet() }
 				elegir(getString(R.string.resultados_de, lista.size, texto), lista.map { s ->
 					// Si ya estás suscrito, se dice
-					val ya = db.fuentePorUrl(s.url) != null
+					val ya = s.url in suscritas
 					val detalle = listOf(if (ya) getString(R.string.rss_ya_suscrita) else "", s.descripcion.take(120), if (s.suscriptores > 0) getString(R.string.rss_suscriptores, s.suscriptores) else "")
 						.filter { it.isNotBlank() }.joinToString(". ")
 					(if (detalle.isBlank()) s.titulo else "${s.titulo}. $detalle") to { suscribir(s.titulo, s.url, categoria) }
@@ -277,19 +289,19 @@ class RssActivity : AppCompatActivity() {
 
 	private fun suscribir(titulo: String, url: String, categoria: String) {
 		val db = RssBaseDatos.obtener(this)
-		if (db.fuentePorUrl(url) != null) return avisar(getString(R.string.rss_ya_suscrito, titulo))
-		val id = db.anadirFuente(url, titulo, categoria = categoria)
 		lifecycleScope.launch {
-			val f = db.fuente(id) ?: return@launch
-			// Ventana de espera hasta que la fuente está suscrita y con sus artículos
-			val n = runCatching { conEspera(getString(R.string.pod_suscribirse), getString(R.string.pod_suscribiendo)) { Rss.actualizar(this@RssActivity, f).size } }
+			val f = withContext(Dispatchers.IO) {
+				if (db.fuentePorUrl(url) != null) null else db.fuente(db.anadirFuente(url, titulo, categoria = categoria))
+			} ?: return@launch avisar(getString(R.string.rss_ya_suscrito, titulo))
+			// Ventana de espera hasta que la fuente está suscrita y con sus artículos (y las reglas aplicadas)
+			val n = runCatching { conEspera(getString(R.string.pod_suscribirse), getString(R.string.pod_suscribiendo)) { Rss.actualizarUna(this@RssActivity, f) } }
 				.getOrElse { if (it is kotlinx.coroutines.CancellationException) throw it; -1 }
 			if (n < 0) mensaje(getString(R.string.rss_anadir_fuente), getString(R.string.rss_error_fuente, titulo))
 			else avisar(getString(R.string.rss_suscrito, titulo) + ". " + resources.getQuantityString(R.plurals.rss_n_articulos, n, n))
 			// Añadida fuera de una carpeta: se ofrece ponerla en una (o crear una nueva)
-			if (categoria.isBlank() && n >= 0 && db.categorias().isNotEmpty()) elegirCarpeta(getString(R.string.en_que_carpeta, titulo), db.categorias(), "") { destino ->
-				if (destino.isNotBlank()) {
-					db.ponerCategoria(id, destino)
+			val carpetas = if (categoria.isBlank() && n >= 0) withContext(Dispatchers.IO) { db.categorias() } else emptyList()
+			if (carpetas.isNotEmpty()) elegirCarpeta(getString(R.string.en_que_carpeta, titulo), carpetas, "") { destino ->
+				if (destino.isNotBlank()) RssAcciones.enFondo(this@RssActivity, { db.ponerCategoria(f.id, destino) }) {
 					avisar(getString(R.string.movida_a_carpeta, destino))
 				}
 			}
@@ -310,9 +322,12 @@ class RssActivity : AppCompatActivity() {
 		}
 		ponerCarpeta()
 		botonCarpeta.setOnClickListener {
-			elegirCarpeta(getString(R.string.mover_a_carpeta), RssBaseDatos.obtener(this).categorias(), carpeta) {
-				carpeta = it
-				ponerCarpeta()
+			lifecycleScope.launch {
+				val lista = withContext(Dispatchers.IO) { RssBaseDatos.obtener(this@RssActivity).categorias() }
+				elegirCarpeta(getString(R.string.mover_a_carpeta), lista, carpeta) {
+					carpeta = it
+					ponerCarpeta()
+				}
 			}
 		}
 		val (cSilenciar, silenciar) = campoTexto(getString(R.string.rss_silenciar), f.silenciar)
@@ -334,11 +349,7 @@ class RssActivity : AppCompatActivity() {
 			.setPositiveButton(R.string.guardar) { _, _ ->
 				val db = RssBaseDatos.obtener(this)
 				val url = direccion.text.toString().trim().let { if (it.isNotEmpty() && !it.contains("://")) "https://$it" else it }.ifBlank { f.url }
-				if (url != f.url && db.fuentePorUrl(url) != null) {
-					mensaje(getString(R.string.rss_editar_fuente), getString(R.string.rss_direccion_repetida))
-					return@setPositiveButton
-				}
-				db.editarFuente(f.copy(
+				val editada = f.copy(
 					titulo = nombre.text.toString().trim().ifBlank { f.titulo },
 					url = url,
 					soloCon = soloCon.text.toString().trim(),
@@ -349,8 +360,15 @@ class RssActivity : AppCompatActivity() {
 					textoCompleto = completo.isChecked,
 					enNavegador = navegador.isChecked,
 					pausada = pausada.isChecked,
-				))
-				avisar(getString(R.string.guardado))
+				)
+				lifecycleScope.launch {
+					// Se guarda fuera del hilo principal; si ya hay otra fuente con esa dirección, se dice
+					val repetida = withContext(Dispatchers.IO) {
+						(url != f.url && db.fuentePorUrl(url) != null).also { if (!it) db.editarFuente(editada) }
+					}
+					if (repetida) mensaje(getString(R.string.rss_editar_fuente), getString(R.string.rss_direccion_repetida))
+					else avisar(getString(R.string.guardado))
+				}
 			}
 			.setNegativeButton(R.string.cancelar, null)
 			.show()

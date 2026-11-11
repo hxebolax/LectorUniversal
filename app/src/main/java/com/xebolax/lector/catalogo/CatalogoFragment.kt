@@ -40,6 +40,7 @@ import com.xebolax.lector.ui.pedirTexto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -311,13 +312,15 @@ class CatalogoFragment : Fragment() {
 				throw e
 			} catch (e: Exception) {
 				// No se pudo abrir: que lo diga quien la conoce
-				a.elegir(getString(R.string.no_se_pudo_comprobar, e.message.orEmpty()), listOf(
-					getString(R.string.tipo_web) to { alSaber(true, "") },
-					getString(R.string.tipo_opds) to { alSaber(false, "") },
+				a.elegir(a.getString(R.string.no_se_pudo_comprobar, e.message.orEmpty()), listOf(
+					a.getString(R.string.tipo_web) to { alSaber(true, "") },
+					a.getString(R.string.tipo_opds) to { alSaber(false, "") },
 				))
 				return@launch
 			}
 			val catalogo = withContext(Dispatchers.Default) { runCatching { Feed.leer(texto, url) }.getOrNull() }
+			// La pestaña se cerró mientras se comprobaba: no hay dónde guardarlo
+			if (!isAdded) return@launch
 			if (catalogo != null) alSaber(false, catalogo.titulo)
 			else alSaber(true, withContext(Dispatchers.Default) { runCatching { nombreDeTitulo(org.jsoup.Jsoup.parse(texto).title()) }.getOrDefault("") })
 		}
@@ -433,7 +436,15 @@ class CatalogoFragment : Fragment() {
 	/** Libro del catálogo: información y descargar para leerlo (o abrirlo, si ya lo tienes). */
 	private fun libro(e: Feed.Entrada) {
 		val mejor = Feed.mejorDescarga(e.descargas) ?: return verResumen(e)
-		yaDescargado(e)?.let { id ->
+		// Si ya se descargó: se mira en el disco y en la base de datos fuera del hilo principal
+		viewLifecycleOwner.lifecycleScope.launch {
+			val ya = withContext(Dispatchers.IO) { yaDescargado(e) }
+			if (_b != null) libro(e, mejor, ya)
+		}
+	}
+
+	private fun libro(e: Feed.Entrada, mejor: Feed.Enlace, ya: Long?) {
+		ya?.let { id ->
 			val texto = listOf(getString(R.string.catalogo_ya_lo_tienes), e.autor, e.resumen.take(1500)).filter { it.isNotBlank() }.joinToString("\n\n")
 			MaterialAlertDialogBuilder(requireContext())
 				.setTitle(e.titulo)
@@ -479,22 +490,27 @@ class CatalogoFragment : Fragment() {
 						}
 						val destino = File(carpeta, "$base.$ext")
 						destino.delete()
-						if (!temporal.renameTo(destino)) throw java.io.IOException(getString(R.string.error_guardar_archivo))
+						if (!temporal.renameTo(destino)) throw java.io.IOException(a.getString(R.string.error_guardar_archivo))
 						destino
 					} finally {
 						temporal.delete()
+					}
+					// Cancelado justo al terminar: no se añade, y el archivo no se queda en el disco (salvo que ya fuera de un libro)
+					if (!isActive) {
+						if (BaseDatos.obtener(a).libroPorUri(Uri.fromFile(destino).toString()) == null) destino.delete()
+						throw CancellationException()
 					}
 					val formato = Formato.deExtension(destino.extension).takeIf { it != Formato.DESCONOCIDO } ?: Formato.EPUB
 					BaseDatos.obtener(a).anadirLibro(
 						Uri.fromFile(destino).toString(), destino.name, e.titulo, e.autor, formato.name, formato.audio, destino.length(), null,
 					)
 				} }
-				a.avisar(getString(R.string.libro_descargado, e.titulo))
+				a.avisar(a.getString(R.string.libro_descargado, e.titulo))
 				Abiertos.abrirPantalla(a, id)
 			} catch (ex: kotlinx.coroutines.CancellationException) {
 				throw ex
 			} catch (ex: Exception) {
-				a.avisar(getString(R.string.error_descarga, ex.message.orEmpty()), mostrar = true)
+				a.avisar(a.getString(R.string.error_descarga, ex.message.orEmpty()), mostrar = true)
 			}
 		}
 	}

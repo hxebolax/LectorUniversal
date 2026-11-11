@@ -60,7 +60,8 @@ class ServicioAudio : MediaSessionService() {
 			// Con TalkBack hablando: pausa y sigue después (voz) o baja el volumen (música), según Ajustes
 			.setAudioAttributes(ControlAudio.atributos(this), ControlAudio.manejaFoco(this))
 			.setHandleAudioBecomingNoisy(true)
-			.setWakeMode(C.WAKE_MODE_LOCAL)
+			// Radio y episodios por internet: también el Wi-Fi despierto con la pantalla apagada (si no, cortes)
+			.setWakeMode(C.WAKE_MODE_NETWORK)
 			.setSeekBackIncrementMs(p.saltoAtras * 1000L)
 			.setSeekForwardIncrementMs(p.saltoAdelante * 1000L)
 			.build()
@@ -97,9 +98,17 @@ class ServicioAudio : MediaSessionService() {
 				// Radio: emisora siguiente o anterior
 				ControlAudio.externo?.alPasar?.let { return it(delante) }
 				val pr = Preferencias(this@ServicioAudio)
-				if (pr.botonesAuriculares == "salto") ControlAudio.saltarSegundos(if (delante) pr.saltoAdelante else -pr.saltoAtras)
+				// Sin capítulos (un episodio o un audio de una sola pista) también salta unos segundos
+				val sinCapitulos = ControlAudio.marcas(UnidadAudio.CAPITULO).size <= 1
+				if (pr.botonesAuriculares == "salto" || sinCapitulos) ControlAudio.saltarSegundos(if (delante) pr.saltoAdelante else -pr.saltoAtras)
 				else ControlAudio.saltar(UnidadAudio.CAPITULO, delante)
 			}
+
+			// Retroceder y avanzar (notificación, reloj): con los segundos de Ajustes de ahora, no los de cuando se creó el servicio
+			override fun seekBack() = ControlAudio.saltarSegundos(-Preferencias(this@ServicioAudio).saltoAtras)
+			override fun seekForward() = ControlAudio.saltarSegundos(Preferencias(this@ServicioAudio).saltoAdelante)
+			override fun getSeekBackIncrement(): Long = Preferencias(this@ServicioAudio).saltoAtras * 1000L
+			override fun getSeekForwardIncrement(): Long = Preferencias(this@ServicioAudio).saltoAdelante * 1000L
 
 			override fun seekToNext() = mover(true)
 			override fun seekToPrevious() = mover(false)
@@ -148,6 +157,8 @@ class ServicioAudio : MediaSessionService() {
 			release()
 		}
 		sesion = null
+		// El refuerzo de volumen va con la sesión de audio del reproductor que se cierra
+		ControlAudio.soltarRefuerzo()
 		ControlAudio.jugador = null
 		(getSystemService(AUDIO_SERVICE) as android.media.AudioManager).unregisterAudioDeviceCallback(dispositivos)
 		super.onDestroy()

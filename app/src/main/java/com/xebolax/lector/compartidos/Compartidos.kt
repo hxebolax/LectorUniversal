@@ -105,19 +105,23 @@ object Compartidos {
 		))
 	}
 
-	/** Un archivo que llega de otra app. Si ya estaba en la biblioteca, se usa ese. */
-	suspend fun guardarArchivo(c: Context, uri: Uri): Long = withContext(Dispatchers.IO) {
+	/**
+	 * Un archivo que llega de otra app. Si ya estaba (en la biblioteca o en
+	 * Compartidos), se usa ese. Devuelve su id y si es nuevo.
+	 */
+	suspend fun guardarArchivo(c: Context, uri: Uri): Pair<Long, Boolean> = withContext(Dispatchers.IO) {
 		val db = BaseDatos.obtener(c)
-		db.libroPorUri(uri.toString())?.let { return@withContext it.id }
+		db.libroPorUri(uri.toString())?.let { return@withContext it.id to false }
 		val antes = db.todosConCompartidos().map { it.id }.toSet()
 		val id = com.xebolax.lector.biblioteca.Importador.anadirExterno(c, uri)
-		if (id !in antes) db.moverACompartidos(id)
-		id
+		val nuevo = id !in antes
+		if (nuevo) db.moverACompartidos(id)
+		id to nuevo
 	}
 
 	/** Abre (y, si se eligió, empieza a leer en voz alta) lo recién recibido. */
-	fun abrir(c: Context, id: Long, leer: Boolean = alRecibir(c) == "leer") {
-		val l = BaseDatos.obtener(c).libro(id) ?: return
+	suspend fun abrir(c: Context, id: Long, leer: Boolean = alRecibir(c) == "leer") {
+		val l = withContext(Dispatchers.IO) { BaseDatos.obtener(c).libro(id) } ?: return
 		if (l.audio || !leer) return com.xebolax.lector.lectura.Abiertos.abrirPantalla(c, l)
 		c.startActivity(Intent(c, LectorActivity::class.java).putExtra(LectorActivity.EXTRA_LIBRO, id).putExtra(LectorActivity.EXTRA_LEER_AL_ABRIR, true))
 	}
@@ -133,7 +137,12 @@ object Compartidos {
 	suspend fun limpiar(c: Context): Int = withContext(Dispatchers.IO) {
 		val dias = diasBorrar(c)
 		if (dias <= 0) return@withContext 0
-		val viejos = BaseDatos.obtener(c).compartidosLeidosAntesDe(System.currentTimeMillis() - dias * 86_400_000L)
+		val db = BaseDatos.obtener(c)
+		// Nunca lo que se está leyendo en voz alta o escuchando, ni lo último abierto (puede estar en el lector)
+		val ultimo = db.compartidos().filter { it.abierto > 0 }.maxByOrNull { it.abierto }?.id
+		val viejos = db.compartidosLeidosAntesDe(System.currentTimeMillis() - dias * 86_400_000L).filter { l ->
+			l.id != ultimo && !com.xebolax.lector.voz.LectorVoz.esActual(l.id) && !com.xebolax.lector.audio.ControlAudio.esActual(l.id)
+		}
 		viejos.forEach { borrar(c, it) }
 		viejos.size
 	}

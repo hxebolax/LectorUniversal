@@ -276,7 +276,10 @@ object Podcasts {
 	/** datosMoviles: el usuario ha pedido descargar ya aunque esté con datos móviles. */
 	fun descargar(c: Context, e: Episodio, datosMoviles: Boolean = false) {
 		if (e.descargado || e.descarga != 0L) return
-		val extension = e.audio.substringBefore('?').substringAfterLast('.', "mp3").take(4).filter { it.isLetterOrDigit() }.ifBlank { "mp3" }
+		// La extensión, del último tramo de la ruta («…/ep/123» no tiene) o, si no, del tipo del audio
+		val extension = Uri.parse(e.audio).lastPathSegment.orEmpty().substringAfterLast('.', "").take(4).filter { it.isLetterOrDigit() }
+			.ifBlank { android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(e.tipo.substringBefore(';').trim()).orEmpty() }
+			.ifBlank { "mp3" }
 		val destino = File(carpeta(c), "${e.id}.$extension")
 		destino.delete()
 		val peticion = DownloadManager.Request(Uri.parse(e.audio))
@@ -298,8 +301,11 @@ object Podcasts {
 	/** Lo que ha pasado con las descargas: las terminadas y las que han fallado ya tres veces. */
 	class EstadoDescargas(val terminadas: List<String>, val fallidas: List<String>)
 
+	/** Se llama desde la pantalla y desde la actualización: de uno en uno (si no, un fallo se contaría y reintentaría dos veces). */
+	@Synchronized
 	fun comprobarDescargas(c: Context): EstadoDescargas {
 		val db = PodcastsBaseDatos.obtener(c)
+		borrarPendientes(c)
 		val gestor = c.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 		val terminados = ArrayList<String>()
 		val fallidas = ArrayList<String>()
@@ -350,6 +356,24 @@ object Podcasts {
 		PodcastsBaseDatos.obtener(c).guardarDescarga(e.id, "", 0)
 	}
 
+	/** Episodios cuya descarga se borra cuando dejen de sonar (escuchados por el umbral, con «Borrar descarga al terminar»). */
+	private const val BORRAR_LUEGO = "pod_borrar_pendientes"
+
+	private fun borrarPendientes(c: Context) {
+		val p = prefs(c)
+		val ids = p.getStringSet(BORRAR_LUEGO, null).orEmpty()
+		if (ids.isEmpty()) return
+		val db = PodcastsBaseDatos.obtener(c)
+		val quedan = ids.filter { s ->
+			val id = s.toLongOrNull() ?: return@filter false
+			// Sigue en el reproductor: se borra más adelante
+			if (ControlAudio.idLibro == -1_000_000_000L - id) return@filter true
+			db.episodio(id)?.takeIf { it.terminado && !it.favorito }?.let { borrarDescarga(c, it) }
+			false
+		}.toSet()
+		p.edit().putStringSet(BORRAR_LUEGO, quedan).apply()
+	}
+
 	/** Borra las descargas de los episodios ya escuchados (salvo favoritos). Devuelve cuántas. */
 	fun borrarEscuchados(c: Context): Int {
 		val lista = PodcastsBaseDatos.obtener(c).descargados().filter { it.terminado && !it.favorito && it.descargado }
@@ -367,87 +391,117 @@ object Podcasts {
 	suspend fun preparar(c: Context, e: Episodio): ControlAudio.Externo {
 		val db = PodcastsBaseDatos.obtener(c)
 		val p = db.podcast(e.podcast)
-		val capitulos = if (e.capitulos.isNotBlank()) capitulos(e.capitulos) else emptyList()
 		val umbral = (prefs(c).getString("pod_marcar_escuchado", "30")?.toLongOrNull() ?: 30L) * 1000
 		val fuente = if (e.descargado && File(e.archivo).exists()) Uri.fromFile(File(e.archivo)).toString() else e.audio
+		// Los capítulos (JSON o incrustados) no se esperan: llegan después con buscarCapitulos
+		var acabado = false
 		return ControlAudio.Externo(
 			id = -1_000_000_000L - e.id,
 			titulo = e.titulo,
 			autor = e.nombrePodcast.ifBlank { p?.titulo.orEmpty() },
 			url = fuente,
 			posicionMs = if (e.terminado) 0 else e.posicion,
-			capitulos = capitulos,
 			velocidad = p?.velocidad?.takeIf { it > 0 } ?: prefs(c).getString("pod_velocidad_lista", "0")?.toIntOrNull()?.takeIf { it > 0 },
 			saltarInicio = p?.saltarInicio ?: 0,
 			saltarFinal = p?.saltarFinal ?: 0,
 			refuerzo = p?.volumen?.takeIf { it >= 0 },
 			alGuardar = { ms, dur ->
 				db.guardarPosicion(e.id, ms, dur)
-				// Casi al final: ya cuenta como escuchado
-				if (dur > 0 && ms > 0 && ms >= dur - umbral && umbral > 0) db.marcarEscuchados(listOf(e.id), true)
+				// Casi al final: ya cuenta como escuchado (una sola vez; la descarga se borra cuando deje de sonar)
+				if (!acabado && dur > 0 && ms > 0 && ms >= dur - umbral && umbral > 0) {
+					acabado = true
+					alAcabarEpisodio(c, e, sigueSonando = true)
+				}
 			},
-			alTerminar = {
-				com.xebolax.lector.datos.Actividad.sumarLuego(c, com.xebolax.lector.datos.Actividad.PODCASTS, elementos = 1)
-				alTerminar(c, e)
-			},
+			alTerminar = { alTerminar(c, e) },
 			alCambiarVelocidad = { v -> if (p != null) db.guardarVelocidad(p.id, v) },
 		)
+	}
+
+	/** Prepara el episodio, lo carga en el reproductor, lo pone a sonar y busca sus capítulos. */
+	private suspend fun sonar(c: Context, e: Episodio) {
+		val ext = preparar(c, e)
+		ControlAudio.cargarExterno(ext)
+		ControlAudio.reproducir()
+		buscarCapitulos(c.applicationContext, ext, e.capitulos)
 	}
 
 	/** Da el episodio por escuchado y pasa al siguiente de la cola (desde el reproductor). Devuelve false si no hay siguiente. */
 	suspend fun terminarYSeguir(c: Context, e: Episodio): Boolean {
 		val db = PodcastsBaseDatos.obtener(c)
-		val siguiente = db.cola().firstOrNull { it.id != e.id } ?: return false
-		db.marcarEscuchados(listOf(e.id), true)
-		val ext = preparar(c, siguiente)
-		ControlAudio.cargarExterno(ext)
-		ControlAudio.reproducir()
-		buscarCapitulosIncrustados(c.applicationContext, ext)
+		val siguiente = withContext(Dispatchers.IO) { db.cola().firstOrNull { it.id != e.id } } ?: return false
+		withContext(Dispatchers.IO) { alAcabarEpisodio(c, e, sigueSonando = true) }
+		sonar(c, siguiente)
+		// Ya no suena: si había que borrar su descarga, ahora
+		withContext(Dispatchers.IO) { borrarPendientes(c) }
 		return true
+	}
+
+	/**
+	 * Se ha acabado un episodio (al terminar, al pasar al siguiente o al llegar al
+	 * umbral de «escuchado»): cuenta en las estadísticas una vez, queda como
+	 * escuchado y, con «Borrar descarga al terminar», se borra su descarga (ya, o
+	 * cuando deje de sonar).
+	 */
+	private fun alAcabarEpisodio(c: Context, e: Episodio, sigueSonando: Boolean) {
+		val db = PodcastsBaseDatos.obtener(c)
+		val actual = db.episodio(e.id) ?: return
+		if (!actual.terminado) {
+			com.xebolax.lector.datos.Actividad.sumarLuego(c, com.xebolax.lector.datos.Actividad.PODCASTS, elementos = 1)
+			db.marcarEscuchados(listOf(e.id), true)
+		}
+		if (!prefs(c).getBoolean("pod_borrar_al_terminar", false) || actual.favorito || !(actual.descargado || actual.descarga != 0L)) return
+		if (sigueSonando) {
+			val p = prefs(c)
+			p.edit().putStringSet(BORRAR_LUEGO, p.getStringSet(BORRAR_LUEGO, null).orEmpty() + e.id.toString()).apply()
+		} else borrarDescarga(c, actual)
 	}
 
 	private fun alTerminar(c: Context, e: Episodio) {
 		val db = PodcastsBaseDatos.obtener(c)
 		val siguiente = db.cola().firstOrNull { it.id != e.id }
-		db.marcarEscuchados(listOf(e.id), true)
-		if (prefs(c).getBoolean("pod_borrar_al_terminar", false)) db.episodio(e.id)?.takeIf { !it.favorito }?.let { borrarDescarga(c, it) }
-		// Temporizador «al final del episodio» o «tras N episodios»: aquí se para
+		alAcabarEpisodio(c, e, sigueSonando = false)
+		// Temporizador «al final del episodio» o «tras N episodios»: ControlAudio ya lo ha contado al terminar
 		if (ControlAudio.pararTrasEpisodio()) return
 		if (siguiente != null && prefs(c).getBoolean("pod_seguir_cola", true)) {
 			kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-				runCatching {
-					val ext = preparar(c, siguiente)
-					ControlAudio.cargarExterno(ext)
-					ControlAudio.reproducir()
-					buscarCapitulosIncrustados(c.applicationContext, ext)
-				}
+				runCatching { sonar(c, siguiente) }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
 			}
 		}
 	}
 
 	/** Capítulos de Podcasting 2.0 (JSON). */
 	private suspend fun capitulos(url: String): List<MarcaAudio> = withContext(Dispatchers.IO) {
-		runCatching {
-			val a = JSONObject(RssLector.descargarTexto(url)).optJSONArray("chapters") ?: return@runCatching emptyList()
+		try {
+			val a = JSONObject(RssLector.descargarTexto(url)).optJSONArray("chapters") ?: return@withContext emptyList()
 			(0 until a.length()).mapNotNull { i ->
 				val o = a.optJSONObject(i) ?: return@mapNotNull null
 				if (o.has("toc") && !o.optBoolean("toc", true)) return@mapNotNull null
 				MarcaAudio(o.optString("title"), 1, 0, (o.optDouble("startTime", 0.0) * 1000).toLong())
 			}.sortedBy { it.ms }
-		}.getOrDefault(emptyList())
+		} catch (e: kotlinx.coroutines.CancellationException) {
+			throw e
+		} catch (e: Exception) {
+			emptyList()
+		}
 	}
 
 	/**
-	 * Capítulos incrustados en el audio (ID3 en MP3, Nero o QuickTime en M4A),
-	 * para episodios sin capítulos de Podcasting 2.0. Se leen en segundo plano
-	 * (por partes si el episodio no está descargado) y se añaden al llegar.
+	 * Capítulos del episodio, en segundo plano y sin hacer esperar al sonido:
+	 * los de Podcasting 2.0 (JSON) y, si no tiene, los incrustados en el audio
+	 * (ID3 en MP3, Nero o QuickTime en M4A; por partes si no está descargado).
+	 * Se añaden al llegar.
 	 */
-	private fun buscarCapitulosIncrustados(c: Context, ext: ControlAudio.Externo) {
+	private fun buscarCapitulos(c: Context, ext: ControlAudio.Externo, json: String) {
 		if (ext.capitulos.isNotEmpty()) return
+		// Ya suena con sus capítulos (se ha vuelto a abrir el mismo episodio)
+		if (ControlAudio.esActual(ext.id) && ControlAudio.libro?.capitulos?.isNotEmpty() == true) return
 		kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-			val lista = runCatching { com.xebolax.lector.formatos.CapitulosAudio.leer(c, Uri.parse(ext.url)) }.getOrDefault(emptyList())
-			if (lista.size < 2) return@launch
-			val marcas = lista.map { (titulo, ms) -> MarcaAudio(titulo, 1, 0, ms) }
+			val marcas = (if (json.isNotBlank()) capitulos(json) else emptyList()).ifEmpty {
+				val lista = runCatching { com.xebolax.lector.formatos.CapitulosAudio.leer(c, Uri.parse(ext.url)) }.getOrDefault(emptyList())
+				if (lista.size < 2) emptyList() else lista.map { (titulo, ms) -> MarcaAudio(titulo, 1, 0, ms) }
+			}
+			if (marcas.isEmpty()) return@launch
 			withContext(Dispatchers.Main) { ControlAudio.ponerCapitulos(ext.id, marcas) }
 		}
 	}
@@ -456,14 +510,14 @@ object Podcasts {
 	suspend fun escuchar(c: Context, e: Episodio) {
 		val db = PodcastsBaseDatos.obtener(c)
 		// Sale de Novedades al escucharlo
-		if (e.nuevo) db.quitarDeNovedades(listOf(e.id))
+		if (e.nuevo) withContext(Dispatchers.IO) { db.quitarDeNovedades(listOf(e.id)) }
 		val ext = preparar(c, e)
 		// Ya suena este episodio: solo se va a ese momento (capítulo, hora de las notas o de la transcripción)
 		if (ControlAudio.esActual(ext.id)) {
 			ControlAudio.irA(0, e.posicion)
 			ControlAudio.reproducir()
 		}
-		buscarCapitulosIncrustados(c.applicationContext, ext)
+		buscarCapitulos(c.applicationContext, ext, e.capitulos)
 		ControlAudio.externoPendiente = ext
 		c.startActivity(Intent(c, com.xebolax.lector.audio.ReproductorActivity::class.java)
 			.putExtra(com.xebolax.lector.audio.ReproductorActivity.EXTRA_EXTERNO, true)
@@ -583,10 +637,10 @@ object Podcasts {
 			autor = podcast,
 			url = e.audio,
 			posicionMs = 0,
-			capitulos = if (e.capitulos.isNotBlank()) capitulos(e.capitulos) else emptyList(),
 			alGuardar = { _, _ -> },
 		)
-		buscarCapitulosIncrustados(c.applicationContext, ext)
+		// Los capítulos llegan después: no se espera a descargarlos para que suene
+		buscarCapitulos(c.applicationContext, ext, e.capitulos)
 		ControlAudio.externoPendiente = ext
 		c.startActivity(Intent(c, com.xebolax.lector.audio.ReproductorActivity::class.java)
 			.putExtra(com.xebolax.lector.audio.ReproductorActivity.EXTRA_EXTERNO, true)

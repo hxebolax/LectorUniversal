@@ -28,6 +28,7 @@ import com.xebolax.lector.ui.ponerMenuLateral
 import com.xebolax.lector.ui.ponerPestanas
 import com.xebolax.lector.ui.seguirMiniReproductor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -45,6 +46,8 @@ class RadioActivity : AppCompatActivity() {
 		const val ACCION_ESCUCHAR = "com.xebolax.lector.radio.ESCUCHAR"
 		const val ACCION_GRABACIONES = "com.xebolax.lector.radio.GRABACIONES"
 		const val ACCION_PROGRAMAR = "com.xebolax.lector.radio.PROGRAMAR"
+		/** Editar una emisora propia (desde el reproductor o la Portada, fuera de la sección). */
+		const val ACCION_EDITAR = "com.xebolax.lector.radio.EDITAR"
 		const val EXTRA_EMISORA = "emisora"
 
 		fun abrir(c: Context) = c.startActivity(Intent(c, RadioActivity::class.java))
@@ -67,18 +70,27 @@ class RadioActivity : AppCompatActivity() {
 	private val importar = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
 		uri ?: return@registerForActivityResult
 		lifecycleScope.launch {
-			val texto = withContext(Dispatchers.IO) { runCatching { contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText().take(2_000_000) } }.getOrNull() }
-			val emisoras = texto?.let { Radio.leerLista(it) }.orEmpty()
-			if (emisoras.isEmpty()) return@launch mensaje(getString(R.string.radio_importar), getString(R.string.radio_importar_vacio))
 			val db = RadioBaseDatos.obtener(this@RadioActivity)
-			var nuevas = 0
-			withContext(Dispatchers.IO) {
-				for ((e, carpeta) in emisoras) {
-					if (db.esFavorita(e.uuid)) continue
-					db.anadirFavorita(e, carpeta.trim().takeIf { it.isNotBlank() }?.let { db.crearCarpeta(it) } ?: "")
-					nuevas++
+			// Leer la lista y guardar sus emisoras puede tardar: con espera y Cancelar. null = la lista no trae emisoras
+			val nuevas = try {
+				conEspera(getString(R.string.radio_importar), getString(R.string.audio_importando)) {
+					withContext(Dispatchers.IO) {
+						val texto = runCatching { contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText().take(2_000_000) } }.getOrNull()
+						val emisoras = texto?.let { Radio.leerLista(it) }.orEmpty()
+						if (emisoras.isEmpty()) return@withContext null
+						var n = 0
+						for ((e, carpeta) in emisoras) {
+							ensureActive()
+							if (db.esFavorita(e.uuid)) continue
+							db.anadirFavorita(e, carpeta.trim().takeIf { it.isNotBlank() }?.let { db.crearCarpeta(it) } ?: "")
+							n++
+						}
+						n
+					}
 				}
-			}
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
+			} ?: return@launch mensaje(getString(R.string.radio_importar), getString(R.string.radio_importar_vacio))
 			mensaje(getString(R.string.radio_importar), resources.getQuantityString(R.plurals.radio_importadas, nuevas, nuevas))
 		}
 	}
@@ -126,6 +138,7 @@ class RadioActivity : AppCompatActivity() {
 				val e = Emisora.deJson(i.getStringExtra(EXTRA_EMISORA).orEmpty())
 				irA(RadioListaFragment.Modo.PROGRAMAR) { f -> e?.let { f.editarProgramacion(null, Programacion.DESPERTADOR, it) } }
 			}
+			ACCION_EDITAR -> Emisora.deJson(i.getStringExtra(EXTRA_EMISORA).orEmpty())?.takeIf { it.propia }?.let { anadirAMano(editar = it) }
 			Intent.ACTION_SEND -> {
 				// Compartir una dirección con «Añadir a Radio»
 				val texto = i.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
@@ -182,7 +195,14 @@ class RadioActivity : AppCompatActivity() {
 	fun irA(modo: RadioListaFragment.Modo, hacer: (RadioListaFragment) -> Unit) {
 		val i = pestanas.indexOf(modo)
 		b.paginas.setCurrentItem(i, false)
-		b.paginas.post { (supportFragmentManager.findFragmentByTag("f$i") as? RadioListaFragment)?.let(hacer) }
+		b.paginas.post { enPestana(i, 20, hacer) }
+	}
+
+	/** ViewPager2 crea el fragmento de la pestaña al dibujarse: si aún no existe, se espera un poco (si no, se perdía lo pedido). */
+	private fun enPestana(i: Int, intentos: Int, hacer: (RadioListaFragment) -> Unit) {
+		val f = supportFragmentManager.findFragmentByTag("f$i") as? RadioListaFragment
+		if (f != null && f.view != null) hacer(f)
+		else if (intentos > 0 && !isFinishing) b.paginas.postDelayed({ enPestana(i, intentos - 1, hacer) }, 50)
 	}
 
 	override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -273,10 +293,14 @@ class RadioActivity : AppCompatActivity() {
 							web = campoWeb.text.toString().ifBlank { if (desdeWeb) direccion else s?.webEmisora.orEmpty() },
 							hls = s?.hls,
 						)
-						val carpeta = editar?.let { db.favorita(it.uuid)?.carpeta }.orEmpty()
-						if (editar != null && editar.uuid != nueva.uuid) db.quitarFavorita(editar.uuid)
-						db.anadirFavorita(nueva, carpeta)
-						avisar(getString(R.string.radio_guardada_favoritas, nueva.nombre))
+						lifecycleScope.launch {
+							withContext(Dispatchers.IO) {
+								// Al editarla (su id sale de la dirección) conserva su carpeta, su orden, su historial y lo programado con ella
+								if (editar != null) db.cambiarEmisora(editar.uuid, nueva)
+								if (!db.esFavorita(nueva.uuid)) db.anadirFavorita(nueva)
+							}
+							avisar(getString(R.string.radio_guardada_favoritas, nueva.nombre))
+						}
 					}
 					when (r) {
 						is Analisis.Encontrada -> guardar(r.sonda, r.desdeWeb)

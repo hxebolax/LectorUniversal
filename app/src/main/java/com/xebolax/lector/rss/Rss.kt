@@ -7,7 +7,6 @@ import com.xebolax.lector.formatos.LectorHtml
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -73,19 +72,10 @@ object Rss {
 				db.guardarActualizacion(f.id, r.etag, r.modificado, null, null, "")
 				return@withContext emptyList()
 			}
-			// Palabras silenciadas: esos artículos no se guardan
-			val silenciadas = f.silenciar.split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
-			// «Solo con estas palabras»: si la fuente lo tiene, el resto no se guarda
-			val soloCon = f.soloCon.split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
-			// Sin duplicados: lo que ya llegó por otra fuente (mismo enlace o mismo titular) no se guarda
-			val (titulosOtras, enlacesOtras) = if (f.sinDuplicados) db.recibidosDeOtras(f.id) else emptyList<String>() to emptySet()
-			val titularesOtras = titulosOtras.map { normal(it) }.filter { it.length > 15 }.toSet()
-			val validos = canal.elementos.filter { e ->
-				val texto = e.titulo.lowercase() + " " + e.resumen.lowercase()
-				silenciadas.none { s -> texto.contains(s) } &&
-					(soloCon.isEmpty() || soloCon.any { s -> texto.contains(s) }) &&
-					(!f.sinDuplicados || e.enlace !in enlacesOtras && normal(e.titulo) !in titularesOtras)
-			}
+			val admitir = filtro(db, f)
+			// Lo que ya llegó por la sincronización con el servidor (se guarda con otro guid) no se repite
+			val delServidor = db.enlacesRemotos(f.id)
+			val validos = canal.elementos.filter { e -> admitir(e) && (e.enlace.isBlank() || e.enlace !in delServidor) }
 			// La primera vez solo los 20 más recientes quedan sin leer
 			val primeraVez = f.ultima == 0L
 			val nuevos = if (primeraVez && validos.size > 20) {
@@ -101,17 +91,62 @@ object Rss {
 		}
 	}
 
-	/** Actualiza todas las fuentes (4 a la vez). progreso(hechas, total). */
-	suspend fun actualizarTodas(c: Context, progreso: (Int, Int) -> Unit = { _, _ -> }): Resultado = coroutineScope {
+	/**
+	 * Las opciones de una fuente para sus artículos nuevos: palabras silenciadas,
+	 * «Solo con estas palabras» y sin duplicados. Vale para las fuentes propias
+	 * y para las que llegan del servidor de sincronización.
+	 */
+	fun filtro(db: RssBaseDatos, f: Fuente): (RssLector.Elemento) -> Boolean {
+		// Palabras silenciadas: esos artículos no se guardan
+		val silenciadas = f.silenciar.split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+		// «Solo con estas palabras»: si la fuente lo tiene, el resto no se guarda
+		val soloCon = f.soloCon.split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+		// Sin duplicados: lo que ya llegó por otra fuente (mismo enlace o mismo titular) no se guarda
+		val (titulosOtras, enlacesOtras) = if (f.sinDuplicados) db.recibidosDeOtras(f.id) else emptyList<String>() to emptySet()
+		val titularesOtras = titulosOtras.map { normal(it) }.filter { it.length > 15 }.toSet()
+		return { e ->
+			val texto = e.titulo.lowercase() + " " + e.resumen.lowercase()
+			silenciadas.none { s -> texto.contains(s) } &&
+				(soloCon.isEmpty() || soloCon.any { s -> texto.contains(s) }) &&
+				(!f.sinDuplicados || e.enlace !in enlacesOtras && normal(e.titulo) !in titularesOtras)
+		}
+	}
+
+	/**
+	 * «Actualizar» una fuente a mano (o al suscribirse): si está enlazada con el
+	 * servidor de sincronización, se sincroniza (bajarla aparte duplicaría sus
+	 * artículos); si no, se descarga. Después, las reglas con lo que ha llegado.
+	 * Devuelve cuántos artículos nuevos.
+	 */
+	suspend fun actualizarUna(c: Context, f: Fuente): Int = withContext(Dispatchers.IO) {
+		val db = RssBaseDatos.obtener(c)
+		val inicio = System.currentTimeMillis()
+		val enlazada = RssSincronizacion.configurado(c) && !db.remotosDeFuentes()[f.id].isNullOrBlank()
+		val n = if (enlazada) {
+			val r = RssSincronizacion.sincronizar(c)
+			prefs(c).edit().putString("rss_sinc_error", "").apply()
+			r.nuevos
+		} else actualizar(c, f).size
+		runCatching { Reglas.aplicar(c, db.recibidosDesde(inicio)) }
+		n
+	}
+
+	/** Actualiza todas las fuentes (4 a la vez). progreso(hechas, total), desde otro hilo. */
+	suspend fun actualizarTodas(c: Context, progreso: (Int, Int) -> Unit = { _, _ -> }): Resultado = withContext(Dispatchers.IO) {
 		val db = RssBaseDatos.obtener(c)
 		val inicio = System.currentTimeMillis()
 		var errores = 0
 		var nuevos = 0
+		val avisos = ArrayList<Pair<Fuente, RssLector.Elemento>>()
 		// Con cuenta en un servidor, las fuentes de la cuenta se traen de allí
 		var sincronizadas = emptySet<Long>()
 		if (RssSincronizacion.configurado(c)) {
 			runCatching { RssSincronizacion.sincronizar(c) }
-				.onSuccess { nuevos += it.nuevos; prefs(c).edit().putString("rss_sinc_error", "").apply() }
+				.onSuccess {
+					nuevos += it.nuevos
+					avisos += it.avisos
+					prefs(c).edit().putString("rss_sinc_error", "").apply()
+				}
 				.onFailure {
 					if (it is kotlinx.coroutines.CancellationException) throw it
 					errores++
@@ -122,7 +157,6 @@ object Rss {
 		val fuentes = db.fuentes().filter { !it.pausada && it.id !in sincronizadas }
 		val limite = Semaphore(4)
 		var hechas = 0
-		val avisos = ArrayList<Pair<Fuente, RssLector.Elemento>>()
 		fuentes.map { f ->
 			async(Dispatchers.IO) {
 				limite.withPermit {
@@ -223,7 +257,7 @@ object Rss {
 	 * volver a intentarlo al abrirlo (con «Descargar el artículo completo» se
 	 * puede pedir otra vez).
 	 */
-	suspend fun completar(c: Context, a: Articulo): ArticuloCompleto.Extraido {
+	suspend fun completar(c: Context, a: Articulo): ArticuloCompleto.Extraido = withContext(Dispatchers.IO) {
 		val r = ArticuloCompleto.obtener(c, a)
 		val db = RssBaseDatos.obtener(c)
 		when (r.resultado) {
@@ -231,7 +265,7 @@ object Rss {
 			ArticuloCompleto.Resultado.SIN_MAS_TEXTO -> db.guardarContenidoCompleto(a.id, a.contenido)
 			else -> Unit
 		}
-		return r
+		r
 	}
 
 	/** Qué decir del resultado. */

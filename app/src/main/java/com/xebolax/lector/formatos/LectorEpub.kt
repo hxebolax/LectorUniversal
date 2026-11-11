@@ -247,11 +247,25 @@ object LectorEpub : LectorFormato {
 		for ((titulo, nivel, destino) in entradas) {
 			val bloque = c.resolver(destino) ?: continue
 			val texto = c.textoDe(bloque) ?: continue
-			val a = normalizar(texto)
-			val b = normalizar(titulo)
-			if (a.isNotEmpty() && b.isNotEmpty() && (a == b || a.contains(b) || b.contains(a))) c.cambiarAEncabezado(bloque, nivel)
+			if (pareceTitulo(texto, titulo)) c.cambiarAEncabezado(bloque, nivel)
 		}
 	}
+
+	/**
+	 * ¿El texto de un bloque es el título de una entrada del índice? Los
+	 * títulos cortos («I», «1», «IV») solo si son la primera palabra del
+	 * bloque: si no, cualquier párrafo con una «i» pasaría a encabezado.
+	 */
+	internal fun pareceTitulo(texto: String, titulo: String): Boolean {
+		val a = normalizar(texto)
+		val b = normalizar(titulo)
+		if (a.isEmpty() || b.isEmpty()) return false
+		if (a == b) return true
+		if (b.length < 4) return normalizar(texto.trim().split(PALABRAS).firstOrNull { it.isNotEmpty() }.orEmpty()) == b
+		return (a.contains(b) && a.length <= b.length + 60) || (a.length >= 4 && b.contains(a))
+	}
+
+	private val PALABRAS = Regex("[^\\p{L}\\p{N}]+")
 
 	private fun normalizar(t: String) = t.lowercase().filter { it.isLetterOrDigit() }
 

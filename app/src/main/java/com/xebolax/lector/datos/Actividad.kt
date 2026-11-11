@@ -113,7 +113,8 @@ object Actividad {
 
 	private fun revisar() {
 		val e = ControlAudio.externo
-		val seccion = if (ControlAudio.reproduciendo && e != null) e.seccionActividad else null
+		// Solo lo que suena de verdad: ni la radio reconectando ni el tono de alarma de reserva
+		val seccion = if (ControlAudio.sonandoDeVerdad && e != null) e.seccionActividad else null
 		if (seccion == contando) return
 		volcar()
 		principal.removeCallbacks(minuto)

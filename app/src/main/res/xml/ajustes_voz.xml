@@ -79,9 +79,8 @@
 		android:defaultValue="true" />
 	<SwitchPreferenceCompat
 		android:key="detectar_idioma"
-		android:dependency="voz_segun_idioma"
 		android:title="@string/aj_detectar_idioma"
-		android:summary="@string/aj_detectar_idioma_desc"
+		android:summary="@string/lectura_detectar_idioma_desc"
 		android:defaultValue="false" />
 	<SwitchPreferenceCompat
 		android:key="destacar_encabezados"

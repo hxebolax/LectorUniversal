@@ -32,7 +32,7 @@ private object AyudaPresentacion {
 
 	fun parser(entrada: InputStream): XmlPullParser = Xml.newPullParser().apply {
 		setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-		setInput(entrada, null)
+		setInput(SinEntidadesXml(entrada), null)
 	}
 
 	/** Nombre sin prefijo ("p:sp" → "sp"). */

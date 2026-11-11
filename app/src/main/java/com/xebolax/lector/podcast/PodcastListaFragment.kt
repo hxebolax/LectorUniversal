@@ -108,7 +108,8 @@ class PodcastListaFragment : Fragment() {
 	private val efectivo get() = if (modo == Modo.EPISODIOS) vista else modo
 
 	private val actividad get() = activity as? PodcastActivity
-	private val oyente = PodcastsBaseDatos.Oyente { view?.post { recargar() } }
+	// Cambios en segundo plano (actualizaciones, descargas): se recarga sin anunciar el recuento
+	private val oyente = PodcastsBaseDatos.Oyente { view?.post { recargar(anunciar = false) } }
 	private val atras = object : OnBackPressedCallback(false) {
 		override fun handleOnBackPressed() = subir()
 	}
@@ -373,21 +374,27 @@ class PodcastListaFragment : Fragment() {
 
 	/** El error al cargar Los más escuchados (para no quedarse en «Cargando…» para siempre). */
 	private var errorCarga: String? = null
+	/** Se están cargando Los más escuchados (si no, una lista vacía es «Sin resultados», no «Cargando…»). */
+	private var cargandoSugerencias = false
 
 	private fun cargarMasEscuchados() {
 		errorCarga = null
+		cargandoSugerencias = true
 		b.estado.text = getString(R.string.cargando)
 		viewLifecycleOwner.lifecycleScope.launch {
 			sugerencias = try {
 				Podcasts.masEscuchados(categoria)
 			} catch (e: kotlinx.coroutines.CancellationException) {
+				cargandoSugerencias = false
 				throw e
 			} catch (e: Exception) {
+				cargandoSugerencias = false
 				// Se salió de la pestaña mientras cargaba: ya no hay vista
 				errorCarga = getString(R.string.error_catalogo, e.message.orEmpty())
 				_b?.estado?.text = errorCarga
 				return@launch
 			}
+			cargandoSugerencias = false
 			recargar()
 		}
 	}
@@ -398,74 +405,120 @@ class PodcastListaFragment : Fragment() {
 
 	/** Los podcasts suscritos (se leen en cada recarga, fuera del hilo principal). */
 	private var misPodcasts: List<Podcast> = emptyList()
+	/** Las carpetas, también leídas en cada recarga (las acciones de cada fila las usan al dibujarse). */
+	private var misCarpetas: List<String> = emptyList()
+	/** Progreso de las descargas en marcha (id del episodio → 0-100 o ESPERANDO_WIFI), leído en cada recarga. */
+	private var progresos: Map<Long, Int> = emptyMap()
+
+	/** Lo que lee una recarga fuera del hilo principal. */
+	private class Datos(val podcasts: List<Podcast>, val carpetas: List<String>, val filas: List<Fila>, val progresos: Map<Long, Int>)
 
 	/** ¿Estás suscrito a esta sugerencia? Con la lista ya leída (sin consultar la base de datos al dibujar). */
 	private fun suscritoA(s: Podcasts.Sugerencia): Podcast? =
 		(if (s.url.isNotBlank()) misPodcasts.firstOrNull { it.url == s.url } else null)
 			?: misPodcasts.firstOrNull { it.titulo.trim().equals(s.titulo.trim(), ignoreCase = true) }
 
-	private fun recargar() {
+	private fun recargar(anunciar: Boolean = true) {
 		if (_b == null) return
 		val m = efectivo
 		val p = podcast
 		val car = carpeta
 		val solo = soloSinEscuchar
 		val texto = busqueda.trim()
+		val filtro = filtroCarpeta
+		// Lo que hace falta del contexto, antes de salir del hilo principal (el fragmento puede separarse mientras se lee)
+		val app = requireContext().applicationContext
+		val orden = Podcasts.prefs(app).getInt("pod_orden_suscripciones", 0)
+		val base = db
 		carga?.cancel()
 		carga = viewLifecycleOwner.lifecycleScope.launch {
-			// Los podcasts suscritos, una vez por recarga (las filas los consultan al dibujarse: sin base de datos en el hilo principal)
-			misPodcasts = withContext(Dispatchers.IO) { db.podcasts() }
-			val nuevas: List<Fila> = withContext(Dispatchers.IO) {
-				fun filtrar(l: List<Episodio>) = if (texto.length < 2) l else l.filter {
-					it.titulo.contains(texto, true) || it.nombrePodcast.contains(texto, true)
-				}
-				when (m) {
-					Modo.COLA -> db.cola().map { Fila.DeEpisodio(it) }
-					Modo.NOVEDADES -> db.novedades().map { Fila.DeEpisodio(it) }
-					Modo.SUSCRIPCIONES -> when {
-						p != null -> listOf<Fila>(Fila.Subir(car ?: "")) +
-							filtrar(db.dePodcast(p, solo && texto.length < 2, antiguosPrimero = db.podcast(p)?.antiguosPrimero == true)).map { Fila.DeEpisodio(it) }
-						car != null -> listOf<Fila>(Fila.Subir()) + ordenados(db.podcasts().filter { it.carpeta.equals(car, ignoreCase = true) }).map { Fila.DePodcast(it) }
-						else -> {
-							// Las carpetas en su orden (también las vacías) y después los podcasts sin carpeta
-							val todos = ordenados(db.podcasts())
-							db.carpetas().map { n ->
-								val l = todos.filter { it.carpeta.equals(n, ignoreCase = true) }
-								Fila.Carpeta(n, l.sumOf { it.sinEscuchar }, l.size)
-							} + todos.filter { it.carpeta.isBlank() || db.carpetas().none { n -> n.equals(it.carpeta, ignoreCase = true) } }.map { Fila.DePodcast(it) }
-						}
+			// Todo lo que las filas consultan al dibujarse se lee aquí, una vez por recarga (sin base de datos en el hilo principal)
+			val datos = withContext(Dispatchers.IO) {
+				val todosPodcasts = base.podcasts()
+				val todasCarpetas = base.carpetas()
+				fun ordenados(lista: List<Podcast>) = ordenar(lista, orden, base)
+				val nuevas: List<Fila> = run {
+					fun filtrar(l: List<Episodio>) = if (texto.length < 2) l else l.filter {
+						it.titulo.contains(texto, true) || it.nombrePodcast.contains(texto, true)
 					}
-					Modo.EN_CURSO -> db.enCurso().map { Fila.DeEpisodio(it) }
-					Modo.DESCARGAS -> db.descargados().map { Fila.DeEpisodio(it) }
-					Modo.FAVORITOS -> filtrar(db.favoritos()).map { Fila.DeEpisodio(it) }
-					Modo.HISTORIAL -> filtrar(if (texto.length >= 2) db.buscar(texto) else db.historial()).map { Fila.DeEpisodio(it) }
-					Modo.DESCUBRIR -> episodiosEncontrados?.map { Fila.Encontrado(it) } ?: (resultados ?: sugerencias).map { Fila.DeSugerencia(it) }
-					Modo.EPISODIOS -> emptyList()
+					when (m) {
+						Modo.COLA -> base.cola().map { Fila.DeEpisodio(it) }
+						Modo.NOVEDADES -> base.novedades().map { Fila.DeEpisodio(it) }
+						Modo.SUSCRIPCIONES -> when {
+							p != null -> listOf<Fila>(Fila.Subir(car ?: "")) +
+								filtrar(base.dePodcast(p, solo && texto.length < 2, antiguosPrimero = base.podcast(p)?.antiguosPrimero == true)).map { Fila.DeEpisodio(it) }
+							car != null -> listOf<Fila>(Fila.Subir()) + ordenados(todosPodcasts.filter { it.carpeta.equals(car, ignoreCase = true) }).map { Fila.DePodcast(it) }
+							else -> {
+								// Las carpetas en su orden (también las vacías) y después los podcasts sin carpeta
+								val todos = ordenados(todosPodcasts)
+								todasCarpetas.map { n ->
+									val l = todos.filter { it.carpeta.equals(n, ignoreCase = true) }
+									Fila.Carpeta(n, l.sumOf { it.sinEscuchar }, l.size)
+								} + todos.filter { it.carpeta.isBlank() || todasCarpetas.none { n -> n.equals(it.carpeta, ignoreCase = true) } }.map { Fila.DePodcast(it) }
+							}
+						}
+						Modo.EN_CURSO -> base.enCurso().map { Fila.DeEpisodio(it) }
+						Modo.DESCARGAS -> base.descargados().map { Fila.DeEpisodio(it) }
+						Modo.FAVORITOS -> filtrar(base.favoritos()).map { Fila.DeEpisodio(it) }
+						Modo.HISTORIAL -> filtrar(if (texto.length >= 2) base.buscar(texto) else base.historial()).map { Fila.DeEpisodio(it) }
+						Modo.DESCUBRIR -> episodiosEncontrados?.map { Fila.Encontrado(it) } ?: (resultados ?: sugerencias).map { Fila.DeSugerencia(it) }
+						Modo.EPISODIOS -> emptyList()
+					}
 				}
+				// Filtro por carpeta: solo los episodios de los podcasts de esa carpeta
+				val filtradas = if (filtro == null || m !in CON_FILTRO) nuevas else {
+					val suyos = todosPodcasts.filter { p ->
+						if (filtro.isEmpty()) p.carpeta.isBlank() || todasCarpetas.none { it.equals(p.carpeta, ignoreCase = true) } else p.carpeta.equals(filtro, ignoreCase = true)
+					}.map { it.id }.toSet()
+					nuevas.filter { it !is Fila.DeEpisodio || it.episodio.podcast in suyos }
+				}
+				// El progreso de las descargas en marcha (pregunta al gestor de descargas: aquí y no al dibujar cada fila)
+				val enMarcha = filtradas.mapNotNull { (it as? Fila.DeEpisodio)?.episodio?.takeIf { e -> e.descarga != 0L } }
+					.associate { e -> e.id to Podcasts.progresoDescarga(app, e) }
+				Datos(todosPodcasts, todasCarpetas, filtradas, enMarcha)
 			}
 			if (_b == null) return@launch
-			// Filtro por carpeta: solo los episodios de los podcasts de esa carpeta
-			val filtro = filtroCarpeta
-			filas = if (filtro == null || m !in CON_FILTRO) nuevas else {
-				val carpetas = db.carpetas()
-				val suyos = db.podcasts().filter { p ->
-					if (filtro.isEmpty()) p.carpeta.isBlank() || carpetas.none { it.equals(p.carpeta, ignoreCase = true) } else p.carpeta.equals(filtro, ignoreCase = true)
-				}.map { it.id }.toSet()
-				nuevas.filter { it !is Fila.DeEpisodio || it.episodio.podcast in suyos }
-			}
+			misPodcasts = datos.podcasts
+			misCarpetas = datos.carpetas
+			progresos = datos.progresos
+			filas = datos.filas
 			@Suppress("NotifyDataSetChanged")
 			b.recycler.adapter?.notifyDataSetChanged()
 			// Solo si cambia: la línea de estado es una región viva y TalkBack la repetiría en cada recarga
-			estado().let { if (b.estado.text.toString() != it) b.estado.text = it }
+			ponerEstado(estado(), anunciar)
 		}
 	}
+
+	/**
+	 * La línea de estado es una región viva. Si la recarga viene de un cambio en segundo plano
+	 * (una canción nueva, una actualización), el texto cambia sin que TalkBack lo anuncie (pauta 10).
+	 */
+	private fun ponerEstado(texto: String, anunciar: Boolean) {
+		val v = _b?.estado ?: return
+		if (v.text.toString() == texto) return
+		v.removeCallbacks(regionViva)
+		if (anunciar) {
+			v.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+			v.text = texto
+			return
+		}
+		v.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+		v.text = texto
+		v.postDelayed(regionViva, 1000)
+	}
+
+	private val regionViva = Runnable { _b?.estado?.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
 
 	private fun estado(): String {
 		val n = episodiosVisibles().size
 		return when {
 			modo == Modo.DESCUBRIR && episodiosEncontrados != null -> getString(R.string.resultados_de, episodiosEncontrados!!.size, textoBuscado)
 			modo == Modo.DESCUBRIR && resultados != null -> getString(R.string.resultados_de, resultados!!.size, textoBuscado)
-			modo == Modo.DESCUBRIR -> if (sugerencias.isEmpty()) errorCarga ?: getString(R.string.cargando) else getString(R.string.pod_descubrir_ayuda)
+			modo == Modo.DESCUBRIR -> when {
+				sugerencias.isNotEmpty() -> getString(R.string.pod_descubrir_ayuda)
+				cargandoSugerencias -> getString(R.string.cargando)
+				else -> errorCarga ?: getString(R.string.rss_sin_resultados)
+			}
 			modo == Modo.SUSCRIPCIONES && podcast == null -> {
 				val p = filas.count { it is Fila.DePodcast } + filas.filterIsInstance<Fila.Carpeta>().sumOf { it.podcasts }
 				if (p == 0) getString(R.string.pod_sin_suscripciones) else resources.getQuantityString(R.plurals.pod_n_podcasts, p, p)
@@ -489,11 +542,11 @@ class PodcastListaFragment : Fragment() {
 		}
 	}
 
-	/** Los podcasts en el orden elegido (a mano es el de la base de datos). */
-	private fun ordenados(lista: List<Podcast>): List<Podcast> = when (Podcasts.prefs(requireContext()).getInt("pod_orden_suscripciones", 0)) {
+	/** Los podcasts en el orden elegido (a mano es el de la base de datos). Sin contexto: se llama fuera del hilo principal. */
+	private fun ordenar(lista: List<Podcast>, orden: Int, base: PodcastsBaseDatos): List<Podcast> = when (orden) {
 		1 -> lista.sortedBy { it.titulo.lowercase() }
 		2 -> lista.sortedByDescending { it.sinEscuchar }
-		3 -> db.ultimoEpisodio().let { u -> lista.sortedByDescending { u[it.id] ?: 0L } }
+		3 -> base.ultimoEpisodio().let { u -> lista.sortedByDescending { u[it.id] ?: 0L } }
 		else -> lista
 	}
 
@@ -552,7 +605,8 @@ class PodcastListaFragment : Fragment() {
 	/** Lo que se puede hacer con una carpeta de podcasts. */
 	private fun accionesCarpeta(n: String): List<Accion> {
 		val a = actividad ?: return emptyList()
-		val carpetas = db.carpetas()
+		// Las carpetas leídas en la última recarga (esto se llama al dibujar cada fila)
+		val carpetas = misCarpetas
 		return listOf<Accion>(
 			getString(R.string.abrir) to { entrarCarpeta(n) },
 			getString(R.string.pod_actualizar_carpeta) to {
@@ -652,8 +706,8 @@ class PodcastListaFragment : Fragment() {
 	/** Lo que se puede hacer con un podcast (su menú y, si el usuario las añade, acciones de TalkBack). */
 	private fun accionesPodcast(p: Podcast): List<Accion> {
 		val a = actividad ?: return emptyList()
-		// Los de su misma carpeta, para ordenarlo entre ellos
-		val vecinos = db.podcasts().filter { it.carpeta.equals(p.carpeta, ignoreCase = true) }
+		// Los de su misma carpeta, para ordenarlo entre ellos (de la última recarga: esto se llama al dibujar cada fila)
+		val vecinos = misPodcasts.filter { it.carpeta.equals(p.carpeta, ignoreCase = true) }
 		return listOf<Accion>(
 			getString(R.string.mover_a_carpeta) to {
 				a.elegirCarpeta(getString(R.string.mover_a_carpeta), db.carpetas(), p.carpeta) { destino ->
@@ -770,8 +824,8 @@ class PodcastListaFragment : Fragment() {
 	// --- Lista ---------------------------------------------------------------------------
 
 	private fun descripcion(e: Episodio): Pair<String, String> {
-		val c = requireContext()
-		val progreso = Podcasts.progresoDescarga(c, e)
+		// Leído en la recarga (no se pregunta al gestor de descargas por cada fila)
+		val progreso = if (e.descarga != 0L) progresos[e.id] ?: -1 else -1
 		val estado = listOfNotNull(
 			getString(R.string.pod_nuevo).takeIf { e.nuevo },
 			if (modo == Modo.COLA) getString(R.string.pod_posicion_cola, e.cola) else getString(R.string.pod_en_cola).takeIf { e.enCola },
@@ -834,13 +888,17 @@ class PodcastListaFragment : Fragment() {
 				}
 				is Fila.DePodcast -> {
 					val p = fila.podcast
-					val d = listOfNotNull(
-						p.autor.takeIf { it.isNotBlank() },
-						resources.getQuantityString(R.plurals.pod_n_sin_escuchar, p.sinEscuchar, p.sinEscuchar),
+					// El estado primero (pauta 14): «En pausa, con errores, título, autor, 3 sin escuchar»
+					val estados = listOfNotNull(
 						getString(R.string.pod_pausado_corto).takeIf { p.pausado },
 						getString(R.string.rss_con_error).takeIf { p.error.isNotBlank() },
-					).joinToString(", ")
-					Triple(p.titulo, d, p.titulo + ", " + d)
+					)
+					val resto = listOfNotNull(
+						p.autor.takeIf { it.isNotBlank() },
+						resources.getQuantityString(R.plurals.pod_n_sin_escuchar, p.sinEscuchar, p.sinEscuchar),
+					)
+					val d = (estados + resto).joinToString(", ")
+					Triple(p.titulo, d, (estados + p.titulo + resto).joinToString(", "))
 				}
 				is Fila.DeEpisodio -> {
 					val (d, vz) = descripcion(fila.episodio)
@@ -904,6 +962,12 @@ class PodcastListaFragment : Fragment() {
 					else -> { a.elegir(texto.take(60), acciones); true }
 				}
 			}
+			// Mantener pulsado solo donde hace algo («Subir a…» no), y con su nombre para TalkBack
+			val largo = fila is Fila.DePodcast || acciones.isNotEmpty()
+			v.f.root.isLongClickable = largo
+			if (largo) androidx.core.view.ViewCompat.replaceAccessibilityAction(v.f.root,
+				androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK, getString(R.string.audio_mas_acciones), null)
+			else androidx.core.view.ViewCompat.removeAccessibilityAction(v.f.root, android.view.accessibility.AccessibilityNodeInfo.ACTION_LONG_CLICK)
 		}
 	}
 }

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import com.xebolax.lector.R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -23,7 +24,13 @@ object ModeloLocal {
 
 	const val NOMBRE = "Gemma 4 E2B"
 	private const val ARCHIVO = "gemma-4-E2B-it.litertlm"
-	private const val URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/$ARCHIVO"
+	/**
+	 * Revisión fija del repositorio (no «main»): si publican otra versión del
+	 * archivo, la descarga sigue siendo esta y su tamaño no cambia. Comprobada
+	 * el 11-11-2026: 2.588.147.712 bytes, SHA-256 1819381…b97139a63c.
+	 */
+	private const val REVISION = "2d74ac41a33d7da82f39f7d5720a04c68514a103"
+	private const val URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/$REVISION/$ARCHIVO"
 	const val TAMANO = 2_588_147_712L
 	private const val CLAVE_DESCARGA = "ia_descarga_modelo"
 
@@ -95,12 +102,19 @@ object ModeloLocal {
 		archivo(c).delete()
 	}
 
-	/** Cambió en Ajustes procesador o tarjeta gráfica: se vuelve a cargar la próxima vez. */
-	fun reiniciar() = cerrar()
+	/**
+	 * Cambió en Ajustes procesador o tarjeta gráfica: se vuelve a cargar la
+	 * próxima vez. Se cierra con el cerrojo: si está respondiendo, al acabar
+	 * (cerrar el motor nativo mientras se usa cerraría la app).
+	 */
+	fun reiniciar() {
+		kotlinx.coroutines.CoroutineScope(Dispatchers.Default).launch { cerrojo.withLock { cerrar() } }
+	}
 
 	fun borrar(c: Context) {
-		cerrar()
+		// El archivo se puede borrar ya (el motor abierto sigue leyendo el suyo); el motor, con el cerrojo
 		archivo(c).delete()
+		reiniciar()
 	}
 
 	// --- Respuestas -------------------------------------------------------------------

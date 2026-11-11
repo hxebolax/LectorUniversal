@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos de la sección Noticias (español, idioma base). -->
+<resources>
+	<!-- Botón del filtro de carpeta en Sin leer: dice qué es y la carpeta elegida -->
+	<string name="noticias_filtro_carpeta">Carpeta: %1$s</string>
+	<string name="noticias_filtro_todas">todas</string>
+	<!-- «Marcar todo como leído» cuando no hay nada sin leer -->
+	<string name="noticias_nada_sin_leer">No hay artículos sin leer.</string>
+</resources>

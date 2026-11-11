@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos de Podcasts, Radio y el reproductor de audio (español, idioma base). -->
+<resources>
+	<!-- Nombre de la acción de mantener pulsado en las filas de las listas («Toca dos veces y mantén pulsado para más acciones») -->
+	<string name="audio_mas_acciones">Más acciones</string>
+	<!-- Reproductor: refuerzo de volumen de un episodio cuyo podcast tiene volumen propio -->
+	<string name="audio_refuerzo_podcast">Refuerzo de volumen de este podcast</string>
+	<!-- Radio: ventana de espera al importar una lista M3U o PLS -->
+	<string name="audio_importando">Importando las emisoras…</string>
+	<!-- Radio: ventana de espera al guardar una grabación en la biblioteca -->
+	<string name="audio_guardando_biblioteca">Guardando la grabación en la biblioteca…</string>
+	<!-- Radio: aviso cuando una grabación no se pudo hacer (el texto dice el motivo) -->
+	<string name="audio_grabacion_fallida">No se pudo grabar %1$s</string>
+	<!-- Radio: aviso cuando una grabación se cortó y no se pudo seguir (lo grabado se guarda) -->
+	<string name="audio_grabacion_cortada">La grabación de %1$s se cortó</string>
+	<!-- Radio: confirmar antes de borrar una canción del historial -->
+	<string name="audio_confirmar_borrar_cancion">¿Borrar «%1$s» de las canciones? No se puede deshacer.</string>
+</resources>

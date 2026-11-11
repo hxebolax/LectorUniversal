@@ -66,8 +66,24 @@ object ImagenLibro {
 		}
 		else -> {
 			val fuente = Fuente(contexto, libro, nombreLibro)
-			if (fuente.extension == "chm") com.xebolax.lector.formatos.leerDeChm(fuente.archivoLocal(), recurso)
-			else fuente.contenedor().use { it.bytes(recurso) }
+			val cabecera = if (fuente.esCarpeta) ByteArray(0) else runCatching { fuente.cabecera(4) }.getOrDefault(ByteArray(0))
+			val esZip = cabecera.size >= 2 && cabecera[0] == 'P'.code.toByte() && cabecera[1] == 'K'.code.toByte()
+			when {
+				recurso.startsWith(com.xebolax.lector.formatos.ConversorHtml.PREFIJO_MOBI) -> com.xebolax.lector.formatos.LectorMobi.imagen(fuente.archivoLocal(), recurso)
+				fuente.extension == "chm" -> com.xebolax.lector.formatos.leerDeChm(fuente.archivoLocal(), recurso)
+				fuente.esCarpeta || esZip -> fuente.contenedor().use { it.bytes(recurso) }
+				// Un archivo suelto (HTML, Markdown): la imagen está a su lado
+				else -> junto(libro, recurso)
+			}
 		}
+	}
+
+	/** Una imagen junto a un documento suelto (solo si es un archivo del móvil y sin salir de su carpeta). */
+	private fun junto(libro: Uri, recurso: String): ByteArray? {
+		if (libro.scheme != "file") return null
+		val carpeta = File(libro.path ?: return null).parentFile?.canonicalFile ?: return null
+		val imagen = File(carpeta, recurso).canonicalFile
+		if (!imagen.path.startsWith(carpeta.path + File.separator) || !imagen.isFile || imagen.length() > 64L * 1024 * 1024) return null
+		return imagen.readBytes()
 	}
 }

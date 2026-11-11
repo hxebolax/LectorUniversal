@@ -145,15 +145,21 @@ class RssTrabajo(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
 	 * «Añadir a favoritos»; al pulsarlo se abre el artículo. Si son más, un solo
 	 * aviso con la lista que abre Noticias.
 	 */
-	private fun avisar(c: Context, avisos: List<Pair<Fuente, RssLector.Elemento>>) {
+	private fun avisar(c: Context, todos: List<Pair<Fuente, RssLector.Elemento>>) {
 		val gestor = c.getSystemService(NotificationManager::class.java) ?: return
+		// Solo los que siguen sin leer y fuera de la papelera (una regla puede haberlos quitado ya)
+		val db = RssBaseDatos.obtener(c)
+		val conId = todos.mapNotNull { (f, e) -> db.idArticulo(f.id, e.guid).takeIf { it > 0 }?.let { Triple(it, f, e) } }
+		val vigentes = db.vigentes(conId.map { it.first })
+		val validos = conId.filter { it.first in vigentes }
+		if (validos.isEmpty()) return
+		val avisos = validos.map { it.second to it.third }
 		if (Build.VERSION.SDK_INT >= 26) gestor.createNotificationChannel(NotificationChannel(CANAL, c.getString(R.string.noticias), NotificationManager.IMPORTANCE_DEFAULT))
 		val abrir = PendingIntent.getActivity(c, 7, Intent(c, RssActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE)
 		val titulo = c.resources.getQuantityString(R.plurals.rss_nuevos, avisos.size, avisos.size)
 		val estilo = NotificationCompat.InboxStyle()
 		avisos.take(6).forEach { (f, e) -> estilo.addLine("${f.titulo}: ${e.titulo}") }
-		val db = RssBaseDatos.obtener(c)
-		val sueltos = if (avisos.size <= 5) avisos.mapNotNull { (f, e) -> db.idArticulo(f.id, e.guid).takeIf { it > 0 }?.let { Triple(it, f, e) } } else emptyList()
+		val sueltos = if (validos.size <= 5) validos else emptyList()
 		for ((id, f, e) in sueltos) {
 			val abrirArticulo = PendingIntent.getActivity(c, (id * 3).toInt(),
 				Intent(c, RssActivity::class.java).putExtra(RssActivity.EXTRA_ARTICULO, id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -166,6 +172,9 @@ class RssTrabajo(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
 				.setContentIntent(abrirArticulo)
 				.setAutoCancel(true)
 				.setGroup(GRUPO)
+				// Suena y lo anuncia TalkBack una sola vez, con el resumen (no uno por artículo)
+				.setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+				.setOnlyAlertOnce(true)
 				.addAction(0, c.getString(R.string.rss_marcar_leido), RssReceptorAvisos.boton(c, RssReceptorAvisos.LEIDO, id, 1))
 				.addAction(0, c.getString(R.string.rss_anadir_favorito), RssReceptorAvisos.boton(c, RssReceptorAvisos.FAVORITO, id, 2))
 				.build()

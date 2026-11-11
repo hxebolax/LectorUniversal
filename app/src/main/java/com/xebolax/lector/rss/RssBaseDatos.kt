@@ -203,8 +203,9 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 	}
 
 	fun ponerCategoria(id: Long, categoria: String) {
-		crearCarpeta(categoria)
-		writableDatabase.update("fuentes", ContentValues().apply { put("categoria", categoria) }, "id = ?", arrayOf(id.toString()))
+		// El nombre tal como ya estaba guardado (sin duplicar «Noticias» y «noticias»)
+		val nombre = crearCarpeta(categoria)
+		writableDatabase.update("fuentes", ContentValues().apply { put("categoria", nombre) }, "id = ?", arrayOf(id.toString()))
 	}
 
 	/** Artículos con cambios (leído, favorito) que aún no se han enviado al servidor: (id remoto, leído, favorito). */
@@ -219,7 +220,26 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 		writableDatabase.execSQL("UPDATE articulos SET remoto = '', cambiado = 0")
 	}
 
-	fun cambiosEnviados() = writableDatabase.execSQL("UPDATE articulos SET cambiado = 0 WHERE cambiado = 1")
+	/**
+	 * Ya enviados: solo los que siguen como se enviaron. Lo que se ha cambiado
+	 * mientras se sincronizaba queda pendiente y se envía la próxima vez.
+	 */
+	fun cambiosEnviados(enviados: List<Triple<String, Boolean, Boolean>>) {
+		if (enviados.isEmpty()) return
+		val db = writableDatabase
+		db.beginTransaction()
+		try {
+			for ((remoto, leido, favorito) in enviados) {
+				db.execSQL(
+					"UPDATE articulos SET cambiado = 0 WHERE cambiado = 1 AND remoto = ? AND leido = ? AND favorito = ?",
+					arrayOf<Any>(remoto, if (leido) 1 else 0, if (favorito) 1 else 0),
+				)
+			}
+			db.setTransactionSuccessful()
+		} finally {
+			db.endTransaction()
+		}
+	}
 
 	/** Ids remotos de los artículos sin leer y de los favoritos de aquí (para comparar con el servidor). */
 	fun remotosSinLeer(): Set<String> = readableDatabase.rawQuery("SELECT remoto FROM articulos WHERE remoto != '' AND leido = 0 AND cambiado = 0", null).use { c ->
@@ -248,23 +268,47 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 		}
 	}
 
-	/** Artículos que vienen del servidor: los nuevos se guardan con su id remoto; los que ya estaban, solo su estado. */
-	fun anadirRemotos(fuente: Long, lista: List<Pair<RssLector.Elemento, Triple<String, Boolean, Boolean>>>): Int {
-		var nuevos = 0
+	/**
+	 * Artículos que vienen del servidor: los nuevos se guardan con su id remoto; los que ya estaban, solo su estado.
+	 * admitir: las opciones de la fuente (silenciar, solo con, sin duplicados); lo que no pasa no se guarda.
+	 * Devuelve los nuevos, con el guid con el que se han guardado (para avisar de ellos).
+	 */
+	fun anadirRemotos(fuente: Long, lista: List<Pair<RssLector.Elemento, Triple<String, Boolean, Boolean>>>,
+		admitir: (RssLector.Elemento) -> Boolean = { true }): List<RssLector.Elemento> {
+		val nuevos = ArrayList<RssLector.Elemento>()
 		val db = writableDatabase
+		// Primer enlace de un artículo que ya estaba aquí (mismo enlace): si se cambió aquí, manda lo de aquí (y se envía después)
+		val enlazar = db.compileStatement(
+			"UPDATE articulos SET remoto = ?, leido = CASE WHEN cambiado = 1 THEN leido ELSE ? END, " +
+				"favorito = CASE WHEN cambiado = 1 THEN favorito ELSE ? END WHERE fuente = ? AND remoto = '' AND enlace = ?",
+		)
 		db.beginTransaction()
 		try {
 			val ahora = System.currentTimeMillis()
 			for ((e, estado) in lista) {
 				val (remoto, leido, favorito) = estado
-				if (e.enlace.isNotBlank() && db.update("articulos", ContentValues().apply {
-						put("remoto", remoto)
-						put("leido", if (leido) 1 else 0)
-						put("favorito", if (favorito) 1 else 0)
-					}, "fuente = ? AND remoto = '' AND enlace = ?", arrayOf(fuente.toString(), e.enlace)) > 0) continue
+				if (e.enlace.isNotBlank()) {
+					enlazar.clearBindings()
+					enlazar.bindString(1, remoto)
+					enlazar.bindLong(2, if (leido) 1L else 0L)
+					enlazar.bindLong(3, if (favorito) 1L else 0L)
+					enlazar.bindLong(4, fuente)
+					enlazar.bindString(5, e.enlace)
+					if (enlazar.executeUpdateDelete() > 0) continue
+				}
+				val soloEstado = ContentValues().apply {
+					put("leido", if (leido) 1 else 0)
+					put("favorito", if (favorito) 1 else 0)
+				}
+				// No pasa las opciones de la fuente: no se guarda (si ya estaba, solo su estado)
+				if (!admitir(e)) {
+					db.update("articulos", soloEstado, "remoto = ? AND cambiado = 0", arrayOf(remoto))
+					continue
+				}
+				val guid = "r:$remoto"
 				val id = db.insertWithOnConflict("articulos", null, ContentValues().apply {
 					put("fuente", fuente)
-					put("guid", "r:$remoto")
+					put("guid", guid)
 					put("titulo", e.titulo)
 					put("enlace", e.enlace)
 					put("autor", e.autor)
@@ -279,18 +323,39 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 					put("remoto", remoto)
 					put("palabras", palabrasDe(e.contenido.ifBlank { e.resumen }))
 				}, SQLiteDatabase.CONFLICT_IGNORE)
-				if (id != -1L) nuevos++
-				else db.update("articulos", ContentValues().apply {
-					put("leido", if (leido) 1 else 0)
-					put("favorito", if (favorito) 1 else 0)
-				}, "remoto = ? AND cambiado = 0", arrayOf(remoto))
+				if (id != -1L) nuevos += RssLector.Elemento(guid, e.titulo, e.enlace, e.autor, e.fecha, e.resumen, e.contenido, e.adjunto, e.tipoAdjunto, e.duracion)
+				else db.update("articulos", soloEstado, "remoto = ? AND cambiado = 0", arrayOf(remoto))
 			}
 			db.setTransactionSuccessful()
 		} finally {
 			db.endTransaction()
+			enlazar.close()
 		}
 		avisar()
 		return nuevos
+	}
+
+	/** Enlaces de los artículos que llegaron del servidor a esta fuente (para no repetirlos al actualizarla aparte). */
+	fun enlacesRemotos(fuente: Long): Set<String> =
+		readableDatabase.rawQuery("SELECT enlace FROM articulos WHERE fuente = ? AND guid LIKE 'r:%' AND enlace != ''", arrayOf(fuente.toString())).use { c ->
+			generateSequence { if (c.moveToNext()) c.getString(0) else null }.toSet()
+		}
+
+	/** La fecha del último artículo de cada fuente (para saber cuáles llevan tiempo sin publicar). */
+	fun ultimasFechas(): Map<Long, Long> = readableDatabase.rawQuery("SELECT fuente, MAX(fecha) FROM articulos GROUP BY fuente", null).use { c ->
+		generateSequence { if (c.moveToNext()) c.getLong(0) to c.getLong(1) else null }.toMap()
+	}
+
+	/** De estos artículos, los que siguen sin leer y fuera de la papelera (para no avisar de lo que una regla ya quitó). */
+	fun vigentes(ids: Collection<Long>): Set<Long> {
+		if (ids.isEmpty()) return emptySet()
+		val r = HashSet<Long>()
+		for (trozo in ids.chunked(400)) {
+			readableDatabase.rawQuery("SELECT id FROM articulos WHERE leido = 0 AND papelera = 0 AND id IN (${trozo.joinToString(",")})", null).use { c ->
+				while (c.moveToNext()) r += c.getLong(0)
+			}
+		}
+		return r
 	}
 
 	// --- Fuentes -------------------------------------------------------------------------
@@ -413,7 +478,7 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 	}
 
 	fun editarFuente(f: Fuente) {
-		crearCarpeta(f.categoria)
+		val carpeta = crearCarpeta(f.categoria)
 		val urlAntes = fuente(f.id)?.url
 		writableDatabase.update("fuentes", ContentValues().apply {
 			if (urlAntes != null && urlAntes != f.url) {
@@ -425,7 +490,7 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 			put("solo_con", f.soloCon)
 			put("titulo", f.titulo)
 			put("url", f.url)
-			put("categoria", f.categoria)
+			put("categoria", carpeta)
 			put("avisar", if (f.avisar) 1 else 0)
 			put("texto_completo", if (f.textoCompleto) 1 else 0)
 			put("en_navegador", if (f.enNavegador) 1 else 0)
@@ -503,13 +568,13 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 
 	fun sinLeer(antiguosPrimero: Boolean = false, categoria: String? = null, limite: Int = 1000): List<Articulo> =
 		if (categoria == null) consulta("a.leido = 0", emptyArray(), orden(antiguosPrimero), limite)
-		else consulta("a.leido = 0 AND f.categoria = ?", arrayOf(categoria), orden(antiguosPrimero))
+		else consulta("a.leido = 0 AND f.categoria = ? COLLATE NOCASE", arrayOf(categoria), orden(antiguosPrimero))
 
 	fun deFuente(fuente: Long, soloSinLeer: Boolean, antiguosPrimero: Boolean = false): List<Articulo> =
 		consulta(if (soloSinLeer) "a.fuente = ? AND a.leido = 0" else "a.fuente = ?", arrayOf(fuente.toString()), orden(antiguosPrimero))
 
 	fun deCategoria(categoria: String, soloSinLeer: Boolean, antiguosPrimero: Boolean = false): List<Articulo> =
-		consulta(if (soloSinLeer) "f.categoria = ? AND a.leido = 0" else "f.categoria = ?", arrayOf(categoria), orden(antiguosPrimero))
+		consulta(if (soloSinLeer) "f.categoria = ? COLLATE NOCASE AND a.leido = 0" else "f.categoria = ? COLLATE NOCASE", arrayOf(categoria), orden(antiguosPrimero))
 
 	fun favoritos(): List<Articulo> = consulta("a.favorito = 1", emptyArray(), orden(false))
 
@@ -530,14 +595,14 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 			set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0)
 		}.timeInMillis
 		return if (categoria == null) consulta("a.fecha >= ?", arrayOf(hoy.toString()), orden(false))
-		else consulta("a.fecha >= ? AND f.categoria = ?", arrayOf(hoy.toString(), categoria), orden(false))
+		else consulta("a.fecha >= ? AND f.categoria = ? COLLATE NOCASE", arrayOf(hoy.toString(), categoria), orden(false))
 	}
 
 	fun recientes(categoria: String? = null): List<Articulo> =
-		if (categoria == null) consulta("1", emptyArray(), orden(false), 400) else consulta("f.categoria = ?", arrayOf(categoria), orden(false), 400)
+		if (categoria == null) consulta("1", emptyArray(), orden(false), 400) else consulta("f.categoria = ? COLLATE NOCASE", arrayOf(categoria), orden(false), 400)
 
 	fun leidos(categoria: String? = null): List<Articulo> =
-		if (categoria == null) consulta("a.leido = 1", emptyArray(), orden(false), 300) else consulta("a.leido = 1 AND f.categoria = ?", arrayOf(categoria), orden(false), 300)
+		if (categoria == null) consulta("a.leido = 1", emptyArray(), orden(false), 300) else consulta("a.leido = 1 AND f.categoria = ? COLLATE NOCASE", arrayOf(categoria), orden(false), 300)
 
 	/** Recibidos en esta actualización (para las reglas y alertas). */
 	fun recibidosDesde(ms: Long): List<Articulo> = consulta("a.recibido >= ?", arrayOf(ms.toString()), orden(false), 2000)
@@ -659,16 +724,36 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 		}, "id = ?", arrayOf(id.toString()))
 	}
 
-	fun marcarTodoLeido(fuente: Long? = null, categoria: String? = null) {
-		when {
-			fuente != null -> writableDatabase.execSQL("UPDATE articulos SET leido = 1, cambiado = 1 WHERE fuente = ? AND leido = 0", arrayOf(fuente))
-			categoria != null -> writableDatabase.execSQL(
-				"UPDATE articulos SET leido = 1, cambiado = 1 WHERE leido = 0 AND fuente IN (SELECT id FROM fuentes WHERE categoria = ?)", arrayOf(categoria),
-			)
-			else -> writableDatabase.execSQL("UPDATE articulos SET leido = 1, cambiado = 1 WHERE leido = 0")
+	/**
+	 * Marca como leído todo lo de una fuente, de una carpeta o todo, sin límite
+	 * (antesDe > 0: solo lo publicado antes). Devuelve los que ha marcado, para Deshacer.
+	 */
+	fun marcarTodoLeido(fuente: Long? = null, categoria: String? = null, antesDe: Long = 0L): List<Long> {
+		val (donde, args) = when {
+			fuente != null -> "fuente = ?" to listOf(fuente.toString())
+			categoria != null -> "fuente IN (SELECT id FROM fuentes WHERE categoria = ? COLLATE NOCASE)" to listOf(categoria)
+			else -> "1" to emptyList()
 		}
-		avisar()
+		val condicion = "leido = 0 AND ($donde)" + if (antesDe > 0) " AND fecha < ?" else ""
+		val valores = (if (antesDe > 0) args + antesDe.toString() else args).toTypedArray()
+		val db = writableDatabase
+		var ids: List<Long> = emptyList()
+		db.beginTransaction()
+		try {
+			ids = db.rawQuery("SELECT id FROM articulos WHERE $condicion", valores).use { c ->
+				generateSequence { if (c.moveToNext()) c.getLong(0) else null }.toList()
+			}
+			db.execSQL("UPDATE articulos SET leido = 1, cambiado = 1 WHERE $condicion", valores)
+			db.setTransactionSuccessful()
+		} finally {
+			db.endTransaction()
+		}
+		if (ids.isNotEmpty()) avisar()
+		return ids
 	}
+
+	/** ¿Hay algo sin leer? (para no ofrecer «Marcar todo como leído» si no) */
+	fun haySinLeer(): Boolean = contarSinLeer() > 0
 
 	/** Borra los artículos leídos más antiguos que 'dias' (nunca favoritos, ni de más tarde, ni podcasts a medias). */
 	/**

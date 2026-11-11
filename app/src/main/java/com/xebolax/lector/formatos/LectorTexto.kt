@@ -29,17 +29,19 @@ object LectorTexto : LectorFormato {
 	)
 
 	override fun leer(fuente: Fuente, ctx: ContextoLectura): Contenido {
-		val avisoTamano = fuente.tamano > MAXIMO
+		var avisoTamano = fuente.tamano > MAXIMO
 		val bytes = fuente.abrir().use { entrada ->
-			if (avisoTamano) {
-				val b = ByteArray(MAXIMO.toInt())
-				var n = 0
-				while (n < b.size) {
-					val r = entrada.read(b, n, b.size - n)
+			if (avisoTamano || fuente.tamano < 0) {
+				// Como mucho MAXIMO, también si no se sabe el tamaño (-1)
+				val b = java.io.ByteArrayOutputStream()
+				val bufer = ByteArray(64 * 1024)
+				while (b.size() < MAXIMO) {
+					val r = entrada.read(bufer, 0, minOf(bufer.size.toLong(), MAXIMO - b.size()).toInt())
 					if (r < 0) break
-					n += r
+					b.write(bufer, 0, r)
 				}
-				b.copyOf(n)
+				if (b.size() >= MAXIMO && entrada.read() >= 0) avisoTamano = true
+				b.toByteArray()
 			} else entrada.readBytes()
 		}
 		val texto = Textos.decodificar(bytes)

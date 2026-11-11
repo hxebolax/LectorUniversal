@@ -144,6 +144,8 @@ object LectorVoz {
 	/** Frase pedida al motor y aún no puesta en el reproductor. */
 	private class Segmento(val gen: Int, val b: Int, val f: Int, val archivo: File, val nuevoBloque: Boolean) {
 		var estado = PEDIDO
+		/** El motor la descartó sin generarla (otra app usó el mismo motor): hay que volver a pedirla. */
+		var detenido = false
 		val pedido = SystemClock.elapsedRealtime()
 		val id get() = "$gen:$b:$f"
 	}
@@ -174,6 +176,8 @@ object LectorVoz {
 			guardar()
 			aplicarVolumen()
 			vigilarMotor()
+			// Lecturas de más de 4 horas: se renueva el bloqueo de la CPU antes de que caduque
+			if (SystemClock.elapsedRealtime() - bloqueoRenovado > 30 * 60_000L) bloquearCpu(true)
 			principal.postDelayed(this, 1000)
 		}
 	}
@@ -191,7 +195,7 @@ object LectorVoz {
 		val j = jugador ?: return
 		val primero = cola.firstOrNull()
 		if (!debeSonar() || j.isPlaying || primero == null || primero.estado != PEDIDO ||
-			SystemClock.elapsedRealtime() - primero.pedido < (if (nube) 45_000 else 4000)) {
+			(!primero.detenido && SystemClock.elapsedRealtime() - primero.pedido < (if (nube) 45_000 else 4000))) {
 			if (j.isPlaying) atascos = 0
 			return
 		}
@@ -444,27 +448,19 @@ object LectorVoz {
 		tts?.let { if (motorActual == deseado) return it }
 		tts?.shutdown()
 		listo = false
+		vocesMotor = emptyList()
 		motorActual = deseado
+		var creado: TextToSpeech? = null
 		val nuevo = TextToSpeech(app, { estado ->
-			principal.post {
-				listo = estado == TextToSpeech.SUCCESS
-				if (listo) {
-					aplicarAjustes()
-					if (pendiente) {
-						pendiente = false
-						hablar()
-					}
-				} else {
-					// El motor no arranca: se suelta todo y se dice (si no, el móvil seguiría despierto sin sonar)
-					leyendo = false
-					soltarFoco()
-					bloquearCpu(false)
-					principal.removeCallbacks(latido)
-					android.widget.Toast.makeText(app, R.string.voz_motor_no_responde, android.widget.Toast.LENGTH_LONG).show()
-					avisar()
-				}
-			}
+			if (estado == TextToSpeech.SUCCESS) {
+				// Las voces se piden una vez y fuera del hilo principal: con un motor lento, pedirlas colgaría la pantalla
+				Thread {
+					val lista = runCatching { creado?.voices?.toList() }.getOrNull().orEmpty()
+					principal.post { motorListo(creado, lista) }
+				}.start()
+			} else principal.post { motorFallido(creado) }
 		}, deseado)
+		creado = nuevo
 		nuevo.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
 			override fun onStart(id: String?) {}
 
@@ -480,9 +476,60 @@ object LectorVoz {
 			override fun onError(id: String?, codigo: Int) {
 				principal.post { generada(id, false) }
 			}
+
+			override fun onStop(id: String?, interrumpida: Boolean) {
+				principal.post { detenida(id) }
+			}
 		})
 		tts = nuevo
 		return nuevo
+	}
+
+	/** Las voces del motor (se piden una vez al arrancarlo, fuera del hilo principal). */
+	private var vocesMotor: List<Voice> = emptyList()
+
+	private fun motorListo(t: TextToSpeech?, voces: List<Voice>) {
+		if (t == null || tts !== t) return
+		vocesMotor = voces
+		listo = true
+		aplicarAjustes()
+		if (pendiente) {
+			pendiente = false
+			hablar()
+		}
+	}
+
+	private fun motorFallido(t: TextToSpeech?) {
+		if (t != null && tts !== t) return
+		listo = false
+		// El motor no arranca: se suelta todo y se dice (si no, el móvil seguiría despierto sin sonar)
+		leyendo = false
+		soltarFoco()
+		bloquearCpu(false)
+		principal.removeCallbacks(latido)
+		android.widget.Toast.makeText(app, R.string.voz_motor_no_responde, android.widget.Toast.LENGTH_LONG).show()
+		avisar()
+	}
+
+	/**
+	 * El motor descartó una frase pedida sin generarla (otra app o TalkBack
+	 * usó el mismo motor y vació su cola). Si es la que toca y ya no suena
+	 * nada, se vuelve a pedir desde ella en el acto; si no, vigilarMotor la
+	 * recoge sin esperar.
+	 */
+	private fun detenida(id: String?) {
+		val s = cola.firstOrNull { it.id == id } ?: return
+		if (s.gen != generacion || s.estado != PEDIDO) return
+		s.detenido = true
+		val j = jugador ?: return
+		if (cola.first() !== s || j.isPlaying || !debeSonar()) return
+		if (s.b != bloque) {
+			bloque = s.b
+			frases = frasesDe(s.b)
+		}
+		frase = s.f.coerceIn(0, (frases.size - 1).coerceAtLeast(0))
+		rehacer = true
+		hablar()
 	}
 
 	/** Aplica voz, velocidad y tono guardados (o los del libro) para las frases que se generen. */
@@ -501,7 +548,7 @@ object LectorVoz {
 			jugador().playbackParameters = PlaybackParameters.DEFAULT
 		}
 		val nombre = perfil.vozEfectiva(p)
-		vozElegida = if (nombre.isNotBlank() && !ElevenLabs.esVozSuya(nombre)) runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull() else null
+		vozElegida = if (nombre.isNotBlank() && !ElevenLabs.esVozSuya(nombre)) vocesMotor.firstOrNull { it.name == nombre } else null
 		if (vozElegida != null) t.voice = vozElegida
 		else {
 			val idioma = documento?.idioma?.takeIf { it.isNotBlank() }?.let { Locale.forLanguageTag(it) } ?: Locale.getDefault()
@@ -518,7 +565,7 @@ object LectorVoz {
 	}
 
 	fun voces(alObtener: (List<Voice>) -> Unit) = conMotor {
-		val lista = runCatching { tts?.voices?.toList() }.getOrNull().orEmpty()
+		val lista = vocesMotor
 			.filter { it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true }
 			.sortedWith(compareBy({ it.locale.getDisplayName(Locale.getDefault()) }, { it.name }))
 		alObtener(lista)
@@ -552,6 +599,7 @@ object LectorVoz {
 		tts?.shutdown()
 		tts = null
 		listo = false
+		vocesMotor = emptyList()
 		rehacer = true
 		if (estaba) {
 			pendiente = true
@@ -559,11 +607,12 @@ object LectorVoz {
 		}
 	}
 
-	/** Prueba la voz con una frase (directamente con el motor). */
-	fun probar(texto: String) = conMotor {
-		aplicarAjustes()
-		tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba")
-	}
+	/**
+	 * Prueba una frase (la pronunciación) con la voz de lo que se lee o, si no
+	 * se lee nada, con la general. Con un motor aparte: no vacía las frases
+	 * pendientes de la lectura ni suena encima de ella.
+	 */
+	fun probar(texto: String) = VocesMotor.probar(app, if (documento != null) perfil else PerfilVoz(), texto)
 
 	/** Prueba la voz propia de un libro o de las noticias (con un motor aparte: no toca la lectura). */
 	fun probarPerfil(idLibro: Long, texto: String) = VocesMotor.probar(app, PerfilesVoz.efectivo(app, idLibro, idLibro == PerfilesVoz.NOTICIAS), texto)
@@ -622,7 +671,7 @@ object LectorVoz {
 	// --- Idioma de cada párrafo ---------------------------------------------------------
 
 	/** Idiomas detectados (bloque → idioma) en párrafos que el libro no marca. */
-	private val idiomasDetectados = java.util.concurrent.ConcurrentHashMap<Int, String>()
+	@Volatile private var idiomasDetectados = java.util.concurrent.ConcurrentHashMap<Int, String>()
 	private var deteccion: kotlinx.coroutines.Job? = null
 
 	/**
@@ -638,7 +687,9 @@ object LectorVoz {
 
 	private fun detectarIdiomas() {
 		deteccion?.cancel()
-		idiomasDetectados.clear()
+		// Un mapa nuevo: lo que aún escriba la detección cancelada (quizá de otro libro) va al viejo, que ya no se usa
+		val detectados = java.util.concurrent.ConcurrentHashMap<Int, String>()
+		idiomasDetectados = detectados
 		val p = Preferencias(app)
 		val doc = documento ?: return
 		if (!perfil.segunIdiomaEfectivo(p) || !p.detectarIdioma) return
@@ -656,7 +707,7 @@ object LectorVoz {
 					val bl = doc.bloques[b]
 					if (bl.idioma != null || bl.texto.length < 60 || bl.tipo == TipoBloque.CODIGO) continue
 					val idioma = runCatching { cliente.identifyLanguage(bl.texto.take(600)).await() }.getOrNull() ?: continue
-					if (idioma != "und" && idioma.substringBefore('-') != base) idiomasDetectados[b] = idioma
+					if (idioma != "und" && idioma.substringBefore('-') != base) detectados[b] = idioma
 				}
 			} finally {
 				cliente.close()
@@ -716,6 +767,8 @@ object LectorVoz {
 	fun pausar() {
 		if (!leyendo) {
 			principal.removeCallbacks(temporizador)
+			// Pausa en los segundos entre un libro y el siguiente de la lectura seguida: el siguiente no empieza
+			ListaLectura.pararEspera()
 			return
 		}
 		if (!parandoPorTemporizador) {
@@ -821,7 +874,7 @@ object LectorVoz {
 		if (frase > 0) return irA(bloque)
 		// El anterior que tenga algo que leer (no un separador ni una nota saltada)
 		var b = bloque - 1
-		while (b > 0 && frasesDe(b).isEmpty()) b--
+		while (b >= 0 && frasesDe(b).isEmpty()) b--
 		if (b >= 0) irA(b)
 	}
 
@@ -1131,13 +1184,16 @@ object LectorVoz {
 		val f = partes[2].toIntOrNull() ?: return
 		val doc = documento ?: return
 		if (b != bloque) {
-			// Fin de capítulo con el temporizador "al final del capítulo"
-			if (alFinalDelCapitulo && (doc.bloques[b].tiene(Marca.INICIO_SECCION) || doc.indice.any { it.bloque == b })) {
+			val finCapitulo = alFinalDelCapitulo && (doc.bloques[b].tiene(Marca.INICIO_SECCION) || doc.indice.any { it.bloque == b })
+			bloque = b
+			frases = frasesDe(b)
+			// Fin de capítulo con el temporizador "al final del capítulo": se guarda el principio del nuevo y se para
+			if (finCapitulo) {
+				frase = f.coerceIn(0, (frases.size - 1).coerceAtLeast(0))
+				rehacer = true
 				pararPorTemporizador()
 				return
 			}
-			bloque = b
-			frases = frasesDe(b)
 		}
 		frase = f
 		// Lo ya leído sale del reproductor (y sus archivos)
@@ -1217,10 +1273,15 @@ object LectorVoz {
 			if (bloqueoCpu == null) {
 				bloqueoCpu = (app.getSystemService(Context.POWER_SERVICE) as PowerManager)
 					.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "LectorUniversal:voz")
+					// Sin contar referencias: volver a cogerlo solo alarga el plazo (lo renueva el latido)
+					.apply { setReferenceCounted(false) }
 			}
-			if (bloqueoCpu?.isHeld == false) bloqueoCpu?.acquire(4 * 60 * 60 * 1000L)
+			bloqueoCpu?.acquire(4 * 60 * 60 * 1000L)
+			bloqueoRenovado = SystemClock.elapsedRealtime()
 		} else if (bloqueoCpu?.isHeld == true) bloqueoCpu?.release()
 	}
+
+	private var bloqueoRenovado = 0L
 
 	/** Conecta con ServicioVoz para que la lectura siga en segundo plano con su notificación. */
 	private fun conectarServicio() {

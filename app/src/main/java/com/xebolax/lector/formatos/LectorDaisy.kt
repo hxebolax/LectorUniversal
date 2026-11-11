@@ -57,12 +57,40 @@ object LectorDaisy : LectorFormato {
 	fun extraerZip(fuente: Fuente, ctx: ContextoLectura, tipo: String = "daisy"): File {
 		val destino = File(ctx.app.filesDir, tipo + "/" + Fuente.hash(fuente.uri.toString() + fuente.tamano))
 		val marca = File(destino, ".completo")
-		if (marca.exists()) return destino
-		destino.deleteRecursively()
-		ctx.progreso(1)
-		ContenedorZip(fuente.archivoLocal()).use { it.extraer(destino) }
-		marca.writeText("1")
+		// La fecha de la marca dice cuándo se usó por última vez (para borrar primero lo que no se usa)
+		if (marca.exists()) return destino.also { marca.setLastModified(System.currentTimeMillis()) }
+		// Un hilo cada vez por carpeta: si dos abren el mismo libro a la vez, uno no borra lo que extrae el otro
+		synchronized(cerrojos.getOrPut(destino.path) { Any() }) {
+			if (marca.exists()) return destino
+			destino.deleteRecursively()
+			ctx.progreso(1)
+			ContenedorZip(fuente.archivoLocal()).use { it.extraer(destino) }
+			marca.writeText("1")
+		}
+		runCatching { limpiarExtracciones(destino.parentFile, destino) }
 		return destino
+	}
+
+	private val cerrojos = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+	/**
+	 * Las extracciones no crecen sin límite: pasando de 3 GB por tipo, se
+	 * borran las que llevan más de un mes sin abrirse (las más antiguas
+	 * primero). Si se vuelve a abrir el libro, se extrae otra vez de su ZIP
+	 * (que hay que leer igualmente para abrirlo).
+	 */
+	private fun limpiarExtracciones(base: File?, actual: File) {
+		val carpetas = base?.listFiles()?.filter { it.isDirectory && it != actual } ?: return
+		fun usada(f: File) = File(f, ".completo").takeIf { it.exists() }?.lastModified() ?: f.lastModified()
+		val tamanos = carpetas.associateWith { c -> c.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
+		var total = tamanos.values.sum() + actual.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+		val haceUnMes = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+		for (c in carpetas.sortedBy { usada(it) }) {
+			if (total <= 3L * 1024 * 1024 * 1024) break
+			if (usada(c) > haceUnMes) break
+			synchronized(cerrojos.getOrPut(c.path) { Any() }) { c.deleteRecursively() }
+			total -= tamanos[c] ?: 0L
+		}
 	}
 
 	/** Lee un libro DAISY de un contenedor (carpeta). nombre: título si el libro no lo declara. */
@@ -610,6 +638,8 @@ object LectorDaisy : LectorFormato {
 
 			// Texto del libro: los archivos a los que apuntan las frases (sin el NCC)
 			val archivosTexto = LinkedHashSet<String>()
+			// EPUB 3: todo el orden de lectura, también los capítulos sin narración (portada, notas...), cada uno en su sitio
+			if (version.startsWith("EPUB")) for (a in textoAlternativo) if (esArchivoTexto(a)) z.buscar(a)?.let { archivosTexto += it }
 			for (f in frases) {
 				val a = f.texto.substringBefore('#')
 				if (a.isNotEmpty() && esArchivoTexto(a) && z.buscar(a) != null) archivosTexto += a

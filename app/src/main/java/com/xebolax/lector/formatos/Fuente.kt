@@ -87,7 +87,8 @@ class Fuente(val contexto: Context, val uri: Uri, nombre: String? = null) {
 	/** Todos los bytes (para formatos pequeños). */
 	fun bytes(maximo: Long = 512L * 1024 * 1024): ByteArray {
 		if (tamano > maximo) throw ExcepcionFormato("El archivo es demasiado grande (${tamano / 1024 / 1024} MB).")
-		return abrir().use { it.readBytes() }
+		// Con el límite también al leer: hay sitios que no dicen el tamaño (-1)
+		return abrir().use { leerConLimite(it, maximo) ?: throw ExcepcionFormato("El archivo es demasiado grande (más de ${maximo / 1024 / 1024} MB).") }
 	}
 
 	/** Los primeros bytes (para reconocer el formato). */
@@ -111,10 +112,14 @@ class Fuente(val contexto: Context, val uri: Uri, nombre: String? = null) {
 		val carpeta = File(contexto.cacheDir, "fuentes").apply { mkdirs() }
 		val destino = File(carpeta, hash(uri.toString() + ":" + tamano) + "." + extension.ifEmpty { "bin" })
 		if (destino.exists() && destino.length() == tamano && tamano > 0) return destino
-		val parcial = File(carpeta, destino.name + ".parte")
-		abrir().use { entrada -> parcial.outputStream().use { entrada.copyTo(it, 256 * 1024) } }
-		parcial.renameTo(destino)
-		limpiarCache(carpeta)
+		val parcial = File(carpeta, destino.name + "." + Thread.currentThread().id + ".parte")
+		try {
+			abrir().use { entrada -> parcial.outputStream().use { entrada.copyTo(it, 256 * 1024) } }
+			if (!parcial.renameTo(destino) && !(destino.exists() && destino.length() == tamano)) throw java.io.IOException("No se pudo copiar el archivo")
+		} finally {
+			parcial.delete()
+		}
+		limpiarCache(carpeta, destino)
 		return destino
 	}
 
@@ -167,15 +172,32 @@ class Fuente(val contexto: Context, val uri: Uri, nombre: String? = null) {
 			return n.substringAfterLast('.', "")
 		}
 
+		/** Todo lo que queda en [entrada] si no pasa de [maximo] bytes; null si pasa (sin cargarlo entero en memoria). */
+		fun leerConLimite(entrada: InputStream, maximo: Long): ByteArray? {
+			val salida = java.io.ByteArrayOutputStream()
+			val bufer = ByteArray(64 * 1024)
+			var total = 0L
+			while (true) {
+				val n = entrada.read(bufer)
+				if (n < 0) break
+				total += n
+				if (total > maximo) return null
+				salida.write(bufer, 0, n)
+			}
+			return salida.toByteArray()
+		}
+
 		fun hash(texto: String): String =
 			MessageDigest.getInstance("SHA-1").digest(texto.toByteArray()).joinToString("") { "%02x".format(it) }
 
 		/** Deja la caché de copias por debajo de 1 GB borrando las más antiguas. */
-		private fun limpiarCache(carpeta: File) {
+		private fun limpiarCache(carpeta: File, guardar: File? = null) {
 			val archivos = carpeta.listFiles()?.sortedBy { it.lastModified() } ?: return
 			var total = archivos.sumOf { it.length() }
 			for (a in archivos) {
 				if (total < 1024L * 1024 * 1024) break
+				// La que se acaba de copiar (y se va a abrir) nunca
+				if (a == guardar) continue
 				total -= a.length()
 				a.delete()
 			}
@@ -241,18 +263,51 @@ class ContenedorZip(archivo: File) : Contenedor {
 	override fun uriReproducible(ruta: String): String? = null
 	override fun close() = zip.close()
 
+	/** Tamaño descomprimido que declara una entrada (-1 si no lo dice o no existe). */
+	fun tamano(ruta: String): Long = buscar(ruta)?.let { zip.getEntry(it)?.size } ?: -1L
+
+	/**
+	 * Una entrada entera en memoria, con límite: un ZIP manipulado («bomba»)
+	 * puede decir que ocupa poco y descomprimir gigas.
+	 */
+	override fun bytes(ruta: String): ByteArray? {
+		val nombre = buscar(ruta) ?: return null
+		val entrada = zip.getEntry(nombre) ?: return null
+		if (entrada.size > MAXIMO_ENTRADA) throw ExcepcionFormato("Hay un archivo demasiado grande dentro del libro: $nombre.")
+		return zip.getInputStream(entrada).use { Fuente.leerConLimite(it, MAXIMO_ENTRADA) }
+			?: throw ExcepcionFormato("Hay un archivo demasiado grande dentro del libro: $nombre.")
+	}
+
 	/** Extrae todo a una carpeta (DAISY en ZIP: el audio tiene que estar en archivos sueltos). */
 	fun extraer(destino: File) {
 		destino.mkdirs()
 		val raiz = destino.canonicalPath
+		// Nunca más de lo que cabe (dejando margen): un ZIP manipulado podría llenar el móvil
+		var queda = destino.usableSpace - 200L * 1024 * 1024
+		val bufer = ByteArray(256 * 1024)
 		for (e in zip.entries()) {
 			if (e.isDirectory) continue
 			val salida = File(destino, e.name.replace('\\', '/'))
 			// Nunca fuera de la carpeta (rutas con ".." en ZIP malintencionados)
 			if (!salida.canonicalPath.startsWith(raiz + File.separator)) continue
 			salida.parentFile?.mkdirs()
-			zip.getInputStream(e).use { entrada -> salida.outputStream().use { entrada.copyTo(it) } }
+			zip.getInputStream(e).use { entrada ->
+				salida.outputStream().use { s ->
+					while (true) {
+						val n = entrada.read(bufer)
+						if (n < 0) break
+						queda -= n
+						if (queda < 0) throw ExcepcionFormato("No hay espacio para descomprimir el libro (o el ZIP está manipulado).")
+						s.write(bufer, 0, n)
+					}
+				}
+			}
 		}
+	}
+
+	companion object {
+		/** Lo más grande que se lee de una vez en memoria de dentro de un ZIP (un capítulo, una imagen). */
+		const val MAXIMO_ENTRADA = 256L * 1024 * 1024
 	}
 }
 

@@ -73,7 +73,14 @@ class SesionActivity : AppCompatActivity() {
 				if (web.canGoBack()) web.goBack() else terminar()
 			}
 		})
-		if (savedInstanceState == null) web.loadUrl("https://$dominio")
+		// Al girar la pantalla se recupera la página en la que se estaba; si no se puede, se carga otra vez la del medio
+		val restaurada = savedInstanceState?.let { web.restoreState(it) } != null
+		if (!restaurada) web.loadUrl("https://$dominio")
+	}
+
+	override fun onSaveInstanceState(outState: Bundle) {
+		super.onSaveInstanceState(outState)
+		web.saveState(outState)
 	}
 
 	override fun onCreateOptionsMenu(menu: Menu): Boolean {

@@ -11,6 +11,7 @@ import com.xebolax.lector.ui.avisar
 import com.xebolax.lector.ui.mensaje
 import com.xebolax.lector.ui.conEspera
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -24,24 +25,39 @@ object RssAcciones {
 	const val EXTRA_ARTICULO = "rss_articulo"
 	const val EXTRA_LISTA = "rss_lista"
 
+	/** Un cambio en la base de datos de Noticias fuera del hilo principal; después, lo que haya que hacer en pantalla. */
+	fun enFondo(a: AppCompatActivity, cambio: () -> Unit, despues: () -> Unit = {}) {
+		a.lifecycleScope.launch {
+			withContext(Dispatchers.IO) { cambio() }
+			despues()
+		}
+	}
+
 	/** Abre un artículo en el lector (o en el navegador si la fuente lo pide). lista: para Siguiente y Anterior. */
 	fun abrir(a: AppCompatActivity, articulo: Articulo, lista: LongArray = longArrayOf(articulo.id)) {
 		val db = RssBaseDatos.obtener(a)
-		val fuente = db.fuente(articulo.fuente)
-		if (Rss.prefs(a).getBoolean("rss_marcar_al_abrir", true) && !articulo.leido) db.marcarLeidos(listOf(articulo.id))
+		val marcar = Rss.prefs(a).getBoolean("rss_marcar_al_abrir", true) && !articulo.leido
 		RssTrabajo.quitarAviso(a, articulo.id)
 		com.xebolax.lector.datos.Actividad.sumarLuego(a, com.xebolax.lector.datos.Actividad.NOTICIAS, elementos = 1)
-		if (fuente?.enNavegador == true && articulo.enlace.isNotBlank()) {
-			abrirNavegador(a, articulo.enlace)
-			return
-		}
 		a.lifecycleScope.launch {
+			val fuente = withContext(Dispatchers.IO) { db.fuente(articulo.fuente) }
+			if (fuente?.enNavegador == true && articulo.enlace.isNotBlank()) {
+				abrirNavegador(a, articulo.enlace)
+				if (marcar) withContext(Dispatchers.IO) { db.marcarLeidos(listOf(articulo.id)) }
+				return@launch
+			}
 			var contenido = articulo.contenido
 			if (Rss.hayQueCompletar(a, articulo, fuente)) {
-				val r = a.conEspera(articulo.titulo, a.getString(R.string.rss_descargando_articulo)) { Rss.completar(a, articulo) }
-				if (r.resultado == ArticuloCompleto.Resultado.COMPLETO) contenido = r.html
+				val r = try {
+					a.conEspera(articulo.titulo, a.getString(R.string.rss_descargando_articulo)) { Rss.completar(a, articulo) }
+				} catch (e: kotlinx.coroutines.CancellationException) {
+					// Se ha cerrado la pantalla: no se abre. Con Cancelar, se abre con lo que trae la fuente
+					if (!isActive) throw e
+					null
+				}
+				if (r != null && r.resultado == ArticuloCompleto.Resultado.COMPLETO) contenido = r.html
 				// Solo para suscriptores: se dice, y se lee lo que trae la fuente
-				else if (r.resultado == ArticuloCompleto.Resultado.SUSCRIPTORES) a.avisar(Rss.motivo(a, r), mostrar = false)
+				else if (r != null && r.resultado == ArticuloCompleto.Resultado.SUSCRIPTORES) a.avisar(Rss.motivo(a, r), mostrar = false)
 			}
 			val uri = withContext(Dispatchers.IO) { Rss.archivo(a, "articulo_${articulo.id}", Rss.html(a, articulo, contenido)) }
 			a.startActivity(
@@ -52,6 +68,8 @@ object RssAcciones {
 					.putExtra(EXTRA_LISTA, lista)
 					.putExtra(LectorActivity.EXTRA_LEER_AL_ABRIR, Rss.prefs(a).getBoolean("rss_leer_al_abrir", false))
 			)
+			// Leído solo cuando de verdad se abre (no si la pantalla se cierra antes)
+			if (marcar) withContext(Dispatchers.IO) { db.marcarLeidos(listOf(articulo.id)) }
 		}
 	}
 
@@ -108,7 +126,8 @@ object RssAcciones {
 		enBiblioteca(a, articulo)?.let { return com.xebolax.lector.lectura.Abiertos.abrirPantalla(a, it) }
 		a.lifecycleScope.launch {
 			a.conEspera(a.getString(R.string.rss_guardar_biblioteca)) {
-				val contenido = if (Rss.hayQueCompletar(a, articulo, RssBaseDatos.obtener(a).fuente(articulo.fuente)))
+				val fuente = withContext(Dispatchers.IO) { RssBaseDatos.obtener(a).fuente(articulo.fuente) }
+				val contenido = if (Rss.hayQueCompletar(a, articulo, fuente))
 					Rss.completar(a, articulo).takeIf { it.resultado == ArticuloCompleto.Resultado.COMPLETO }?.html ?: articulo.contenido
 				else articulo.contenido
 				withContext(Dispatchers.IO) { Rss.guardarEnBiblioteca(a, articulo, contenido) }
@@ -140,46 +159,52 @@ object RssAcciones {
 		)
 	}
 
-	/** Acciones de un artículo (menú al mantener pulsado y acciones de TalkBack). */
-	fun acciones(a: AppCompatActivity, articulo: Articulo, lista: () -> LongArray, alCambiar: () -> Unit = {}): List<Accion> {
+	/**
+	 * Acciones de un artículo (menú al mantener pulsado y acciones de TalkBack).
+	 * guardado: si ya se sabe que está en la biblioteca (las listas lo calculan al cargar,
+	 * para no consultar la base de datos con cada fila); null, se mira aquí.
+	 */
+	fun acciones(a: AppCompatActivity, articulo: Articulo, lista: () -> LongArray, guardado: Boolean? = null, alCambiar: () -> Unit = {}): List<Accion> {
 		val db = RssBaseDatos.obtener(a)
 		val r = mutableListOf<Accion>(
 			a.getString(R.string.abrir) to { abrir(a, articulo, lista()) },
 		)
 		if (articulo.esPodcast) r += a.getString(R.string.rss_escuchar) to { escuchar(a, articulo) }
 		r += (if (articulo.leido) a.getString(R.string.rss_marcar_no_leido) else a.getString(R.string.rss_marcar_leido)) to {
-			db.marcarLeidos(listOf(articulo.id), !articulo.leido)
-			a.avisar(a.getString(if (articulo.leido) R.string.rss_marcado_no_leido else R.string.rss_marcado_leido))
-			alCambiar()
+			enFondo(a, { db.marcarLeidos(listOf(articulo.id), !articulo.leido) }) {
+				a.avisar(a.getString(if (articulo.leido) R.string.rss_marcado_no_leido else R.string.rss_marcado_leido))
+				alCambiar()
+			}
 		}
 		r += (if (articulo.favorito) a.getString(R.string.rss_quitar_favorito) else a.getString(R.string.rss_anadir_favorito)) to {
-			db.marcarFavorito(articulo.id, !articulo.favorito)
-			a.avisar(a.getString(if (articulo.favorito) R.string.rss_quitado_favorito else R.string.rss_anadido_favorito))
-			alCambiar()
+			enFondo(a, { db.marcarFavorito(articulo.id, !articulo.favorito) }) {
+				a.avisar(a.getString(if (articulo.favorito) R.string.rss_quitado_favorito else R.string.rss_anadido_favorito))
+				alCambiar()
+			}
 		}
 		r += (if (articulo.masTarde) a.getString(R.string.rss_quitar_mas_tarde) else a.getString(R.string.rss_mas_tarde)) to {
-			db.marcarMasTarde(articulo.id, !articulo.masTarde)
-			a.avisar(a.getString(if (articulo.masTarde) R.string.rss_quitado_mas_tarde else R.string.rss_anadido_mas_tarde))
-			alCambiar()
+			enFondo(a, { db.marcarMasTarde(articulo.id, !articulo.masTarde) }) {
+				a.avisar(a.getString(if (articulo.masTarde) R.string.rss_quitado_mas_tarde else R.string.rss_anadido_mas_tarde))
+				alCambiar()
+			}
 		}
 		if (articulo.enlace.isNotBlank() && !articulo.esPodcast) r += a.getString(R.string.rss_descargar_completo) to { descargarCompleto(a, articulo, alCambiar) }
 		if (articulo.enlace.isNotBlank()) r += a.getString(R.string.abrir_navegador) to {
 			// Leerlo en la web cuenta como leído (si así está en Ajustes, Noticias)
-			if (Rss.prefs(a).getBoolean("rss_marcar_al_abrir", true) && !articulo.leido) {
-				db.marcarLeidos(listOf(articulo.id))
-				alCambiar()
-			}
+			if (Rss.prefs(a).getBoolean("rss_marcar_al_abrir", true) && !articulo.leido) enFondo(a, { db.marcarLeidos(listOf(articulo.id)) }) { alCambiar() }
 			abrirNavegador(a, articulo.enlace)
 		}
 		r += a.getString(R.string.compartir) to { compartir(a, articulo) }
 		// Si ya está en la biblioteca, la acción es abrirlo (no volver a guardarlo)
-		r += (if (enBiblioteca(a, articulo) != null) a.getString(R.string.rss_abrir_en_biblioteca) else a.getString(R.string.rss_guardar_biblioteca)) to {
+		val yaGuardado = guardado ?: (enBiblioteca(a, articulo) != null)
+		r += (if (yaGuardado) a.getString(R.string.rss_abrir_en_biblioteca) else a.getString(R.string.rss_guardar_biblioteca)) to {
 			guardarEnBiblioteca(a, articulo, alCambiar)
 		}
 		r += a.getString(R.string.rss_a_la_papelera) to {
-			db.marcarPapelera(listOf(articulo.id), true)
-			a.avisar(a.getString(R.string.rss_enviado_papelera))
-			alCambiar()
+			enFondo(a, { db.marcarPapelera(listOf(articulo.id), true) }) {
+				a.avisar(a.getString(R.string.rss_enviado_papelera))
+				alCambiar()
+			}
 		}
 		return r
 	}

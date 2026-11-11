@@ -46,6 +46,7 @@ class ServicioGrabacion : Service() {
 		private const val EXTRA_MINUTOS = "minutos"
 		private const val CANAL = "radio_grabacion"
 		private const val NOTIFICACION = 7301
+		private const val NOTIFICACION_FALLO = 7304
 
 		/** Lo que se está grabando (null si nada). */
 		@Volatile
@@ -86,8 +87,9 @@ class ServicioGrabacion : Service() {
 
 	private val ambito = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 	private var trabajo: Job? = null
-	private var idGrabacion = 0L
-	private var archivo: File? = null
+	/** La conexión de la grabación en marcha (para cortarla al parar). */
+	@Volatile
+	private var conexion: HttpURLConnection? = null
 
 	override fun onBind(intent: Intent?): IBinder? = null
 
@@ -172,31 +174,79 @@ class ServicioGrabacion : Service() {
 		return f
 	}
 
+	/** Mientras graba, el móvil no se duerme ni apaga el Wi-Fi (con la pantalla apagada la grabación se cortaba). */
+	private var despierto: android.os.PowerManager.WakeLock? = null
+	private var wifiDespierto: android.net.wifi.WifiManager.WifiLock? = null
+
+	private fun mantenerDespierto(min: Int) {
+		soltarDespierto()
+		// Con un límite: los minutos de la grabación y un margen, o un día si es «hasta que la pares»
+		val limite = if (min > 0) min * 60_000L + 120_000L else 24 * 3_600_000L
+		despierto = runCatching {
+			(getSystemService(POWER_SERVICE) as android.os.PowerManager).newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "LectorUniversal:grabacion")
+				.apply { setReferenceCounted(false); acquire(limite) }
+		}.getOrNull()
+		wifiDespierto = runCatching {
+			val wifi = applicationContext.getSystemService(WIFI_SERVICE) as android.net.wifi.WifiManager
+			@Suppress("DEPRECATION")
+			val modo = android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF
+			wifi.createWifiLock(modo, "LectorUniversal:grabacion").apply { setReferenceCounted(false); acquire() }
+		}.getOrNull()
+	}
+
+	private fun soltarDespierto() {
+		runCatching { despierto?.takeIf { it.isHeld }?.release() }
+		runCatching { wifiDespierto?.takeIf { it.isHeld }?.release() }
+		despierto = null
+		wifiDespierto = null
+	}
+
 	private fun empezar(e: Emisora, min: Int) {
 		grabando = e
 		minutos = min
-		desde = SystemClock.elapsedRealtime()
+		mantenerDespierto(min)
+		val inicio = SystemClock.elapsedRealtime()
+		desde = inicio
 		val db = RadioBaseDatos.obtener(this)
-		val fin = if (min > 0) SystemClock.elapsedRealtime() + min * 60_000L else Long.MAX_VALUE
+		val fin = if (min > 0) inicio + min * 60_000L else Long.MAX_VALUE
 		trabajo = ambito.launch {
+			// Todo lo de esta grabación es suyo (si se para y empieza otra mientras conecta, no se mezclan)
 			var salida: FileOutputStream? = null
+			var archivoLocal: File? = null
+			var idLocal = 0L
 			var fallos = 0
+			var motivo = ""
 			try {
 				while (isActive && SystemClock.elapsedRealtime() < fin && fallos < 10) {
 					// Como el reproductor: agente propio, redirecciones http↔https y reserva a http (sin metadatos ICY mezclados)
-					val c = runCatching { Flujos.abrir(e.url, icy = false, conectar = 10_000, leer = 20_000).conexion }.getOrNull()
+					val c = try {
+						Flujos.abrir(e.url, icy = false, conectar = 10_000, leer = 20_000).conexion
+					} catch (x: Flujos.ErrorFlujo) {
+						motivo = x.motivo
+						null
+					} catch (x: Exception) {
+						motivo = "red"
+						null
+					}
+					// Se ha parado mientras conectaba: no se crea nada
+					if (!isActive) {
+						c?.disconnect()
+						break
+					}
 					if (c == null || c.responseCode !in 200..299) {
+						if (c != null) motivo = "http:" + c.responseCode
 						c?.disconnect()
 						fallos++
 						delay(3_000L * fallos)
 						continue
 					}
+					conexion = c
 					if (salida == null) {
 						val f = nombreArchivo(e, extension(c.contentType, e))
-						archivo = f
+						archivoLocal = f
 						archivoActual = f.absolutePath
 						salida = FileOutputStream(f)
-						idGrabacion = db.nuevaGrabacion(f.absolutePath, e)
+						idLocal = db.nuevaGrabacion(f.absolutePath, e)
 					}
 					val destino = salida!!
 					try {
@@ -206,6 +256,7 @@ class ServicioGrabacion : Service() {
 								val n = entrada.read(bufer)
 								if (n < 0) {
 									// El servidor cortó: se reintenta con una espera creciente (no sin parar)
+									motivo = "red"
 									fallos++
 									delay(2_000L * fallos)
 									break
@@ -215,17 +266,32 @@ class ServicioGrabacion : Service() {
 							}
 						}
 					} catch (_: java.io.IOException) {
+						motivo = "red"
 						fallos++
-						delay(2_000)
+						if (isActive) delay(2_000)
 					} finally {
+						if (conexion === c) conexion = null
 						c.disconnect()
 					}
 				}
 			} finally {
 				runCatching { salida?.close() }
+				// La cierra su propio trabajo: duración y tamaño, o se borra si quedó vacía
+				if (idLocal > 0) {
+					val tam = archivoLocal?.length() ?: 0L
+					if (tam <= 0) {
+						archivoLocal?.delete()
+						db.borrarGrabacion(idLocal)
+					} else db.terminarGrabacion(idLocal, SystemClock.elapsedRealtime() - inicio, tam)
+				}
+				if (archivoActual == archivoLocal?.absolutePath) archivoActual = null
+				// No se pudo grabar (10 intentos sin conseguirlo): se avisa con el motivo
+				val fallida = fallos >= 10 && isActive
+				if (fallida) avisarFallo(e, motivo, conAlgo = idLocal > 0 && (archivoLocal?.length() ?: 0L) > 0)
+				val propio = coroutineContext[Job]
 				launch(Dispatchers.Main) {
-					// Terminó sola (minutos cumplidos o no se pudo conectar): se cierra el servicio
-					if (grabando?.uuid == e.uuid && trabajo?.isCancelled != true) {
+					// Terminó sola (minutos cumplidos o no se pudo conectar): se cierra el servicio (si no ha empezado otra)
+					if (trabajo === propio && grabando?.uuid == e.uuid) {
 						terminar()
 						pararServicio()
 					}
@@ -234,31 +300,48 @@ class ServicioGrabacion : Service() {
 		}
 	}
 
+	/** Aviso de que la grabación no se pudo hacer (o se cortó), con el motivo en palabras. */
+	private fun avisarFallo(e: Emisora, motivo: String, conAlgo: Boolean) {
+		canal()
+		val explicacion = when {
+			motivo.startsWith("http:") -> {
+				val codigo = motivo.removePrefix("http:").toIntOrNull() ?: 0
+				getString(if (codigo in 400..499) R.string.radio_error_rechaza else R.string.radio_error_servidor, codigo)
+			}
+			motivo == "ssl" -> getString(R.string.radio_motivo_ssl)
+			motivo == "no_estandar" -> getString(R.string.radio_motivo_no_estandar)
+			motivo == "redirecciones" -> getString(R.string.radio_motivo_redirecciones)
+			else -> getString(R.string.radio_motivo_red)
+		}.replaceFirstChar { it.titlecase() }
+		val abrir = PendingIntent.getActivity(this, 3, Intent(this, RadioActivity::class.java).setAction(RadioActivity.ACCION_GRABACIONES), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+		val titulo = getString(if (conAlgo) R.string.audio_grabacion_cortada else R.string.audio_grabacion_fallida, e.nombre)
+		val n = NotificationCompat.Builder(this, CANAL)
+			.setSmallIcon(R.drawable.ic_grabar)
+			.setContentTitle(titulo)
+			.setContentText(explicacion)
+			.setStyle(NotificationCompat.BigTextStyle().bigText(explicacion))
+			.setContentIntent(abrir)
+			.setAutoCancel(true)
+			.build()
+		runCatching { androidx.core.app.NotificationManagerCompat.from(this).notify(NOTIFICACION_FALLO, n) }
+	}
+
 	/** Android 15: el tiempo de un servicio así se acaba (6 horas al día): se guarda lo grabado y se cierra. */
 	override fun onTimeout(startId: Int, tipo: Int) {
 		terminar()
 		pararServicio()
 	}
 
-	/** Cierra la grabación y apunta su duración y tamaño. */
+	/** Para la grabación: su trabajo la cierra y apunta su duración y tamaño (o la borra si quedó vacía). */
 	private fun terminar() {
 		trabajo?.cancel()
 		trabajo = null
-		val f = archivo
-		val db = RadioBaseDatos.obtener(this)
-		if (idGrabacion > 0) {
-			val tam = f?.length() ?: 0L
-			if (tam <= 0) {
-				f?.delete()
-				db.borrarGrabacion(idGrabacion)
-			} else db.terminarGrabacion(idGrabacion, SystemClock.elapsedRealtime() - desde, tam)
-		}
-		idGrabacion = 0
-		archivo = null
-		archivoActual = null
+		// Si está esperando datos del servidor, se corta la conexión para que pare ya
+		conexion?.let { c -> ambito.launch { runCatching { c.disconnect() } } }
 		grabando = null
 		minutos = 0
-		db.avisar()
+		soltarDespierto()
+		RadioBaseDatos.obtener(this).avisar()
 	}
 
 	private fun pararServicio() {
@@ -268,6 +351,7 @@ class ServicioGrabacion : Service() {
 
 	override fun onDestroy() {
 		if (grabando != null) terminar()
+		soltarDespierto()
 		ambito.cancel()
 		super.onDestroy()
 	}

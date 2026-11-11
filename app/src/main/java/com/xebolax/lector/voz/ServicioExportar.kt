@@ -48,7 +48,8 @@ class ServicioExportar : Service() {
 		}
 	}
 
-	private val ambito = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+	// Fuera del hilo principal: trocear capítulos, la base de datos, la carpeta elegida y el motor de voz tardan
+	private val ambito = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 	private var trabajo: Job? = null
 
 	override fun onBind(intent: Intent?): IBinder? = null
@@ -90,9 +91,11 @@ class ServicioExportar : Service() {
 			}
 			exportando = false
 			// El aviso final se queda (sin el servicio)
-			ServiceCompat.stopForeground(this@ServicioExportar, ServiceCompat.STOP_FOREGROUND_REMOVE)
-			getSystemService(NotificationManager::class.java)?.notify(AVISO + 1, aviso(final, -1, false))
-			stopSelf()
+			withContext(Dispatchers.Main + kotlinx.coroutines.NonCancellable) {
+				ServiceCompat.stopForeground(this@ServicioExportar, ServiceCompat.STOP_FOREGROUND_REMOVE)
+				getSystemService(NotificationManager::class.java)?.notify(AVISO + 1, aviso(final, -1, false))
+				stopSelf()
+			}
 		}
 		return START_NOT_STICKY
 	}

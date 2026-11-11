@@ -58,9 +58,14 @@ class PodcastFichaActivity : AppCompatActivity() {
 	}
 
 	private sealed class Fila {
-		class Info(val titulo: String, val texto: String) : Fila()
-		class DeEpisodio(val e: PodcastLector.Elemento) : Fila()
+		class Info(val id: Long, val titulo: String, val texto: String) : Fila()
+		class DeEpisodio(val ep: Ep) : Fila() {
+			val e get() = ep.e
+		}
 	}
+
+	/** Un episodio con su descripción en texto plano (para el filtro) y un id fijo (para no perder el foco al filtrar). */
+	private class Ep(val e: PodcastLector.Elemento, val texto: String, val id: Long)
 
 	private lateinit var b: ActivityListaBinding
 	private val cabecera by lazy { LinearLayout(this).apply { orientation = LinearLayout.VERTICAL } }
@@ -68,6 +73,9 @@ class PodcastFichaActivity : AppCompatActivity() {
 	private var canal: PodcastLector.Canal? = null
 	private var filas: List<Fila> = emptyList()
 	private var filtro = ""
+	/** Los episodios en su orden, preparados al cargar (fuera del hilo principal). */
+	private var eps: List<Ep> = emptyList()
+	private var filtrando: kotlinx.coroutines.Job? = null
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -86,7 +94,12 @@ class PodcastFichaActivity : AppCompatActivity() {
 			override fun onTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
 			override fun afterTextChanged(s: Editable?) {
 				filtro = s?.toString().orEmpty().trim()
-				mostrar()
+				// Se espera a que deje de escribir un momento (con muchos episodios, filtrar en cada tecla da tirones)
+				filtrando?.cancel()
+				filtrando = lifecycleScope.launch {
+					kotlinx.coroutines.delay(300)
+					mostrar()
+				}
 			}
 		})
 		b.recycler.layoutManager = LinearLayoutManager(this)
@@ -112,6 +125,10 @@ class PodcastFichaActivity : AppCompatActivity() {
 				}
 				if (url.isBlank()) error(getString(R.string.pod_sin_rss))
 				val c = withContext(Dispatchers.IO) { PodcastLector.descargar(url).canal } ?: error(getString(R.string.pod_sin_rss))
+				// El texto plano de cada descripción, una sola vez y fuera del hilo principal
+				eps = withContext(Dispatchers.Default) {
+					episodios(c).mapIndexed { i, e -> Ep(e, runCatching { Jsoup.parse(e.descripcion).text() }.getOrDefault(e.descripcion), i.toLong()) }
+				}
 				canal = c
 				if (c.titulo.isNotBlank()) {
 					supportActionBar?.title = c.titulo
@@ -203,9 +220,9 @@ class PodcastFichaActivity : AppCompatActivity() {
 
 	private fun mostrar() {
 		val c = canal ?: return
-		val lista = episodios(c).filter { filtro.length < 2 || it.titulo.contains(filtro, true) || Jsoup.parse(it.descripcion).text().contains(filtro, true) }
+		val lista = eps.filter { filtro.length < 2 || it.e.titulo.contains(filtro, true) || it.texto.contains(filtro, true) }
 		filas = if (filtro.length >= 2) lista.map { Fila.DeEpisodio(it) }
-		else listOf(Fila.Info(getString(R.string.pod_informacion), informacion(c)), Fila.Info(getString(R.string.pod_descripcion), c.descripcion.ifBlank { "—" })) +
+		else listOf(Fila.Info(-1, getString(R.string.pod_informacion), informacion(c)), Fila.Info(-2, getString(R.string.pod_descripcion), c.descripcion.ifBlank { "—" })) +
 			lista.map { Fila.DeEpisodio(it) }
 		@Suppress("NotifyDataSetChanged")
 		b.recycler.adapter?.notifyDataSetChanged()
@@ -272,7 +289,17 @@ class PodcastFichaActivity : AppCompatActivity() {
 
 	private inner class Vista(val f: ItemListaBinding) : RecyclerView.ViewHolder(f.root)
 
+	// Ids estables (pauta 15): al filtrar, TalkBack no pierde el sitio
 	private inner class Adaptador : RecyclerView.Adapter<Vista>() {
+		init {
+			setHasStableIds(true)
+		}
+
+		override fun getItemId(posicion: Int): Long = when (val f = filas[posicion]) {
+			is Fila.Info -> f.id
+			is Fila.DeEpisodio -> f.ep.id
+		}
+
 		override fun getItemCount() = filas.size
 
 		override fun onCreateViewHolder(padre: ViewGroup, tipo: Int) = Vista(ItemListaBinding.inflate(LayoutInflater.from(padre.context), padre, false))
@@ -289,6 +316,8 @@ class PodcastFichaActivity : AppCompatActivity() {
 					v.f.root.isClickable = false
 					v.f.root.accionesAccesibles(emptyList())
 					v.f.root.setOnLongClickListener(null)
+					// Sin nada que hacer al mantener pulsado (setOnLongClickListener lo deja activado)
+					v.f.root.isLongClickable = false
 				}
 				is Fila.DeEpisodio -> {
 					val e = fila.e

@@ -64,7 +64,22 @@ object RssSincronizacion {
 		}
 	}
 
-	class Resultado(val fuentes: Int, val nuevos: Int)
+	/** avisos: los nuevos de las fuentes con «Avisar» (para la notificación). */
+	class Resultado(val fuentes: Int, val nuevos: Int, val avisos: List<Pair<Fuente, RssLector.Elemento>> = emptyList())
+
+	/** Artículos por página al pedirlos al servidor, y cuántos como mucho de cada lista. */
+	private const val PAGINA = 300
+	private const val TOPE = 1000
+
+	/**
+	 * La dirección de una fuente sin lo que no la cambia: http o https, «www.»,
+	 * mayúsculas del servidor y la barra final (para emparejarla con la del servidor).
+	 */
+	fun direccionNormal(url: String): String {
+		val sin = url.trim().replaceFirst(Regex("(?i)^(https?|feed)://"), "")
+		val corte = sin.indexOf('/').takeIf { it >= 0 } ?: sin.length
+		return sin.substring(0, corte).lowercase().removePrefix("www.") + sin.substring(corte).trimEnd('/')
+	}
 
 	/** Sincroniza todo: primero envía lo cambiado aquí, luego trae fuentes, artículos y estados. */
 	suspend fun sincronizar(c: Context): Resultado = cerrojo.withLock {
@@ -72,50 +87,72 @@ object RssSincronizacion {
 			val s = servicio(c) ?: error("Sin cuenta")
 			val db = RssBaseDatos.obtener(c)
 			s.entrar()
-			// 1. Lo cambiado en el móvil
+			// 1. Lo cambiado en el móvil (solo se da por enviado lo que no ha vuelto a cambiar mientras tanto)
 			val cambios = db.cambiosPendientes()
 			s.marcarLeidos(cambios.filter { it.second }.map { it.first }, true)
 			s.marcarLeidos(cambios.filter { !it.second }.map { it.first }, false)
 			s.marcarFavoritos(cambios.filter { it.third }.map { it.first }, true)
 			s.marcarFavoritos(cambios.filter { !it.third }.map { it.first }, false)
-			db.cambiosEnviados()
+			db.cambiosEnviados(cambios)
 			// 2. Fuentes: las del servidor se añaden aquí; las de aquí que no están, se suben
 			val remotas = s.fuentes()
 			val locales = db.fuentes()
 			val enlazadas = db.remotosDeFuentes()
 			val idLocal = HashMap<String, Long>()
+			val emparejadas = HashSet<Long>()
 			for (r in remotas) {
-				val local = locales.firstOrNull { it.url == r.url } ?: db.fuentePorUrl(r.url)
+				// Primero por su id en el servidor; si no, por la dirección (http o https, www o la barra final dan igual)
+				val local = locales.firstOrNull { it.id !in emparejadas && enlazadas[it.id] == r.id }
+					?: locales.firstOrNull { it.id !in emparejadas && direccionNormal(it.url) == direccionNormal(r.url) }
+					?: db.fuentePorUrl(r.url)
 				val id = local?.id ?: db.anadirFuente(r.url, r.titulo, r.sitio, r.categoria)
 				// La carpeta del servidor solo la primera vez que se enlaza: después manda lo que se decida en el móvil
 				// (si no, «Borrar solo la carpeta» o «Sin carpeta» se desharían en cada sincronización)
 				if (local != null && enlazadas[local.id].isNullOrBlank() && local.categoria.isBlank() && r.categoria.isNotBlank()) db.ponerCategoria(id, r.categoria)
 				db.ponerRemotoFuente(id, r.id)
 				idLocal[r.id] = id
+				emparejadas += id
 			}
 			// Se suben las que nunca se enlazaron; las que estaban enlazadas y ya no vienen se borraron en el servidor
-			for (f in db.fuentes().filter { f -> remotas.none { it.url == f.url } && enlazadas[f.id].isNullOrBlank() }) {
+			val subidas = ArrayList<Fuente>()
+			for (f in db.fuentes().filter { f -> f.id !in emparejadas && enlazadas[f.id].isNullOrBlank() }) {
 				runCatching { s.suscribir(f.url, f.titulo, f.categoria) }.getOrNull()?.let {
 					db.ponerRemotoFuente(f.id, it)
 					idLocal[it] = f.id
+					subidas += f
 				}
 			}
-			// 3. Artículos y estados
+			// Algunos servidores (FreshRSS) dan a la fuente subida otro id del que devuelven al suscribirse:
+			// se vuelve a pedir la lista para que sus artículos lleguen ya en esta sincronización
+			if (subidas.isNotEmpty()) runCatching { s.fuentes() }.getOrNull()?.forEach { r ->
+				if (idLocal.containsKey(r.id)) return@forEach
+				val f = subidas.firstOrNull { direccionNormal(it.url) == direccionNormal(r.url) } ?: return@forEach
+				db.ponerRemotoFuente(f.id, r.id)
+				idLocal[r.id] = f.id
+			}
+			// 3. Artículos y estados, con las opciones de cada fuente (silenciar, solo con, sin duplicados)
 			val articulos = s.articulos()
+			val porId = db.fuentes().associateBy { it.id }
 			var nuevos = 0
+			val avisos = ArrayList<Pair<Fuente, RssLector.Elemento>>()
 			for ((fuenteRemota, lista) in articulos.groupBy { it.fuente }) {
 				val id = idLocal[fuenteRemota] ?: continue
-				nuevos += db.anadirRemotos(id, lista.map { it.elemento to Triple(it.id, it.leido, it.favorito) })
+				val f = porId[id]
+				val admitir: (RssLector.Elemento) -> Boolean = if (f != null) Rss.filtro(db, f) else { _ -> true }
+				val llegados = db.anadirRemotos(id, lista.map { it.elemento to Triple(it.id, it.leido, it.favorito) }, admitir)
+				nuevos += llegados.size
+				if (f != null && f.avisar) llegados.forEach { avisos += f to it }
 			}
-			val sinLeer = s.idsSinLeer()
-			val favoritos = s.idsFavoritos()
+			// Lo que acaba de llegar sin leer o como favorito lo es seguro, aunque el servidor dé los ids en otro formato
+			val sinLeer = s.idsSinLeer() + articulos.filter { !it.leido }.map { it.id }
+			val favoritos = s.idsFavoritos() + articulos.filter { it.favorito }.map { it.id }
 			db.estadoRemoto(db.remotosSinLeer() - sinLeer, leido = true)
 			db.estadoRemoto(sinLeer, leido = false)
 			db.estadoRemoto(db.remotosFavoritos() - favoritos, favorito = false)
 			db.estadoRemoto(favoritos, favorito = true)
 			db.avisar()
 			Rss.prefs(c).edit().putLong("rss_sinc_ultima", System.currentTimeMillis()).apply()
-			Resultado(remotas.size, nuevos)
+			Resultado(remotas.size, nuevos, avisos)
 		}
 	}
 
@@ -187,10 +224,22 @@ object RssSincronizacion {
 			}
 		}
 
+		/** Los artículos de una lista, página a página (con «continuation») hasta el tope. */
 		private fun elementos(stream: String, excluirLeidos: Boolean): List<ArticuloRemoto> {
 			val xt = if (excluirLeidos) "&xt=user/-/state/com.google/read" else ""
-			val o = JSONObject(peticion("$base/reader/api/0/stream/contents/$stream?n=300$xt&output=json", cabeceras = cab))
-			val items = o.optJSONArray("items") ?: JSONArray()
+			val r = ArrayList<ArticuloRemoto>()
+			var continuacion = ""
+			do {
+				val c = if (continuacion.isNotEmpty()) "&c=${e(continuacion)}" else ""
+				val o = JSONObject(peticion("$base/reader/api/0/stream/contents/$stream?n=$PAGINA$xt$c&output=json", cabeceras = cab))
+				val items = o.optJSONArray("items") ?: JSONArray()
+				r += pagina(items)
+				continuacion = o.optString("continuation")
+			} while (continuacion.isNotEmpty() && items.length() > 0 && r.size < TOPE)
+			return r
+		}
+
+		private fun pagina(items: JSONArray): List<ArticuloRemoto> {
 			return (0 until items.length()).mapNotNull { i ->
 				val it = items.optJSONObject(i) ?: return@mapNotNull null
 				val categorias = (0 until (it.optJSONArray("categories")?.length() ?: 0)).map { k -> it.optJSONArray("categories")!!.optString(k) }
@@ -211,12 +260,37 @@ object RssSincronizacion {
 
 		override fun articulos() = elementos("user/-/state/com.google/reading-list", true) + elementos("user/-/state/com.google/starred", false)
 
-		/** Los ids cortos (decimales) se pasan al formato largo que usan los artículos. */
+		/** Los ids de una lista, página a página (con «continuation»), en el formato largo que usan los artículos. */
 		private fun ids(consulta: String): Set<String> {
-			val o = JSONObject(peticion("$base/reader/api/0/stream/items/ids?$consulta&n=10000&output=json", cabeceras = cab))
-			val a = o.optJSONArray("itemRefs") ?: JSONArray()
-			return (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.optString("id")?.toLongOrNull() }
-				.map { "tag:google.com,2005:reader/item/" + "%016x".format(it) }.toSet()
+			val r = HashSet<String>()
+			var continuacion = ""
+			do {
+				val c = if (continuacion.isNotEmpty()) "&c=${e(continuacion)}" else ""
+				val o = JSONObject(peticion("$base/reader/api/0/stream/items/ids?$consulta&n=10000$c&output=json", cabeceras = cab))
+				val a = o.optJSONArray("itemRefs") ?: JSONArray()
+				for (i in 0 until a.length()) r += formasDelId(a.optJSONObject(i)?.optString("id").orEmpty())
+				continuacion = o.optString("continuation")
+			} while (continuacion.isNotEmpty() && a.length() > 0 && r.size < 200_000)
+			return r
+		}
+
+		/**
+		 * Un id corto en el formato largo. Los decimales (FreshRSS; con signo en
+		 * el Google Reader original) pasan a 16 cifras hexadecimales. Los que ya
+		 * vienen en hexadecimal (The Old Reader) se dan en las dos formas, para
+		 * que casen con los de los artículos sea cual sea el que use el servidor.
+		 */
+		private fun formasDelId(id: String): List<String> {
+			val t = id.trim()
+			if (t.isEmpty()) return emptyList()
+			if (t.startsWith("tag:")) return listOf(t)
+			val numero = when {
+				Regex("-\\d+").matches(t) -> t.toLongOrNull()
+				t.all { it.isDigit() } -> t.toULongOrNull()?.toLong()
+				else -> null
+			}
+			val prefijo = "tag:google.com,2005:reader/item/"
+			return if (numero != null) listOf(prefijo + "%016x".format(numero)) else listOf(prefijo + t.lowercase(), t)
 		}
 
 		override fun idsSinLeer() = ids("s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read")
@@ -264,8 +338,20 @@ object RssSincronizacion {
 			}
 		}
 
+		/** Las entradas, página a página (offset) hasta el tope. */
 		private fun entradas(consulta: String): List<ArticuloRemoto> {
-			val a = JSONObject(peticion("$api/entries?$consulta&limit=300&order=published_at&direction=desc", cabeceras = cab)).optJSONArray("entries") ?: JSONArray()
+			val r = ArrayList<ArticuloRemoto>()
+			var vistas = 0
+			do {
+				val a = JSONObject(peticion("$api/entries?$consulta&limit=$PAGINA&offset=$vistas&order=published_at&direction=desc", cabeceras = cab))
+					.optJSONArray("entries") ?: JSONArray()
+				vistas += a.length()
+				r += pagina(a)
+			} while (a.length() >= PAGINA && r.size < TOPE)
+			return r
+		}
+
+		private fun pagina(a: JSONArray): List<ArticuloRemoto> {
 			return (0 until a.length()).mapNotNull { i ->
 				val o = a.optJSONObject(i) ?: return@mapNotNull null
 				val html = o.optString("content")
@@ -317,7 +403,9 @@ object RssSincronizacion {
 
 	private class NextcloudNews(val base: String, val usuario: String, val clave: String) : Servicio {
 		private val cab get() = mapOf("Authorization" to basica(usuario, clave))
-		private val api get() = if (base.contains("/apps/news/api")) base else "$base/index.php/apps/news/api/v1-3"
+		// Siempre la v1-3 (la que entiende este código), aunque la dirección escrita traiga otra (/api/v1-2)
+		private val api get() = if (base.contains("/apps/news/api")) base.substringBefore("/apps/news/api") + "/apps/news/api/v1-3"
+			else "$base/index.php/apps/news/api/v1-3"
 
 		override fun entrar() {
 			peticion("$api/version", cabeceras = cab)
@@ -333,10 +421,29 @@ object RssSincronizacion {
 			}
 		}
 
+		/** Los artículos, página a página: cada página pide los más antiguos que el último recibido (offset), hasta el tope. */
 		private fun elementos(tipo: Int, leidos: Boolean): List<ArticuloRemoto> {
-			val a = JSONObject(peticion("$api/items?type=$tipo&getRead=$leidos&batchSize=300", cabeceras = cab)).optJSONArray("items") ?: JSONArray()
-			return (0 until a.length()).mapNotNull { i ->
-				val o = a.optJSONObject(i) ?: return@mapNotNull null
+			val r = ArrayList<ArticuloRemoto>()
+			val vistos = HashSet<Long>()
+			var desde = 0L
+			do {
+				val a = JSONObject(peticion("$api/items?type=$tipo&getRead=$leidos&batchSize=$PAGINA&offset=$desde", cabeceras = cab))
+					.optJSONArray("items") ?: JSONArray()
+				var menor = Long.MAX_VALUE
+				val nuevos = (0 until a.length()).mapNotNull { a.optJSONObject(it) }.filter { o ->
+					val id = o.optLong("id")
+					if (id > 0) menor = minOf(menor, id)
+					vistos.add(id)
+				}
+				r += pagina(nuevos)
+				val seguir = a.length() >= PAGINA && nuevos.isNotEmpty() && menor != Long.MAX_VALUE
+				desde = menor
+			} while (seguir && r.size < TOPE)
+			return r
+		}
+
+		private fun pagina(lista: List<JSONObject>): List<ArticuloRemoto> {
+			return lista.map { o ->
 				val html = o.optString("body")
 				ArticuloRemoto(o.optLong("id").toString(), o.optLong("feedId").toString(),
 					RssLector.Elemento(o.optString("guidHash"), o.optString("title"), o.optString("url"), o.optString("author"),

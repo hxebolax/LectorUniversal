@@ -49,6 +49,8 @@ class ExportadorAudio(private val c: Context) {
 		val p = Preferencias(c)
 		val pronunciador = if (p.pronunciacionActiva) Pronunciador(c, idLibro.takeIf { it > 0 }) else null
 		val total = doc.caracteres.coerceAtLeast(1)
+		// Lo que ya hay en la carpeta, de una vez (buscar archivo a archivo en una carpeta del sistema es muy lento)
+		val existentes = withContext(Dispatchers.IO) { subcarpeta.listFiles().associateBy { it.name } }
 		var hechos = 0
 		try {
 			for ((i, cap) in capitulos.withIndex()) {
@@ -57,18 +59,26 @@ class ExportadorAudio(private val c: Context) {
 				// Trozos de unos 2500 caracteres en frases completas (el motor tiene un máximo por petición)
 				val trozos = trozos(doc, cap.bloques, p.saltarNotas).map { t -> pronunciador?.takeIf { !it.vacio }?.aplicar(t) ?: t }
 				if (trozos.isEmpty()) continue
-				val wavs = ArrayList<File>()
-				for ((k, t) in trozos.withIndex()) {
-					coroutineContext.ensureActive()
-					val wav = File(temporal, "t$k.wav")
-					if (sintetizar(tts, t, wav)) wavs += wav
-				}
-				if (wavs.isEmpty()) continue
+				// Cada trozo se codifica en cuanto se genera y su WAV se borra: la caché no crece con capítulos largos
 				val m4a = File(temporal, "capitulo.m4a")
-				withContext(Dispatchers.Default) { codificar(wavs, m4a) }
-				wavs.forEach { it.delete() }
+				var codificador: Codificador? = null
+				try {
+					for ((k, t) in trozos.withIndex()) {
+						coroutineContext.ensureActive()
+						val wav = File(temporal, "t$k.wav")
+						if (sintetizar(tts, t, wav)) withContext(Dispatchers.Default) {
+							val cod = codificador ?: crearCodificador(wav, m4a)?.also { codificador = it }
+							cod?.anadir(wav)
+						}
+						wav.delete()
+					}
+					withContext(Dispatchers.Default) { codificador?.terminar() }
+				} finally {
+					codificador?.liberar()
+				}
+				if (codificador == null) continue
 				val nombre = "%02d - %s.m4a".format(i + 1, nombreArchivo(cap.titulo).take(60))
-				subcarpeta.findFile(nombre)?.delete()
+				existentes[nombre]?.delete()
 				val archivo = subcarpeta.createFile("audio/mp4", nombre) ?: error("No se puede crear $nombre")
 				withContext(Dispatchers.IO) {
 					c.contentResolver.openOutputStream(archivo.uri)?.use { s -> m4a.inputStream().use { it.copyTo(s) } }
@@ -190,28 +200,53 @@ class ExportadorAudio(private val c: Context) {
 		null
 	}
 
-	private fun codificar(wavs: List<File>, destino: File) {
-		val cabeceras = wavs.mapNotNull { f -> leerCabecera(f)?.let { f to it } }
-		if (cabeceras.isEmpty()) error("Audio vacío")
-		val frecuencia = cabeceras.first().second.frecuencia.takeIf { it > 0 } ?: 22050
-		val canales = cabeceras.first().second.canales.coerceIn(1, 2)
-		val formato = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, frecuencia, canales).apply {
-			setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
-			setInteger(MediaFormat.KEY_BIT_RATE, 64_000)
-			setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16_384)
-		}
-		val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
-		codec.configure(formato, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-		codec.start()
-		val muxer = MediaMuxer(destino.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-		var pista = -1
-		val info = MediaCodec.BufferInfo()
-		var muestras = 0L
-		val bytesPorMuestra = 2 * canales
-		// Pausa de medio segundo entre trozos
-		val silencio = ByteArray(frecuencia / 2 * bytesPorMuestra)
+	/** Un codificador para el capítulo con el formato del primer WAV (null si no es un WAV válido). */
+	private fun crearCodificador(primero: File, destino: File): Codificador? {
+		val w = leerCabecera(primero) ?: return null
+		return Codificador(destino, w.frecuencia.takeIf { it > 0 } ?: 22050, w.canales.coerceIn(1, 2))
+	}
 
-		fun vaciar(final: Boolean) {
+	/**
+	 * Pasa a AAC (M4A) los WAV de un capítulo según se van generando, con
+	 * medio segundo de pausa entre trozos. Así no hace falta guardar todos los
+	 * WAV del capítulo (un libro sin índice serían gigas en la caché).
+	 */
+	private inner class Codificador(destino: File, private val frecuencia: Int, canales: Int) {
+		private val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+		private val bytesPorMuestra = 2 * canales
+		// Pausa de medio segundo entre trozos
+		private val silencio = ByteArray(frecuencia / 2 * bytesPorMuestra)
+		private val trozo = ByteArray(16_384)
+		private val info = MediaCodec.BufferInfo()
+		private var pista = -1
+		private var muestras = 0L
+		private var trozos = 0
+		private var liberado = false
+
+		init {
+			try {
+				val formato = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, frecuencia, canales).apply {
+					setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
+					setInteger(MediaFormat.KEY_BIT_RATE, 64_000)
+					setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16_384)
+				}
+				codec.configure(formato, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+				codec.start()
+			} catch (e: Exception) {
+				codec.release()
+				throw e
+			}
+		}
+
+		private val muxer = try {
+			MediaMuxer(destino.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+		} catch (e: Exception) {
+			runCatching { codec.stop() }
+			codec.release()
+			throw e
+		}
+
+		private fun vaciar(final: Boolean) {
 			while (true) {
 				val i = codec.dequeueOutputBuffer(info, if (final) 10_000 else 0)
 				when {
@@ -235,7 +270,7 @@ class ExportadorAudio(private val c: Context) {
 			}
 		}
 
-		fun meter(datos: ByteArray, largo: Int) {
+		private fun meter(datos: ByteArray, largo: Int) {
 			var hecho = 0
 			while (hecho < largo) {
 				val i = codec.dequeueInputBuffer(10_000)
@@ -254,30 +289,37 @@ class ExportadorAudio(private val c: Context) {
 			}
 		}
 
-		try {
-			val trozo = ByteArray(16_384)
-			for ((k, par) in cabeceras.withIndex()) {
-				val (f, w) = par
-				if (k > 0) meter(silencio, silencio.size)
-				RandomAccessFile(f, "r").use { raf ->
-					raf.seek(w.inicio)
-					var queda = w.largo
-					while (queda > 0) {
-						val n = raf.read(trozo, 0, minOf(trozo.size.toLong(), queda).toInt())
-						if (n <= 0) break
-						meter(trozo, n - n % bytesPorMuestra)
-						queda -= n
-					}
+		/** Añade un WAV (si no es válido, se salta). */
+		fun anadir(f: File) {
+			val w = leerCabecera(f) ?: return
+			if (trozos++ > 0) meter(silencio, silencio.size)
+			RandomAccessFile(f, "r").use { raf ->
+				raf.seek(w.inicio)
+				var queda = w.largo
+				while (queda > 0) {
+					val n = raf.read(trozo, 0, minOf(trozo.size.toLong(), queda).toInt())
+					if (n <= 0) break
+					meter(trozo, n - n % bytesPorMuestra)
+					queda -= n
 				}
 			}
+		}
+
+		/** Cierra el audio del capítulo (el archivo queda completo). */
+		fun terminar() {
 			val i = codec.dequeueInputBuffer(10_000)
 			if (i >= 0) codec.queueInputBuffer(i, 0, 0, muestras * 1_000_000L / frecuencia, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
 			vaciar(true)
-		} finally {
+		}
+
+		/** Suelta el codificador y el archivo (también si se canceló a medias). */
+		fun liberar() {
+			if (liberado) return
+			liberado = true
 			runCatching { codec.stop() }
-			codec.release()
+			runCatching { codec.release() }
 			runCatching { if (pista >= 0) muxer.stop() }
-			muxer.release()
+			runCatching { muxer.release() }
 		}
 	}
 

@@ -34,8 +34,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * La web de una biblioteca para personas ciegas (Tiflolibros, Biblioteca
@@ -193,20 +191,22 @@ class NavegadorBibliotecaActivity : AppCompatActivity() {
 	 */
 	private suspend fun bajar(url: String, agente: String, pagina: String?, disposicion: String?, tipo: String?, titulo: String, enlace: String): File {
 		val carpeta = File(filesDir, "biblioteca/descargas").apply { mkdirs() }
-		val c = (URL(url).openConnection() as HttpURLConnection).apply {
-			connectTimeout = 20_000
-			readTimeout = 60_000
-			setRequestProperty("User-Agent", agente)
-			CookieManager.getInstance().getCookie(url)?.let { setRequestProperty("Cookie", it) }
-			pagina?.let { setRequestProperty("Referer", it) }
-		}
+		// Las redirecciones, a mano: las cookies de la sesión solo van al servidor de cada dirección
+		val c = Redirecciones.abrir(url, { con ->
+			con.connectTimeout = 20_000
+			con.readTimeout = 60_000
+			con.setRequestProperty("User-Agent", agente)
+			pagina?.let { con.setRequestProperty("Referer", it) }
+		}) { direccion -> CookieManager.getInstance().getCookie(direccion) }
+		var temporal: File? = null
 		try {
 			if (c.responseCode !in 200..299) error(getString(R.string.web_servidor_respondio, c.responseCode))
 			if (c.contentType.orEmpty().startsWith("text/html")) error(getString(R.string.web_no_es_archivo))
 			// El nombre que da el servidor en esta respuesta (o el del navegador, o el título del libro)
 			var nombreArchivo = NombreDescarga.elegir(c.getHeaderField("Content-Disposition") ?: disposicion, c.url.toString(), c.contentType ?: tipo, titulo, enlace, nombre)
-			val temporal = File(carpeta, "descarga_${System.currentTimeMillis()}.parte")
-			c.inputStream.use { entrada -> temporal.outputStream().use { salida ->
+			val parte = File(carpeta, "descarga_${System.currentTimeMillis()}.parte")
+			temporal = parte
+			c.inputStream.use { entrada -> parte.outputStream().use { salida ->
 				val b = ByteArray(64 * 1024)
 				while (true) {
 					kotlin.coroutines.coroutineContext.ensureActive()
@@ -216,7 +216,7 @@ class NavegadorBibliotecaActivity : AppCompatActivity() {
 				}
 			} }
 			// Si el nombre no trae extensión (o trae una que no es de libro), la del contenido: ZIP, PDF, MP3...
-			val porContenido = temporal.inputStream().use { e -> ByteArray(8).also { e.read(it) } }.let { NombreDescarga.extensionDeContenido(it) }
+			val porContenido = parte.inputStream().use { e -> ByteArray(8).also { e.read(it) } }.let { NombreDescarga.extensionDeContenido(it) }
 			val actual = nombreArchivo.substringAfterLast('.', "").lowercase()
 			if (porContenido.isNotEmpty() && (actual.isEmpty() || actual in setOf("bin", "dat", "tmp", "download", "aspx", "php"))) {
 				nombreArchivo = (if (actual.isEmpty()) nombreArchivo else nombreArchivo.substringBeforeLast('.')) + ".$porContenido"
@@ -228,10 +228,12 @@ class NavegadorBibliotecaActivity : AppCompatActivity() {
 				destino = File(carpeta, nombreArchivo.substringBeforeLast('.') + " ($n)" + nombreArchivo.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" })
 				n++
 			}
-			if (!temporal.renameTo(destino)) error(getString(R.string.web_no_anadido))
+			if (!parte.renameTo(destino)) error(getString(R.string.web_no_anadido))
 			return destino
 		} finally {
 			c.disconnect()
+			// Cancelado o con error: no queda el «.parte» en el disco (si se guardó, ya no existe con ese nombre)
+			temporal?.delete()
 		}
 	}
 

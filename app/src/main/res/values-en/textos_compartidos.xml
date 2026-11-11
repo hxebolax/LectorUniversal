@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texts for Shared, Library, catalogs and importing (kept apart from strings.xml). -->
+<resources>
+	<string name="comp_ya_biblioteca_x">Already in your library: %1$s</string>
+	<string name="comp_ya_compartidos_x">Already in Shared: %1$s</string>
+	<plurals name="comp_ya_biblioteca_n">
+		<item quantity="one">%1$d was already in your library</item>
+		<item quantity="other">%1$d were already in your library</item>
+	</plurals>
+	<string name="disp_ya_compartidos_abrir">Already in Shared: open it</string>
+	<string name="zona_dispositivo">Books on the device</string>
+	<string name="widget_escuchar_x">Listen to %1$s</string>
+</resources>

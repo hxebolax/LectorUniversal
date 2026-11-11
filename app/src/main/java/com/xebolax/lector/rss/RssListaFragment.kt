@@ -62,11 +62,14 @@ class RssListaFragment : Fragment() {
 		fun nuevo(modo: Modo) = RssListaFragment().apply { arguments = bundleOf("modo" to modo.name) }
 	}
 
+	// Lo que necesitan las acciones de cada fila se calcula al cargar (fuera del hilo principal), no al dibujarla
 	private sealed class Fila {
 		class Subir(val nombre: String) : Fila()
 		class Categoria(val nombre: String, val sinLeer: Int, val fuentes: Int) : Fila()
-		class DeFuente(val fuente: Fuente) : Fila()
-		class DeArticulo(val articulo: Articulo) : Fila()
+		/** vecinas: las fuentes de su misma carpeta, en su orden (para ordenarla entre ellas). */
+		class DeFuente(val fuente: Fuente, val vecinas: List<Long>) : Fila()
+		/** guardado: ya está en la biblioteca. */
+		class DeArticulo(val articulo: Articulo, val guardado: Boolean = false) : Fila()
 	}
 
 	private var _b: FragmentLibrosBinding? = null
@@ -83,6 +86,9 @@ class RssListaFragment : Fragment() {
 	// Sin leer: filtro por categoría
 	private var filtroCategoria: String? = null
 	private var busqueda = ""
+	// Calculado al cargar: las carpetas en su orden y el nombre de la fuente abierta
+	private var carpetas: List<String> = emptyList()
+	private var nombreFuente: String? = null
 
 	private val actividad get() = activity as? RssActivity
 
@@ -207,7 +213,8 @@ class RssListaFragment : Fragment() {
 						recargar()
 					}
 				})
-				anadir(boton(if (filtroCategoria == null) getString(R.string.rss_todas_categorias) else filtroCategoria!!) { elegirFiltro() })
+				// Dice qué es, no solo el nombre de la carpeta: «Carpeta: Deportes»
+				anadir(boton(getString(R.string.noticias_filtro_carpeta, filtroCategoria ?: getString(R.string.noticias_filtro_todas))) { elegirFiltro() })
 			}
 			Modo.FUENTES -> when {
 				fuente != null -> {
@@ -219,14 +226,24 @@ class RssListaFragment : Fragment() {
 						construirCabecera()
 						recargar()
 					})
-					anadir(boton(getString(R.string.rss_opciones_fuente)) { db.fuente(fuente!!)?.let { opcionesFuente(it) } })
+					anadir(boton(getString(R.string.rss_opciones_fuente)) {
+						val id = fuente ?: return@boton
+						// Con sus cuentas (sin leer) y sus vecinas, fuera del hilo principal
+						viewLifecycleOwner.lifecycleScope.launch {
+							val todas = withContext(Dispatchers.IO) { db.fuentes() }
+							val f = todas.firstOrNull { it.id == id } ?: return@launch
+							opcionesFuente(f, todas.filter { it.categoria.equals(f.categoria, ignoreCase = true) }.map { it.id })
+						}
+					})
 				}
 				categoria != null -> {
 					anadir(boton(getString(R.string.rss_leer_todo)) { leerTodo() })
 				anadir(boton(getString(R.string.rss_leer_titulares)) { leerTitulares() })
 				otraFila()
 					anadir(boton(getString(R.string.rss_anadir_fuente_aqui)) { actividad?.anadirFuente(categoria!!) })
-					anadir(boton(getString(R.string.opciones_carpeta)) { categoria?.let { n -> actividad?.elegir(n, accionesCategoria(n)) } })
+					anadir(boton(getString(R.string.opciones_carpeta)) {
+						categoria?.let { n -> actividad?.elegir(n, accionesCategoria(n, filas.filterIsInstance<Fila.DeFuente>().sumOf { it.fuente.sinLeer })) }
+					})
 				}
 				// Arriba ya está «Añadir fuente»: aquí, crear carpetas
 				else -> anadir(boton(getString(R.string.nueva_carpeta)) { nuevaCarpeta() })
@@ -240,12 +257,15 @@ class RssListaFragment : Fragment() {
 	}
 
 	private fun elegirFiltro() {
-		val categorias = db.categorias()
-		val nombres = listOf(getString(R.string.rss_todas_categorias)) + categorias
-		requireContext().elegirUno(getString(R.string.rss_categoria), nombres, categorias.indexOf(filtroCategoria) + 1) { i ->
-			filtroCategoria = if (i == 0) null else categorias[i - 1]
-			construirCabecera()
-			recargar()
+		viewLifecycleOwner.lifecycleScope.launch {
+			val categorias = withContext(Dispatchers.IO) { db.categorias() }
+			if (_b == null) return@launch
+			val nombres = listOf(getString(R.string.rss_todas_categorias)) + categorias
+			requireContext().elegirUno(getString(R.string.rss_categoria), nombres, categorias.indexOf(filtroCategoria) + 1) { i ->
+				filtroCategoria = if (i == 0) null else categorias[i - 1]
+				construirCabecera()
+				recargar()
+			}
 		}
 	}
 
@@ -263,41 +283,63 @@ class RssListaFragment : Fragment() {
 		val filtro = filtroCategoria
 		val texto = busqueda
 		val vistaActual = vista
+		// Los textos y la base de datos de la biblioteca se toman aquí: en el otro hilo el fragmento puede haberse separado
+		val nombreFuentes = getString(R.string.rss_pestana_fuentes)
+		val biblioteca = com.xebolax.lector.datos.BaseDatos.obtener(requireContext())
 		carga?.cancel()
 		carga = viewLifecycleOwner.lifecycleScope.launch {
+			var titulo: String? = null
+			var ordenCarpetas: List<String> = emptyList()
 			val nuevas: List<Fila> = withContext(Dispatchers.IO) {
+				// Las fuentes de cada carpeta, en su orden (para «Subir», «Bajar»…)
+				fun conVecinas(todas: List<Fuente>, lista: List<Fuente>): List<Fila> {
+					val porCarpeta = todas.groupBy { it.categoria.lowercase() }.mapValues { (_, l) -> l.map { it.id } }
+					return lista.map { Fila.DeFuente(it, porCarpeta[it.categoria.lowercase()].orEmpty()) }
+				}
+				// Si ya está en la biblioteca (y sigue ahí), para ofrecer «Abrir en la biblioteca»
+				fun deArticulos(lista: List<Articulo>): List<Fila> {
+					val guardados = lista.map { it.enBiblioteca }.filter { it > 0 }.distinct().filter { biblioteca.libro(it) != null }.toSet()
+					return lista.map { Fila.DeArticulo(it, it.enBiblioteca in guardados) }
+				}
 				when (m) {
-					Modo.SIN_LEER -> when (vistaActual) {
+					Modo.SIN_LEER -> deArticulos(when (vistaActual) {
 						1 -> db.deHoy(filtro)
 						2 -> db.recientes(filtro)
 						3 -> db.leidos(filtro)
 						else -> db.sinLeer(antiguos, filtro)
-					}.map { Fila.DeArticulo(it) }
-					Modo.FAVORITOS -> db.favoritos().map { Fila.DeArticulo(it) }
-					Modo.MAS_TARDE -> db.masTarde().map { Fila.DeArticulo(it) }
-					Modo.BUSCAR -> if (texto.trim().length < 2) emptyList() else db.buscar(texto).map { Fila.DeArticulo(it) }
-					Modo.FUENTES -> when {
-						fu != null -> {
-							val f = db.fuente(fu)
-							listOf<Fila>(Fila.Subir(cat ?: getString(R.string.rss_pestana_fuentes))) +
-								db.deFuente(fu, solo, antiguos).map { Fila.DeArticulo(it) }.also { if (f == null) return@withContext emptyList() }
-						}
-						cat != null -> listOf<Fila>(Fila.Subir(getString(R.string.rss_pestana_fuentes))) +
-							db.fuentes().filter { it.categoria.equals(cat, ignoreCase = true) }.map { Fila.DeFuente(it) }
-						else -> {
-							// Las carpetas en su orden (también las vacías) y después las fuentes sin carpeta
-							val todas = db.fuentes()
-							val carpetas = db.categorias().let { c -> c + todas.map { it.categoria }.filter { n -> n.isNotBlank() && c.none { it.equals(n, ignoreCase = true) } }.distinct() }
-							carpetas.map { n ->
-								val l = todas.filter { it.categoria.equals(n, ignoreCase = true) }
-								Fila.Categoria(n, l.sumOf { it.sinLeer }, l.size)
-							} + todas.filter { it.categoria.isBlank() }.map { Fila.DeFuente(it) }
+					})
+					Modo.FAVORITOS -> deArticulos(db.favoritos())
+					Modo.MAS_TARDE -> deArticulos(db.masTarde())
+					Modo.BUSCAR -> if (texto.trim().length < 2) emptyList() else deArticulos(db.buscar(texto))
+					Modo.FUENTES -> {
+						ordenCarpetas = db.categorias()
+						when {
+							fu != null -> {
+								val f = db.fuente(fu) ?: return@withContext emptyList()
+								titulo = f.titulo
+								listOf<Fila>(Fila.Subir(cat ?: nombreFuentes)) + deArticulos(db.deFuente(fu, solo, antiguos))
+							}
+							cat != null -> {
+								val todas = db.fuentes()
+								listOf<Fila>(Fila.Subir(nombreFuentes)) + conVecinas(todas, todas.filter { it.categoria.equals(cat, ignoreCase = true) })
+							}
+							else -> {
+								// Las carpetas en su orden (también las vacías) y después las fuentes sin carpeta
+								val todas = db.fuentes()
+								val lista = ordenCarpetas.let { c -> c + todas.map { it.categoria }.filter { n -> n.isNotBlank() && c.none { it.equals(n, ignoreCase = true) } }.distinct() }
+								lista.map { n ->
+									val l = todas.filter { it.categoria.equals(n, ignoreCase = true) }
+									Fila.Categoria(n, l.sumOf { it.sinLeer }, l.size)
+								} + conVecinas(todas, todas.filter { it.categoria.isBlank() })
+							}
 						}
 					}
 				}
 			}
 			if (_b == null) return@launch
 			filas = nuevas
+			carpetas = ordenCarpetas
+			nombreFuente = titulo
 			@Suppress("NotifyDataSetChanged")
 			b.recycler.adapter?.notifyDataSetChanged()
 			// Solo si cambia: la línea de estado es una región viva y TalkBack la repetiría en cada recarga
@@ -347,9 +389,12 @@ class RssListaFragment : Fragment() {
 
 	/** Abre una fuente (desde otra pestaña con «Ir a la fuente»). */
 	fun abrirFuente(id: Long) {
-		val f = db.fuente(id) ?: return
-		categoria = f.categoria.ifBlank { null }
-		entrarFuente(f)
+		lifecycleScope.launch {
+			val f = withContext(Dispatchers.IO) { db.fuente(id) } ?: return@launch
+			if (_b == null) return@launch
+			categoria = f.categoria.ifBlank { null }
+			entrarFuente(f)
+		}
 	}
 
 	private fun entrarFuente(f: Fuente) {
@@ -367,7 +412,7 @@ class RssListaFragment : Fragment() {
 		val a = activity as? AppCompatActivity ?: return
 		val lista = articulosVisibles()
 		val titulo = when {
-			fuente != null -> db.fuente(fuente!!)?.titulo ?: getString(R.string.noticias)
+			fuente != null -> nombreFuente ?: getString(R.string.noticias)
 			categoria != null -> categoria!!
 			else -> getString(modo.nombre)
 		}
@@ -378,45 +423,64 @@ class RssListaFragment : Fragment() {
 	private fun leerTitulares() {
 		val a = activity as? AppCompatActivity ?: return
 		val titulo = when {
-			fuente != null -> db.fuente(fuente!!)?.titulo ?: getString(R.string.noticias)
+			fuente != null -> nombreFuente ?: getString(R.string.noticias)
 			categoria != null -> categoria!!
 			else -> getString(modo.nombre)
 		}
 		RssAcciones.leerTitulares(a, getString(R.string.rss_titulares_de, titulo), articulosVisibles())
 	}
 
-	private fun opcionesFuente(f: Fuente) {
-		actividad?.elegir(f.titulo, accionesFuente(f))
+	private fun opcionesFuente(f: Fuente, vecinas: List<Long>) {
+		actividad?.elegir(f.titulo, accionesFuente(f, vecinas))
 	}
 
-	/** Lo que se puede hacer con una fuente (su menú y, si el usuario las añade, acciones de TalkBack). */
-	private fun accionesFuente(f: Fuente): List<Accion> {
-		val a = actividad ?: return emptyList()
-		// Las de su misma carpeta, para ordenarla entre ellas
-		val vecinas = db.fuentes().filter { it.categoria.equals(f.categoria, ignoreCase = true) }
-		return listOf<Accion>(
-			getString(R.string.mover_a_carpeta) to {
-				a.elegirCarpeta(getString(R.string.mover_a_carpeta), db.categorias(), f.categoria) { destino ->
-					db.ponerCategoria(f.id, destino)
-					a.avisar(if (destino.isBlank()) getString(R.string.sin_carpeta) else getString(R.string.movida_a_carpeta, destino))
+	/** Mover a otra carpeta: las carpetas se leen al pulsar, fuera del hilo principal. */
+	private fun moverACarpeta(a: RssActivity, f: Fuente) {
+		a.lifecycleScope.launch {
+			val lista = withContext(Dispatchers.IO) { db.categorias() }
+			a.elegirCarpeta(getString(R.string.mover_a_carpeta), lista, f.categoria) { destino ->
+				RssAcciones.enFondo(a, { db.ponerCategoria(f.id, destino) }) {
+					a.avisar(if (destino.isBlank()) a.getString(R.string.sin_carpeta) else a.getString(R.string.movida_a_carpeta, destino))
 				}
-			},
-		) + a.accionesOrden(vecinas.map { it.id }, f.id) { db.ordenarFuentes(it) } + listOf(
+			}
+		}
+	}
+
+	/** Marca como leído (todo lo de una fuente o una carpeta) fuera del hilo principal, con Deshacer. */
+	private fun marcarTodo(a: RssActivity, fuente: Long? = null, categoria: String? = null) {
+		a.lifecycleScope.launch {
+			val ids = withContext(Dispatchers.IO) { db.marcarTodoLeido(fuente = fuente, categoria = categoria) }
+			a.conDeshacer(a.resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) {
+				RssAcciones.enFondo(a, { db.marcarLeidos(ids, false) })
+			}
+		}
+	}
+
+	/**
+	 * Lo que se puede hacer con una fuente (su menú y, si el usuario las añade, acciones de TalkBack).
+	 * vecinas: las fuentes de su misma carpeta, en su orden (se calculan al cargar, no al dibujar la fila).
+	 */
+	private fun accionesFuente(f: Fuente, vecinas: List<Long>): List<Accion> {
+		val a = actividad ?: return emptyList()
+		return listOf<Accion>(
+			getString(R.string.mover_a_carpeta) to { moverACarpeta(a, f) },
+		) + a.accionesOrden(vecinas, f.id) { nueva -> RssAcciones.enFondo(a, { db.ordenarFuentes(nueva) }) } + listOf(
 			getString(R.string.abrir) to { entrarFuente(f) },
 			getString(R.string.rss_actualizar) to {
 				lifecycleScope.launch {
-					val n = runCatching { a.conEspera(getString(R.string.rss_actualizar), getString(R.string.rss_actualizando)) { Rss.actualizar(a, f).size } }
+					// Si está enlazada con el servidor de sincronización, se sincroniza (no se duplican sus artículos); después, las reglas
+					val n = runCatching { a.conEspera(getString(R.string.rss_actualizar), getString(R.string.rss_actualizando)) { Rss.actualizarUna(a, f) } }
 						.getOrElse { if (it is kotlinx.coroutines.CancellationException) throw it; -1 }
-					a.avisar(if (n < 0) getString(R.string.rss_error_fuente, f.titulo) else resources.getQuantityString(R.plurals.rss_nuevos, n, n))
+					a.avisar(if (n < 0) a.getString(R.string.rss_error_fuente, f.titulo) else a.resources.getQuantityString(R.plurals.rss_nuevos, n, n))
 				}
+				Unit
 			},
-			getString(R.string.rss_marcar_todo_leido) to {
-				a.confirmar(getString(R.string.confirmar_marcar_leido_x, f.titulo), getString(R.string.rss_marcar_todo_leido)) {
-					val ids = db.deFuente(f.id, soloSinLeer = true).map { it.id }
-					db.marcarTodoLeido(fuente = f.id)
-					a.conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) { db.marcarLeidos(ids, false) }
-				}
-			},
+		) + listOfNotNull<Accion>(
+			// Solo si hay algo sin leer (no se ofrece lo que ya está hecho)
+			(getString(R.string.rss_marcar_todo_leido) to {
+				a.confirmar(getString(R.string.confirmar_marcar_leido_x, f.titulo), getString(R.string.rss_marcar_todo_leido)) { marcarTodo(a, fuente = f.id) }
+			}).takeIf { f.sinLeer > 0 },
+		) + listOf<Accion>(
 			getString(R.string.rss_editar_fuente) to { a.editarFuente(f) },
 			getString(R.string.rss_info_fuente) to {
 				val texto = listOfNotNull(
@@ -430,95 +494,133 @@ class RssListaFragment : Fragment() {
 			getString(R.string.abrir_navegador) to { RssAcciones.abrirNavegador(a, f.sitio.ifBlank { f.url }) },
 			getString(R.string.rss_borrar_fuente) to {
 				a.confirmar(getString(R.string.rss_confirmar_borrar_fuente, f.titulo), getString(R.string.borrar)) {
-					db.remotosDeFuentes()[f.id]?.let { r -> a.lifecycleScope.launch { RssSincronizacion.borrarFuente(a, r) } }
-					db.borrarFuente(f.id)
-					if (fuente == f.id) subir()
-					a.avisar(getString(R.string.rss_fuente_borrada))
+					a.lifecycleScope.launch {
+						val remoto = withContext(Dispatchers.IO) {
+							db.remotosDeFuentes()[f.id].also { db.borrarFuente(f.id) }
+						}
+						// También en el servidor de sincronización, si estaba enlazada
+						remoto?.let { r -> a.lifecycleScope.launch { RssSincronizacion.borrarFuente(a, r) } }
+						if (fuente == f.id && _b != null) subir()
+						a.avisar(a.getString(R.string.rss_fuente_borrada))
+					}
 				}
 			},
 		)
 	}
 
-	private fun accionesCategoria(n: String): List<Accion> {
+	/**
+	 * Lo que se puede hacer con una carpeta. sinLeer: sus artículos sin leer (para no
+	 * ofrecer «Marcar todo como leído» si no hay ninguno). El orden de las carpetas se calcula al cargar.
+	 */
+	private fun accionesCategoria(n: String, sinLeer: Int): List<Accion> {
 		val a = actividad ?: return emptyList()
 		return listOf<Accion>(
 			getString(R.string.abrir) to { entrarCategoria(n) },
 			getString(R.string.rss_leer_todo) to {
-				RssAcciones.leerSeguidos(a, n, db.deCategoria(n, soloSinLeer = true))
-			},
-			getString(R.string.rss_marcar_todo_leido) to {
-				a.confirmar(getString(R.string.confirmar_marcar_leido_x, n), getString(R.string.rss_marcar_todo_leido)) {
-					val ids = db.deCategoria(n, soloSinLeer = true).map { it.id }
-					db.marcarTodoLeido(categoria = n)
-					a.conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) { db.marcarLeidos(ids, false) }
+				a.lifecycleScope.launch {
+					val lista = withContext(Dispatchers.IO) { db.deCategoria(n, soloSinLeer = true) }
+					RssAcciones.leerSeguidos(a, n, lista)
 				}
 			},
+		) + listOfNotNull<Accion>(
+			(getString(R.string.rss_marcar_todo_leido) to {
+				a.confirmar(getString(R.string.confirmar_marcar_leido_x, n), getString(R.string.rss_marcar_todo_leido)) { marcarTodo(a, categoria = n) }
+			}).takeIf { sinLeer > 0 },
+		) + listOf<Accion>(
 			getString(R.string.renombrar) to {
 				a.pedirNombreCarpeta(getString(R.string.renombrar), n) { nuevo ->
-					db.renombrarCategoria(n, nuevo)
-					if (categoria == n) categoria = db.categorias().firstOrNull { it.equals(nuevo, ignoreCase = true) } ?: nuevo
-					construirCabecera()
-					a.avisar(getString(R.string.carpeta_renombrada, nuevo))
+					a.lifecycleScope.launch {
+						val guardado = withContext(Dispatchers.IO) {
+							db.renombrarCategoria(n, nuevo)
+							db.categorias().firstOrNull { it.equals(nuevo, ignoreCase = true) } ?: nuevo
+						}
+						if (_b == null) return@launch
+						if (categoria == n) categoria = guardado
+						construirCabecera()
+						a.avisar(getString(R.string.carpeta_renombrada, nuevo))
+					}
 				}
 			},
 			getString(R.string.borrar_carpeta) to { borrarCarpeta(n) },
-		) + a.accionesOrden(db.categorias(), db.categorias().firstOrNull { it.equals(n, ignoreCase = true) } ?: n) { db.ordenarCarpetas(it) }
+		) + a.accionesOrden(carpetas, carpetas.firstOrNull { it.equals(n, ignoreCase = true) } ?: n) { nueva ->
+			RssAcciones.enFondo(a, { db.ordenarCarpetas(nueva) })
+		}
 	}
 
 	private fun nuevaCarpeta() {
 		val a = actividad ?: return
 		a.pedirNombreCarpeta(getString(R.string.nueva_carpeta)) { nombre ->
-			val ya = db.categorias().any { it.equals(nombre, ignoreCase = true) }
-			val n = db.crearCarpeta(nombre)
-			a.avisar(getString(if (ya) R.string.carpeta_ya_existe else R.string.carpeta_creada, n))
+			a.lifecycleScope.launch {
+				val (ya, n) = withContext(Dispatchers.IO) {
+					val ya = db.categorias().any { it.equals(nombre, ignoreCase = true) }
+					ya to db.crearCarpeta(nombre)
+				}
+				a.avisar(a.getString(if (ya) R.string.carpeta_ya_existe else R.string.carpeta_creada, n))
+			}
 		}
 	}
 
 	/** Borrar una carpeta: si tiene fuentes, se pregunta si borrarlas también o dejarlas sin carpeta. */
 	private fun borrarCarpeta(n: String) {
 		val a = actividad ?: return
-		val suyas = db.fuentes().count { it.categoria.equals(n, ignoreCase = true) }
+		a.lifecycleScope.launch {
+			val suyas = withContext(Dispatchers.IO) { db.fuentes().count { it.categoria.equals(n, ignoreCase = true) } }
+			borrarCarpeta(a, n, suyas)
+		}
+	}
+
+	private fun borrarCarpeta(a: RssActivity, n: String, suyas: Int) {
 		val hecho = {
-			if (categoria.equals(n, ignoreCase = true)) subir()
-			a.avisar(getString(R.string.carpeta_borrada_x, n))
+			if (categoria.equals(n, ignoreCase = true) && _b != null) subir()
+			a.avisar(a.getString(R.string.carpeta_borrada_x, n))
 		}
 		if (suyas == 0) return a.confirmar(getString(R.string.confirmar_borrar_carpeta_vacia, n), getString(R.string.borrar)) {
-			db.borrarCarpeta(n, conFuentes = false)
-			hecho()
+			RssAcciones.enFondo(a, { db.borrarCarpeta(n, conFuentes = false) }, hecho)
 		}
 		a.elegir(getString(R.string.borrar_carpeta_x, n), listOf<Accion>(
 			resources.getQuantityString(R.plurals.borrar_solo_carpeta, suyas, suyas) to {
-				db.borrarCarpeta(n, conFuentes = false)
-				hecho()
+				RssAcciones.enFondo(a, { db.borrarCarpeta(n, conFuentes = false) }, hecho)
 			},
 			resources.getQuantityString(R.plurals.borrar_carpeta_y_fuentes, suyas, suyas) to {
 				a.confirmar(resources.getQuantityString(R.plurals.confirmar_borrar_carpeta_y_fuentes, suyas, n, suyas), getString(R.string.borrar)) {
-					val remotos = db.remotosDeFuentes()
-					val borradas = db.borrarCarpeta(n, conFuentes = true)
-					borradas.forEach { f -> remotos[f.id]?.let { r -> a.lifecycleScope.launch { RssSincronizacion.borrarFuente(a, r) } } }
-					hecho()
+					borrarCarpetaYFuentes(a, n, hecho)
 				}
 			},
 		))
 	}
 
-	private fun accionesArticulo(art: Articulo, posicion: Int): List<Accion> {
+	/** Borra la carpeta con sus fuentes (también en el servidor de sincronización las que estaban enlazadas). */
+	private fun borrarCarpetaYFuentes(a: RssActivity, n: String, hecho: () -> Unit) {
+		a.lifecycleScope.launch {
+			val remotosBorrados = withContext(Dispatchers.IO) {
+				val remotos = db.remotosDeFuentes()
+				db.borrarCarpeta(n, conFuentes = true).mapNotNull { remotos[it.id] }
+			}
+			remotosBorrados.forEach { r -> a.lifecycleScope.launch { RssSincronizacion.borrarFuente(a, r) } }
+			hecho()
+		}
+	}
+
+	private fun accionesArticulo(art: Articulo, guardado: Boolean, posicion: Int): List<Accion> {
 		val a = activity as? AppCompatActivity ?: return emptyList()
-		val lista = RssAcciones.acciones(a, art, { articulosVisibles().map { it.id }.toLongArray() }).toMutableList()
+		val lista = RssAcciones.acciones(a, art, { articulosVisibles().map { it.id }.toLongArray() }, guardado).toMutableList()
 		// Marcar como leídos los de debajo (en esta lista)
 		val debajo = filas.drop(posicion + 1).mapNotNull { (it as? Fila.DeArticulo)?.articulo?.takeIf { x -> !x.leido }?.id }
-		if (debajo.isNotEmpty()) lista += getString(R.string.rss_marcar_debajo) to {
-			db.marcarLeidos(debajo)
-			a.conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, debajo.size, debajo.size)) { db.marcarLeidos(debajo, false) }
-		}
+		if (debajo.isNotEmpty()) lista += getString(R.string.rss_marcar_debajo) to { marcarVarios(a, debajo) }
 		// Y los de encima (lo ya pasado al bajar por la lista)
 		val encima = filas.take(posicion).mapNotNull { (it as? Fila.DeArticulo)?.articulo?.takeIf { x -> !x.leido }?.id }
-		if (encima.isNotEmpty()) lista += getString(R.string.rss_marcar_encima) to {
-			db.marcarLeidos(encima)
-			a.conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, encima.size, encima.size)) { db.marcarLeidos(encima, false) }
-		}
+		if (encima.isNotEmpty()) lista += getString(R.string.rss_marcar_encima) to { marcarVarios(a, encima) }
 		if (modo != Modo.FUENTES || fuente == null) lista += getString(R.string.rss_ir_fuente) to { actividad?.irAFuente(art.fuente) }
 		return lista
+	}
+
+	/** Marca como leídos varios artículos fuera del hilo principal, con Deshacer. */
+	private fun marcarVarios(a: AppCompatActivity, ids: List<Long>) {
+		RssAcciones.enFondo(a, { db.marcarLeidos(ids) }) {
+			a.conDeshacer(a.resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) {
+				RssAcciones.enFondo(a, { db.marcarLeidos(ids, false) })
+			}
+		}
 	}
 
 	// --- Lista -------------------------------------------------------------------------------
@@ -580,12 +682,15 @@ class RssListaFragment : Fragment() {
 				}
 				is Fila.DeFuente -> {
 					val f = fila.fuente
-					val d = listOfNotNull(
-						resources.getQuantityString(R.plurals.rss_n_sin_leer, f.sinLeer, f.sinLeer),
+					val estado = listOfNotNull(
 						getString(R.string.rss_pausada_corto).takeIf { f.pausada },
 						getString(R.string.rss_con_error).takeIf { f.error.isNotBlank() },
-					).joinToString(", ")
-					Triple(f.titulo.ifBlank { f.url }, d, f.titulo.ifBlank { f.url } + ", " + d)
+					)
+					val sinLeer = resources.getQuantityString(R.plurals.rss_n_sin_leer, f.sinLeer, f.sinLeer)
+					val d = (listOf(sinLeer) + estado).joinToString(", ")
+					// TalkBack: el estado primero («pausada, con error, El País, 3 sin leer»)
+					val nombre = f.titulo.ifBlank { f.url }
+					Triple(nombre, d, (estado + listOf(nombre, sinLeer)).joinToString(", "))
 				}
 				is Fila.DeArticulo -> {
 					val (d, vz) = descripcion(fila.articulo)
@@ -608,9 +713,9 @@ class RssListaFragment : Fragment() {
 			}
 			val acciones: List<Accion> = when (fila) {
 				is Fila.Subir -> emptyList()
-				is Fila.Categoria -> accionesCategoria(fila.nombre)
-				is Fila.DeFuente -> listOf(getString(R.string.rss_opciones_fuente) to { opcionesFuente(fila.fuente) }) + accionesFuente(fila.fuente)
-				is Fila.DeArticulo -> accionesArticulo(fila.articulo, posicion)
+				is Fila.Categoria -> accionesCategoria(fila.nombre, fila.sinLeer)
+				is Fila.DeFuente -> listOf(getString(R.string.rss_opciones_fuente) to { opcionesFuente(fila.fuente, fila.vecinas) }) + accionesFuente(fila.fuente, fila.vecinas)
+				is Fila.DeArticulo -> accionesArticulo(fila.articulo, fila.guardado, posicion)
 			}
 			// Cada tipo de fila con las acciones que el usuario eligió para su zona (Ajustes, Acciones de TalkBack)
 			v.f.root.accionesAccesibles(acciones, when (fila) {
@@ -621,7 +726,7 @@ class RssListaFragment : Fragment() {
 			})
 			v.f.root.setOnLongClickListener {
 				when {
-					fila is Fila.DeFuente -> { opcionesFuente(fila.fuente); true }
+					fila is Fila.DeFuente -> { opcionesFuente(fila.fuente, fila.vecinas); true }
 					acciones.isEmpty() -> false
 					else -> { a.elegir(texto.take(60), acciones); true }
 				}

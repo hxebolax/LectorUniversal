@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
 	<SwitchPreferenceCompat
 		android:key="tablas_encabezados"
 		android:title="@string/aj_tablas_encabezados"
@@ -13,7 +14,7 @@
 	<ListPreference
 		android:key="dividir_parrafos"
 		android:title="@string/aj_dividir_parrafos"
-		android:summary="@string/aj_dividir_parrafos_desc"
+		app:useSimpleSummaryProvider="true"
 		android:entries="@array/dividir_nombres"
 		android:entryValues="@array/dividir_valores"
 		android:defaultValue="0" />

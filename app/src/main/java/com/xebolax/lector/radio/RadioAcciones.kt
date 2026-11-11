@@ -27,13 +27,14 @@ object RadioAcciones {
 	 * Acciones de una emisora. Los textos cambian según el estado («Quitar de
 	 * favoritas» si ya lo es, «Detener la grabación» si se está grabando…).
 	 * extra: las propias de la lista (mover a carpeta, orden, quitar del historial).
+	 * esFavorita: si quien llama ya lo sabe (las listas, al dibujar cada fila); null = se consulta.
 	 */
-	fun deEmisora(a: AppCompatActivity, e: Emisora, lista: List<Emisora> = emptyList(), extra: List<Accion> = emptyList(), conEscuchar: Boolean = true): List<Accion> {
-		val db = RadioBaseDatos.obtener(a)
+	fun deEmisora(a: AppCompatActivity, e: Emisora, lista: List<Emisora> = emptyList(), extra: List<Accion> = emptyList(), conEscuchar: Boolean = true, esFavorita: Boolean? = null): List<Accion> {
+		val favorita = esFavorita ?: RadioBaseDatos.obtener(a).esFavorita(e.uuid)
 		val r = mutableListOf<Accion>()
 		if (conEscuchar) r += if (Radio.actual?.uuid == e.uuid) a.getString(R.string.radio_ir_reproductor) to { abrirReproductor(a) }
 		else a.getString(R.string.radio_escuchar) to { Radio.escuchar(a, e, lista) }
-		r += if (db.esFavorita(e.uuid)) a.getString(R.string.radio_quitar_favorita) to { alternarFavorita(a, e) }
+		r += if (favorita) a.getString(R.string.radio_quitar_favorita) to { alternarFavorita(a, e) }
 		else a.getString(R.string.radio_anadir_favorita) to { alternarFavorita(a, e) }
 		r += extra
 		r += if (ServicioGrabacion.grabandoEsta(e)) a.getString(R.string.radio_detener_grabacion) to {
@@ -52,7 +53,11 @@ object RadioAcciones {
 		r += a.getString(R.string.radio_acceso_directo) to {
 			if (!Radio.accesoDirecto(a, e)) a.mensaje(a.getString(R.string.radio_acceso_directo), a.getString(R.string.radio_sin_accesos))
 		}
-		if (e.propia && db.esFavorita(e.uuid)) r += a.getString(R.string.radio_editar) to { (a as? RadioActivity)?.anadirAMano(editar = e) }
+		// Fuera de la Radio (reproductor, Portada) se abre la Radio con la ventana de editarla
+		if (e.propia && favorita) r += a.getString(R.string.radio_editar) to {
+			(a as? RadioActivity)?.anadirAMano(editar = e) ?: a.startActivity(Intent(a, RadioActivity::class.java)
+				.setAction(RadioActivity.ACCION_EDITAR).putExtra(RadioActivity.EXTRA_EMISORA, e.json().toString()))
+		}
 		return r
 	}
 
@@ -161,7 +166,16 @@ object RadioAcciones {
 		val f = java.io.File(g.archivo)
 		if (!f.exists()) return a.mensaje(a.getString(R.string.radio_grabaciones), a.getString(R.string.radio_grabacion_no_esta))
 		a.lifecycleScope.launch {
-			val r = com.xebolax.lector.biblioteca.Importador.anadirArchivos(a, listOf(Uri.fromFile(f)), null)
+			// Copiar un audio largo a la biblioteca tarda: con espera y Cancelar
+			val r = try {
+				a.conEspera(a.getString(R.string.radio_guardar_biblioteca), a.getString(R.string.audio_guardando_biblioteca)) {
+					com.xebolax.lector.biblioteca.Importador.anadirArchivos(a, listOf(Uri.fromFile(f)), null)
+				}
+			} catch (x: kotlinx.coroutines.CancellationException) {
+				throw x
+			} catch (x: Exception) {
+				return@launch a.mensaje(a.getString(R.string.radio_guardar_biblioteca), a.getString(R.string.error_importar))
+			}
 			a.avisar(a.getString(if (r.anadidos.isNotEmpty()) R.string.radio_grabacion_en_biblioteca else R.string.radio_grabacion_ya_en_biblioteca))
 		}
 	}

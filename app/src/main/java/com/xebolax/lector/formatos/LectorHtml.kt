@@ -34,19 +34,23 @@ object LectorHtml : LectorFormato {
 				val href = a.attr("href")
 				if (!href.startsWith("#")) a.attr("href", a.absUrl("href").ifBlank { href })
 			}
-			ConversorHtml(c, "", ctx.opciones).convertir(principal(doc))
+			ConversorHtml(c, "", ctx.opciones).convertir(principal(doc, web = urlBase.isNotEmpty()))
 			c.construir()
 		}
 
-	/** Contenido principal: el <article> o <main> con más texto si tiene una parte importante de la página. */
-	private fun principal(doc: Document): Element {
+	/**
+	 * Contenido principal: el <article> o <main> con más texto si tiene una
+	 * parte importante de la página. Sin ellos, el bloque del título solo en
+	 * páginas web: un HTML local (un libro con varios h1) se lee entero.
+	 */
+	private fun principal(doc: Document, web: Boolean): Element {
 		val cuerpo = doc.body() ?: return doc
 		val total = cuerpo.text().length
 		val candidato = (doc.select("article") + doc.select("main") + doc.select("[role=main]"))
 			.maxByOrNull { it.text().length }
 		if (candidato != null && total > 0 && candidato.text().length > total * 0.4) return candidato
 		// Sin <article> ni <main>: el bloque que rodea al título principal, si tiene párrafos de verdad
-		bloqueDelTitulo(doc, doc.select("h1"))?.let { return it }
+		if (web) bloqueDelTitulo(doc, doc.select("h1"))?.let { return it }
 		return cuerpo
 	}
 

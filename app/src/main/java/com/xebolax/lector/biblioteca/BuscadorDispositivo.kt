@@ -32,7 +32,8 @@ object BuscadorDispositivo {
 		TODO(com.xebolax.lector.R.string.disp_todo, LIBROS.extensiones + setOf("m4b", "m4a", "mp3", "aac", "ogg", "opus", "flac", "wma")),
 	}
 
-	class Encontrado(val archivo: File, val formato: Formato) {
+	/** tamano: se mide al buscar (así la lista no mira el disco al dibujar cada fila). */
+	class Encontrado(val archivo: File, val formato: Formato, val tamano: Long = 0) {
 		val nombre: String get() = archivo.name
 	}
 
@@ -72,7 +73,10 @@ object BuscadorDispositivo {
 					if (nivel < 20 && !ruta.endsWith("/Android/data") && !ruta.endsWith("/Android/obb")) pila.addLast(h to nivel + 1)
 				} else {
 					val ext = h.name.substringAfterLast('.', "").lowercase()
-					if (ext in alcance.extensiones && h.length() > 0) r += Encontrado(h, Formato.deExtension(ext))
+					if (ext in alcance.extensiones) {
+						val tamano = h.length()
+						if (tamano > 0) r += Encontrado(h, Formato.deExtension(ext), tamano)
+					}
 				}
 			}
 			if (r.size - ultimoAviso >= 25) {

@@ -131,12 +131,48 @@ class RadioBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "radi
 	/** Pone al día los datos de las favoritas que siguen en el directorio (votos, dirección, calidad). */
 	fun actualizarDatos(emisoras: List<Emisora>) {
 		val db = writableDatabase
+		val porUuid = emisoras.associateBy { it.uuid }
+		// El despertador y las grabaciones programadas guardan su emisora: también la dirección nueva
+		val programadas = programaciones().filter { it.emisora.uuid in porUuid }
 		db.beginTransaction()
 		try {
 			for (e in emisoras) {
 				db.update("favoritas", ContentValues().apply { put("datos", e.json().toString()) }, "uuid = ?", arrayOf(e.uuid))
 				db.update("historial", ContentValues().apply { put("datos", e.json().toString()) }, "uuid = ?", arrayOf(e.uuid))
 			}
+			for (p in programadas) porUuid[p.emisora.uuid]?.let { e ->
+				db.update("programaciones", ContentValues().apply { put("datos", e.json().toString()) }, "id = ?", arrayOf(p.id.toString()))
+			}
+			db.setTransactionSuccessful()
+		} finally {
+			db.endTransaction()
+		}
+		avisar()
+	}
+
+	/**
+	 * Una emisora propia editada (su id sale de la dirección y puede cambiar):
+	 * conserva su carpeta y su orden, y pasan a ella su historial, sus canciones,
+	 * sus grabaciones y el despertador o las grabaciones programadas con ella.
+	 */
+	fun cambiarEmisora(antes: String, e: Emisora) {
+		val db = writableDatabase
+		val datos = e.json().toString()
+		val programadas = programaciones().filter { it.emisora.uuid == antes }
+		db.beginTransaction()
+		try {
+			if (antes != e.uuid) {
+				// Si ya había otra con la dirección nueva, se queda la editada (con su sitio)
+				if (esFavorita(antes)) db.delete("favoritas", "uuid = ?", arrayOf(e.uuid))
+				db.execSQL("UPDATE favoritas SET uuid = ? WHERE uuid = ?", arrayOf(e.uuid, antes))
+				db.execSQL("DELETE FROM historial WHERE uuid = ? AND EXISTS (SELECT 1 FROM historial WHERE uuid = ?)", arrayOf(e.uuid, antes))
+				db.execSQL("UPDATE historial SET uuid = ? WHERE uuid = ?", arrayOf(e.uuid, antes))
+				db.execSQL("UPDATE canciones SET uuid = ? WHERE uuid = ?", arrayOf(e.uuid, antes))
+				db.execSQL("UPDATE grabaciones SET uuid = ? WHERE uuid = ?", arrayOf(e.uuid, antes))
+			}
+			db.update("favoritas", ContentValues().apply { put("datos", datos) }, "uuid = ?", arrayOf(e.uuid))
+			db.update("historial", ContentValues().apply { put("datos", datos) }, "uuid = ?", arrayOf(e.uuid))
+			for (p in programadas) db.update("programaciones", ContentValues().apply { put("datos", datos) }, "id = ?", arrayOf(p.id.toString()))
 			db.setTransactionSuccessful()
 		} finally {
 			db.endTransaction()

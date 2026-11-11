@@ -31,7 +31,7 @@ import java.util.zip.GZIPOutputStream
 object CacheContenido {
 
 	/** Súbela cuando cambie cualquier lector de formato o el modelo. */
-	const val VERSION = 5
+	const val VERSION = 6
 	private const val MAGICO = 0x4C55_4331 // "LUC1"
 	private const val MAXIMO_BYTES = 400L * 1024 * 1024
 
@@ -44,8 +44,37 @@ object CacheContenido {
 				fuente.uri, arrayOf(DocumentsContract.Document.COLUMN_LAST_MODIFIED), null, null, null,
 			)?.use { c -> if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else 0L } ?: 0L
 		}.getOrDefault(0L)
-		return Fuente.hash("${fuente.uri}|${fuente.tamano}|$modificado|$formato|${opciones.firma()}|$VERSION")
+		// Una carpeta (DAISY, audiolibro) no tiene tamaño ni fecha propios: cuentan los de sus archivos
+		val carpeta = if (fuente.esCarpeta) huellaCarpeta(fuente) else ""
+		return Fuente.hash("${fuente.uri}|${fuente.tamano}|$modificado|$carpeta|$formato|${opciones.firma()}|$VERSION")
 	}
+
+	/** Número de archivos, lo que ocupan y la fecha más reciente (hasta 3 niveles): cambia si cambia la carpeta. */
+	private fun huellaCarpeta(fuente: Fuente): String = runCatching {
+		var n = 0
+		var bytes = 0L
+		var fecha = 0L
+		if (fuente.uri.scheme == "file") {
+			File(fuente.uri.path!!).walkTopDown().maxDepth(3).filter { it.isFile }.forEach {
+				n++
+				bytes += it.length()
+				fecha = maxOf(fecha, it.lastModified())
+			}
+		} else {
+			val uri = fuente.uri
+			val id = if (DocumentsContract.isDocumentUri(fuente.contexto, uri)) DocumentsContract.getDocumentId(uri) else DocumentsContract.getTreeDocumentId(uri)
+			val hijos = DocumentsContract.buildChildDocumentsUriUsingTree(uri, id)
+			val columnas = arrayOf(DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+			fuente.contexto.contentResolver.query(hijos, columnas, null, null, null)?.use { c ->
+				while (c.moveToNext()) {
+					n++
+					if (!c.isNull(0)) bytes += c.getLong(0)
+					if (!c.isNull(1)) fecha = maxOf(fecha, c.getLong(1))
+				}
+			}
+		}
+		"$n:$bytes:$fecha"
+	}.getOrDefault("")
 
 	fun borrar(contexto: Context) {
 		carpeta(contexto).listFiles()?.forEach { it.delete() }
@@ -62,15 +91,43 @@ object CacheContenido {
 				archivo.setLastModified(System.currentTimeMillis())
 				when (e.readByte().toInt()) {
 					0 -> Contenido.Texto(leerDocumento(e))
-					1 -> Contenido.Audio(leerAudio(e))
+					1 -> Contenido.Audio(leerAudio(e)).takeIf { a ->
+						// Audio de un ZIP ya extraído: si se borró la extracción, se vuelve a abrir el libro
+						a.libro.pistas.none { faltaArchivo(it.uri) }
+					}.also { a ->
+						if (a == null) archivo.delete()
+						else a.libro.pistas.firstOrNull()?.let { tocarExtraccion(it.uri) }
+					}
 					else -> null
 				}
 			}
 		} catch (_: Exception) {
 			archivo.delete()
 			null
+		} catch (_: OutOfMemoryError) {
+			// Un archivo dañado puede pedir un tamaño enorme: se descarta y se convierte otra vez
+			archivo.delete()
+			null
 		}
 	}
+
+	/** Marca como usada la carpeta extraída de un audio (su «.completo»), para que no se borre por vieja. */
+	private fun tocarExtraccion(uri: String) {
+		if (!uri.startsWith("file:")) return
+		var d = File(android.net.Uri.parse(uri).path ?: return).parentFile
+		repeat(8) {
+			val carpeta = d ?: return
+			val marca = File(carpeta, ".completo")
+			if (marca.exists()) {
+				marca.setLastModified(System.currentTimeMillis())
+				return
+			}
+			d = carpeta.parentFile
+		}
+	}
+
+	private fun faltaArchivo(uri: String): Boolean =
+		uri.startsWith("file:") && android.net.Uri.parse(uri).path?.let { !File(it).exists() } == true
 
 	fun guardar(contexto: Context, clave: String, contenido: Contenido) {
 		val dir = carpeta(contexto)
@@ -131,7 +188,8 @@ object CacheContenido {
 			s.writeByte(b.nivel)
 			s.writeInt(b.marcas)
 			s.texto(b.idioma.orEmpty())
-			s.writeShort(b.enlaces.size)
+			// Entero (no short): un bloque puede tener más de 32.767 enlaces (un índice enorme)
+			s.writeInt(b.enlaces.size)
 			for (e in b.enlaces) {
 				s.writeInt(e.inicio)
 				s.writeInt(e.fin)
@@ -219,7 +277,7 @@ object CacheContenido {
 			val nivel = e.readByte().toInt()
 			val marcas = e.readInt()
 			val idiomaBloque = e.texto().ifEmpty { null }
-			val enlaces = List(e.readShort().toInt()) { Enlace(e.readInt(), e.readInt(), e.texto()) }
+			val enlaces = List(e.readInt()) { Enlace(e.readInt(), e.readInt(), e.texto()) }
 			Bloque(tipo, texto, nivel, enlaces, marcas, idiomaBloque)
 		}
 		val indice = List(e.readInt()) { EntradaIndice(e.texto(), e.readByte().toInt(), e.readInt()) }

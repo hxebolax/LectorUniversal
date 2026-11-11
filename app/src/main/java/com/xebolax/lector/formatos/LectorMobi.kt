@@ -44,6 +44,24 @@ object LectorMobi : LectorFormato {
 	override fun leer(fuente: Fuente, ctx: ContextoLectura): Contenido =
 		BaseDatosPalm.abrir(fuente.archivoLocal()).use { pdb -> leerBase(pdb, fuente, ctx) }
 
+	/**
+	 * Los bytes de una imagen del libro (para «Describir imagen»): recurso es
+	 * «mobi:6:n» (recindex de MOBI 6) o «mobi:8:n» (kindle:embed de KF8),
+	 * contando desde 1 a partir del primer registro de imágenes.
+	 */
+	fun imagen(archivo: File, recurso: String): ByteArray? = BaseDatosPalm.abrir(archivo).use { pdb ->
+		val partes = recurso.removePrefix(ConversorHtml.PREFIJO_MOBI).split(':')
+		val n = partes.getOrNull(1)?.toIntOrNull()?.takeIf { it > 0 } ?: return null
+		val cab = CabeceraMobi(pdb.registro(0))
+		val (base, primera) = if (partes[0] == "8") {
+			val base8 = if (cab.esKf8) 0 else cab.exthEntero(121).takeIf { it in 1 until pdb.cuantos && pdb.empiezaPor(it - 1, "BOUNDARY") } ?: return null
+			base8 to (if (base8 == 0) cab else CabeceraMobi(pdb.registro(base8))).primeraImagen
+		} else 0 to cab.primeraImagen
+		if (primera < 0) return null
+		val indice = base + primera + n - 1
+		if (indice !in 1 until pdb.cuantos) null else pdb.registro(indice)
+	}
+
 	private fun leerBase(pdb: BaseDatosPalm, fuente: Fuente, ctx: ContextoLectura): Contenido {
 		val cab = CabeceraMobi(pdb.registro(0))
 		if (cab.cifrado != 0) throw ExcepcionDrm(DRM)
@@ -671,6 +689,8 @@ private class CabeceraMobi(private val r: ByteArray) {
 	val codificacion: Charset = if (campo(28) == 65001) Charsets.UTF_8 else Charset.forName("windows-1252")
 	val esKf8 = campo(0x24) == 8 || campo(0x68) == 8
 	val locale = campo(92)
+	/** Primer registro de imágenes (en KF8, de recursos), contando desde el registro de esta cabecera. */
+	val primeraImagen = campo(0x6C)
 	val huffRegistro = campo(0x70)
 	val huffCuenta = campo(0x74)
 	private val banderasExth = campo(0x80)
@@ -811,6 +831,8 @@ private class HuffmanCdic(huff: ByteArray, cdics: List<ByteArray>) {
 		var x = leer64(d, n, 0)
 		var bits = 32
 		while (true) {
+			// Un registro de texto ocupa unos pocos KB: frases anidadas que se expanden sin fin son un archivo dañado
+			if (s.tamano > 1 shl 20) break
 			if (bits <= 0) {
 				pos += 4
 				x = leer64(d, n, pos)

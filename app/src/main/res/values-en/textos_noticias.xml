@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- News section texts (English). -->
+<resources>
+	<!-- Folder filter button in Unread: says what it is and the chosen folder -->
+	<string name="noticias_filtro_carpeta">Folder: %1$s</string>
+	<string name="noticias_filtro_todas">all</string>
+	<!-- "Mark all as read" when there is nothing unread -->
+	<string name="noticias_nada_sin_leer">There are no unread articles.</string>
+</resources>

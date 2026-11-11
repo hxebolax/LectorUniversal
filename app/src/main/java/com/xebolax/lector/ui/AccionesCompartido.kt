@@ -38,19 +38,17 @@ object AccionesCompartido {
 		lista += a.getString(R.string.comp_mover_biblioteca) to { moverABiblioteca(a, l) }
 		// Favoritos: no se borran solos
 		lista += if (l.favorito) a.getString(R.string.quitar_favoritos) to {
-			db.cambiarFavorito(l.id, false)
-			a.avisar(a.getString(R.string.quitado_favoritos))
+			a.enSegundoPlano({ db.cambiarFavorito(l.id, false) }) { a.avisar(a.getString(R.string.quitado_favoritos)) }
 		} else a.getString(R.string.anadir_favoritos) to {
-			db.cambiarFavorito(l.id, true)
-			a.avisar(a.getString(R.string.anadido_favoritos))
+			a.enSegundoPlano({ db.cambiarFavorito(l.id, true) }) { a.avisar(a.getString(R.string.anadido_favoritos)) }
 		}
 		lista += if (l.estado == Estado.TERMINADO) a.getString(R.string.comp_marcar_no_leido) to {
 			// Vuelve a pendientes sin perder por dónde ibas
-			if (l.posicion != null) db.marcarNoLeido(l.id) else db.cambiarEstado(l.id, Estado.NUEVO)
-			a.avisar(a.getString(R.string.comp_marcado_no_leido))
+			a.enSegundoPlano({ if (l.posicion != null) db.marcarNoLeido(l.id) else db.cambiarEstado(l.id, Estado.NUEVO) }) {
+				a.avisar(a.getString(R.string.comp_marcado_no_leido))
+			}
 		} else a.getString(R.string.comp_marcar_leido) to {
-			db.cambiarEstado(l.id, Estado.TERMINADO)
-			a.avisar(a.getString(R.string.comp_marcado_leido))
+			a.enSegundoPlano({ db.cambiarEstado(l.id, Estado.TERMINADO) }) { a.avisar(a.getString(R.string.comp_marcado_leido)) }
 		}
 		// Una página web: descargarla otra vez (si cambió, o si quedó pendiente sin conexión)
 		if (web != null && l.formato == Formato.HTML.name) lista += a.getString(R.string.comp_volver_descargar) to { volverADescargar(a, l, web) }
@@ -69,17 +67,13 @@ object AccionesCompartido {
 		} else lista += a.getString(R.string.compartir) to { AccionesLibro.compartir(a, l) }
 		lista += a.getString(R.string.renombrar) to {
 			a.pedirTexto(a.getString(R.string.renombrar), a.getString(R.string.titulo), l.tituloVisible) { t ->
-				if (t.isNotBlank()) {
-					db.renombrar(l.id, t.trim(), l.autor)
-					a.avisar(a.getString(R.string.guardado))
-				}
+				if (t.isNotBlank()) a.enSegundoPlano({ db.renombrar(l.id, t.trim(), l.autor) }) { a.avisar(a.getString(R.string.guardado)) }
 			}
 		}
 		lista += a.getString(R.string.informacion) to { informacion(a, l) }
 		lista += a.getString(R.string.borrar) to {
 			a.confirmar(a.getString(R.string.comp_confirmar_borrar, l.tituloVisible), a.getString(R.string.borrar)) {
-				Compartidos.borrar(a, l)
-				a.avisar(a.getString(R.string.comp_borrado))
+				a.enSegundoPlano({ Compartidos.borrar(a.applicationContext, l) }) { a.avisar(a.getString(R.string.comp_borrado)) }
 			}
 		}
 		return lista
@@ -106,12 +100,15 @@ object AccionesCompartido {
 		val db = BaseDatos.obtener(a)
 		AccionesLibro.elegirTipo(a, l.claveTipo, a.getString(R.string.comp_que_es)) { tipo ->
 			AccionesLibro.elegirCarpeta(a, a.getString(R.string.comp_a_que_carpeta), null, tipo.ifBlank { l.claveTipo }) { carpeta ->
-				// Si la carpeta es de un tipo, manda la carpeta
-				val final = carpeta?.let { db.carpeta(it)?.tipo }?.takeIf { it.isNotEmpty() } ?: tipo
-				db.moverABiblioteca(l.id, final, carpeta)
-				val donde = listOf(AccionesLibro.nombreTipo(a, final.ifBlank { l.claveTipo })) +
-					listOfNotNull(carpeta?.let { db.rutaCarpeta(it) }?.takeIf { it.isNotBlank() })
-				a.avisar(a.getString(R.string.comp_movido_biblioteca, donde.joinToString(" › ")))
+				a.enSegundoPlano({
+					// Si la carpeta es de un tipo, manda la carpeta
+					val tipoFinal = carpeta?.let { db.carpeta(it)?.tipo }?.takeIf { it.isNotEmpty() } ?: tipo
+					db.moverABiblioteca(l.id, tipoFinal, carpeta)
+					tipoFinal to carpeta?.let { db.rutaCarpeta(it) }?.takeIf { it.isNotBlank() }
+				}) { (tipoFinal, ruta) ->
+					val donde = listOf(AccionesLibro.nombreTipo(a, tipoFinal.ifBlank { l.claveTipo })) + listOfNotNull(ruta)
+					a.avisar(a.getString(R.string.comp_movido_biblioteca, donde.joinToString(" › ")))
+				}
 			}
 		}
 	}

@@ -62,8 +62,12 @@ class WidgetLectura : AppWidgetProvider() {
 			val leyendo = estado.leyendo
 			v.setImageViewResource(R.id.widget_voz, if (leyendo) R.drawable.ic_pausa else R.drawable.ic_reproducir)
 			v.setContentDescription(R.id.widget_voz, contexto.getString(if (leyendo) R.string.pausar_lectura else R.string.leer_en_voz_alta))
-			val alternar = Intent(contexto, WidgetLectura::class.java).setAction(ALTERNAR)
-			v.setOnClickPendingIntent(R.id.widget_voz, PendingIntent.getBroadcast(contexto, 2, alternar, flags))
+			// Un audiolibro sin nada cargado se abre en su pantalla directamente: desde un aviso en segundo plano
+			// (el BroadcastReceiver) Android 14 o superior puede impedir abrir una pantalla
+			val voz = if (!estado.activo && libro?.audio == true) PendingIntent.getActivity(contexto, 3, abrir, flags)
+			else PendingIntent.getBroadcast(contexto, 2, Intent(contexto, WidgetLectura::class.java).setAction(ALTERNAR), flags)
+			v.setOnClickPendingIntent(R.id.widget_voz, voz)
+			if (!estado.activo && libro?.audio == true) v.setContentDescription(R.id.widget_voz, contexto.getString(R.string.widget_escuchar_x, titulo))
 			return v
 		}
 	}
@@ -81,15 +85,16 @@ class WidgetLectura : AppWidgetProvider() {
 			return
 		}
 		// Nada cargado: abre el último libro y lee desde donde se quedó (un audiolibro, en su pantalla)
-		val libro = BaseDatos.obtener(contexto).ultimoAbierto() ?: return
-		if (libro.audio) {
-			Abiertos.abrirPantalla(contexto.applicationContext, libro)
-			return
-		}
 		val pendiente = goAsync()
 		ambito.launch {
 			try {
 				val app = contexto.applicationContext
+				// La base de datos, fuera del hilo principal
+				val libro = withContext(Dispatchers.IO) { BaseDatos.obtener(app).ultimoAbierto() } ?: return@launch
+				if (libro.audio) {
+					Abiertos.abrirPantalla(app, libro)
+					return@launch
+				}
 				val contenido = runCatching { withContext(Dispatchers.IO) { Abiertos.abrir(app, libro, Abiertos.opciones(app)) } }.getOrNull()
 				val doc = (contenido as? Contenido.Texto)?.documento ?: return@launch
 				val pos = libro.posicion?.takeIf { !it.audio }

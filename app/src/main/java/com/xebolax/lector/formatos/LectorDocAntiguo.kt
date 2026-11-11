@@ -88,31 +88,51 @@ object LectorDocAntiguo : LectorFormato {
 
 	/** Párrafos (separados por \r) y filas de tabla (celdas terminadas en 0x07). */
 	private fun anadir(c: com.xebolax.lector.modelo.ConstructorDocumento, texto: String, ctx: ContextoLectura) {
+		for ((tipo, t) in bloques(texto) { ctx.comprobar() }) {
+			if (tipo == TipoBloque.FILA_TABLA) c.bloque(TipoBloque.FILA_TABLA, t) else c.parrafo(t)
+		}
+	}
+
+	/**
+	 * Párrafos y filas de tabla del texto de Word, en orden. Cada celda acaba
+	 * en 0x07 y cada fila con otra marca sin texto; como una celda vacía
+	 * también es una marca sin texto, se cuentan las columnas de la primera
+	 * fila: una marca vacía antes de llegar a ellas es una celda vacía, no el
+	 * final de la fila.
+	 */
+	internal fun bloques(texto: String, comprobar: () -> Unit = {}): List<Pair<TipoBloque, String>> {
+		val salida = ArrayList<Pair<TipoBloque, String>>()
 		val celdas = ArrayList<String>()
 		val actual = StringBuilder()
+		// Columnas de la tabla en curso (0: aún no se saben)
+		var columnas = 0
 		fun parrafo() {
 			val p = actual.toString().trim()
 			actual.clear()
-			if (p.isNotEmpty()) c.parrafo(p.replace('\n', ' '))
+			if (p.isEmpty()) return
+			salida += TipoBloque.PARRAFO to p.replace('\n', ' ')
+			// Texto fuera de una fila: la tabla terminó
+			if (celdas.isEmpty()) columnas = 0
 		}
 		for (ch in texto) {
-			ctx.comprobar()
+			comprobar()
 			when (ch) {
 				'\r' -> parrafo()
 				'\u0007' -> {
 					val celda = actual.toString().replace('\r', ' ').trim()
 					actual.clear()
-					// Una marca de celda sin texto tras otra celda: fin de la fila
-					if (celda.isEmpty() && celdas.isNotEmpty()) {
-						c.bloque(TipoBloque.FILA_TABLA, celdas.filter { it.isNotEmpty() }.joinToString("; "))
+					if (celda.isEmpty() && celdas.isNotEmpty() && (columnas == 0 || celdas.size >= columnas)) {
+						if (columnas == 0) columnas = celdas.size
+						salida += TipoBloque.FILA_TABLA to celdas.filter { it.isNotEmpty() }.joinToString("; ")
 						celdas.clear()
 					} else celdas += celda
 				}
 				else -> actual.append(ch)
 			}
 		}
-		if (celdas.isNotEmpty()) c.bloque(TipoBloque.FILA_TABLA, celdas.joinToString("; "))
+		if (celdas.any { it.isNotEmpty() }) salida += TipoBloque.FILA_TABLA to celdas.filter { it.isNotEmpty() }.joinToString("; ")
 		parrafo()
+		return salida
 	}
 }
 
@@ -135,14 +155,17 @@ class Ole(private val datos: ByteArray) {
 		for (k in 0 until 109) b.getInt(0x4C + k * 4).takeIf { it >= 0 }?.let { sectoresFat += it }
 		var difat = b.getInt(0x44)
 		var vueltas = 0
-		while (difat >= 0 && vueltas++ < 10_000) {
+		while (difat >= 0 && vueltas++ < datos.size / sector + 1) {
 			val off = desplazamiento(difat)
 			if (off + sector > datos.size) break
 			for (k in 0 until sector / 4 - 1) b.getInt(off + k * 4).takeIf { it >= 0 }?.let { sectoresFat += it }
 			difat = b.getInt(off + sector - 4)
 		}
-		fat = IntArray(sectoresFat.size * sector / 4)
-		sectoresFat.forEachIndexed { k, s ->
+		// Nunca más sectores de FAT de los que necesita el archivo (una cabecera dañada no llena la memoria)
+		val necesarios = datos.size / sector / (sector / 4) + 2
+		val usados = sectoresFat.take(necesarios)
+		fat = IntArray(usados.size * sector / 4)
+		usados.forEachIndexed { k, s ->
 			val off = desplazamiento(s)
 			for (j in 0 until sector / 4) if (off + j * 4 + 4 <= datos.size) fat[k * sector / 4 + j] = b.getInt(off + j * 4)
 		}
@@ -169,7 +192,9 @@ class Ole(private val datos: ByteArray) {
 		val salida = java.io.ByteArrayOutputStream()
 		var s = primero
 		var vueltas = 0
-		while (s >= 0 && s < fat.size && vueltas++ < 1_000_000) {
+		// Una cadena no puede tener más sectores que el archivo: con una FAT dañada en ciclo, se para ahí
+		val maximo = datos.size / sector + 1
+		while (s >= 0 && s < fat.size && vueltas++ < maximo) {
 			val off = desplazamiento(s)
 			if (off >= datos.size) break
 			salida.write(datos, off, minOf(sector, datos.size - off))
@@ -189,7 +214,7 @@ class Ole(private val datos: ByteArray) {
 			val salida = java.io.ByteArrayOutputStream()
 			var s = e.inicio
 			var vueltas = 0
-			while (s >= 0 && s < miniFat.size + 1 && salida.size() < tam && vueltas++ < 1_000_000) {
+			while (s >= 0 && s < miniFat.size + 1 && salida.size() < tam && vueltas++ < miniFlujo.size / miniSector + 1) {
 				val off = s * miniSector
 				if (off >= miniFlujo.size) break
 				salida.write(miniFlujo, off, minOf(miniSector, miniFlujo.size - off))

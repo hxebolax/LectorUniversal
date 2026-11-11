@@ -176,12 +176,19 @@ class BibliotecaActivity : AppCompatActivity() {
 
 	private fun anadirArchivos(uris: List<Uri>) {
 		lifecycleScope.launch {
-			val r = conEspera(getString(R.string.anadir_libros), getString(R.string.anadiendo_libros)) { Importador.anadirArchivos(this@BibliotecaActivity, uris, carpetaDestino()) }
+			val r = try {
+				conEspera(getString(R.string.anadir_libros), getString(R.string.anadiendo_libros)) { Importador.anadirArchivos(this@BibliotecaActivity, uris, carpetaDestino()) }
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				mensaje(getString(R.string.error), getString(R.string.error_abrir, e.message ?: ""))
+				return@launch
+			}
 			aplicarTipoDestino(r.anadidos)
 			resultado(r)
 			// Uno solo: se abre directamente
 			if (uris.size == 1) {
-				val id = r.anadidos.firstOrNull() ?: BaseDatos.obtener(this@BibliotecaActivity).libroPorUri(uris[0].toString())?.id
+				val id = r.anadidos.firstOrNull() ?: withContext(Dispatchers.IO) { BaseDatos.obtener(this@BibliotecaActivity).libroPorUri(uris[0].toString())?.id }
 				id?.let { Abiertos.abrirPantalla(this@BibliotecaActivity, it) }
 			}
 		}
@@ -195,14 +202,18 @@ class BibliotecaActivity : AppCompatActivity() {
 	 * se guarda con ese tipo: un PDF añadido en Documentos es un documento.
 	 * El audio sigue siendo audio.
 	 */
-	private fun aplicarTipoDestino(ids: List<Long>) {
+	private suspend fun aplicarTipoDestino(ids: List<Long>) {
 		if (ids.isEmpty()) return
-		val db = BaseDatos.obtener(this)
-		val tipo = carpetaDestino()?.let { db.carpeta(it)?.tipo }?.takeIf { it.isNotEmpty() }
-			?: biblioteca?.takeIf { pestana == R.id.pestana_biblioteca }?.tipoVisto ?: return
-		if (tipo == com.xebolax.lector.datos.TipoContenido.AUDIOLIBRO.name) return
-		val cambiar = ids.filter { id -> db.libro(id)?.let { !it.audio && it.claveTipo != tipo } == true }
-		db.cambiarTipo(cambiar, tipo)
+		val carpeta = carpetaDestino()
+		val tipoVisto = biblioteca?.takeIf { pestana == R.id.pestana_biblioteca }?.tipoVisto
+		// La base de datos, fuera del hilo principal
+		withContext(Dispatchers.IO) {
+			val db = BaseDatos.obtener(this@BibliotecaActivity)
+			val tipo = carpeta?.let { db.carpeta(it)?.tipo }?.takeIf { it.isNotEmpty() } ?: tipoVisto ?: return@withContext
+			if (tipo == com.xebolax.lector.datos.TipoContenido.AUDIOLIBRO.name) return@withContext
+			val cambiar = ids.filter { id -> db.libro(id)?.let { !it.audio && it.claveTipo != tipo } == true }
+			db.cambiarTipo(cambiar, tipo)
+		}
 	}
 
 	private val biblioteca: LibrosFragment?
@@ -392,10 +403,10 @@ class BibliotecaActivity : AppCompatActivity() {
 	}
 
 	/** Si ya estaba en Compartidos, pasa a la biblioteca (aquí es donde se quería). */
-	private fun aBiblioteca(id: Long): Long {
-		val db = com.xebolax.lector.datos.BaseDatos.obtener(this)
+	private suspend fun aBiblioteca(id: Long): Long = withContext(Dispatchers.IO) {
+		val db = BaseDatos.obtener(this@BibliotecaActivity)
 		db.libro(id)?.takeIf { it.compartido }?.let { db.moverABiblioteca(it.id, it.tipo, null) }
-		return id
+		id
 	}
 
 	private fun abrirExterno(uri: Uri) {

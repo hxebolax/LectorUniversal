@@ -82,10 +82,13 @@ class RadioReproductorActivity : AppCompatActivity() {
 		super.onStart()
 		ControlAudio.registrar(oyente)
 		RadioBaseDatos.obtener(this).suscribir(oyenteDb)
-		ControlAudio.conectar(this) { actualizar() }
+		// Si no suena la radio (se detuvo), no hay nada que mostrar; se mira ya conectado con el servicio
+		// (antes se esperaba 1,5 s fijos y, si el servicio tardaba en arrancar, se cerraba con la radio empezando)
+		ControlAudio.conectar(this) {
+			actualizar()
+			if (Radio.actual == null && !b.panelDespertador.isVisible) principal.postDelayed({ if (Radio.actual == null && !isFinishing) finish() }, 500)
+		}
 		principal.post(refresco)
-		// Si no suena la radio (se detuvo), no hay nada que mostrar
-		if (ControlAudio.libro == null && !b.panelDespertador.isVisible) principal.postDelayed({ if (Radio.actual == null) finish() }, 1500)
 	}
 
 	override fun onStop() {

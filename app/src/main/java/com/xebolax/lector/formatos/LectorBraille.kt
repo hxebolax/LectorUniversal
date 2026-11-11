@@ -18,7 +18,7 @@ import org.jsoup.parser.Parser
 object LectorBraille : LectorFormato {
 
 	override fun leer(fuente: Fuente, ctx: ContextoLectura): Contenido {
-		val bytes = fuente.abrir().use { it.readBytes() }
+		val bytes = fuente.bytes(64L * 1024 * 1024)
 		val c = ctx.nuevoConstructor()
 		c.titulo = fuente.nombre.substringBeforeLast('.')
 		val inicio = String(bytes, 0, minOf(bytes.size, 2048), Charsets.ISO_8859_1)

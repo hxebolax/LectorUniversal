@@ -304,11 +304,24 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 
 	fun pendientesDeEnviar(): List<Episodio> = consulta("e.sinc = 1 AND e.audio != ''", limite = 5000)
 
-	fun enviados(ids: Collection<Long>) {
-		for (t in ids.chunked(400)) writableDatabase.execSQL("UPDATE episodios SET sinc = 0 WHERE id IN (${t.joinToString(",")})")
+	/** Ya enviados: solo los que no han cambiado mientras se enviaban (lo de ese momento se envía la próxima vez). */
+	fun enviados(lista: Collection<Episodio>) {
+		if (lista.isEmpty()) return
+		val db = writableDatabase
+		db.beginTransaction()
+		try {
+			for (e in lista) db.execSQL("UPDATE episodios SET sinc = 0 WHERE id = ? AND posicion = ? AND estado = ? AND escuchado = ?",
+				arrayOf<Any>(e.id, e.posicion, e.estado, e.escuchado))
+			db.setTransactionSuccessful()
+		} finally {
+			db.endTransaction()
+		}
 	}
 
 	fun episodioPorAudio(url: String): Episodio? = consulta("e.audio = ?", arrayOf(url), limite = 1).firstOrNull()
+
+	/** Por su guid (si la dirección del audio cambia, como en las de seguimiento). */
+	fun episodioPorGuid(guid: String): Episodio? = if (guid.isBlank()) null else consulta("e.guid = ?", arrayOf(guid), limite = 1).firstOrNull()
 
 	/** Lo escuchado en otro dispositivo: por dónde va o si ya se terminó. */
 	fun aplicarRemoto(id: Long, posicion: Long, terminado: Boolean, cuando: Long) {
@@ -429,13 +442,26 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 		writableDatabase.update("podcasts", ContentValues().apply { put("velocidad", velocidad) }, "id = ?", arrayOf(id.toString()))
 	}
 
+	/** Refuerzo de volumen propio del podcast (desde el reproductor). */
+	fun guardarVolumen(id: Long, volumen: Int) {
+		writableDatabase.update("podcasts", ContentValues().apply { put("volumen", volumen) }, "id = ?", arrayOf(id.toString()))
+		avisar()
+	}
+
 	fun borrarPodcast(id: Long) {
 		writableDatabase.delete("episodios", "podcast = ?", arrayOf(id.toString()))
 		writableDatabase.delete("podcasts", "id = ?", arrayOf(id.toString()))
+		// La cola, sin huecos («posición 5» con 3)
+		renumerarCola()
 		avisar()
 	}
 
 	fun guardarActualizacion(id: Long, etag: String?, modificado: String?, datos: PodcastLector.Canal?, error: String) {
+		// El podcast se ha mudado (itunes:new-feed-url): la dirección nueva, si no la tiene ya otro
+		val mudanza = datos?.nuevaUrl?.takeIf { it.isNotBlank() && podcastPorUrl(it) == null }
+		val antigua = if (mudanza != null) readableDatabase.rawQuery("SELECT url FROM podcasts WHERE id = ?", arrayOf(id.toString())).use { c ->
+			if (c.moveToFirst()) c.getString(0) else null
+		} else null
 		writableDatabase.update("podcasts", ContentValues().apply {
 			if (etag != null) put("etag", etag)
 			if (modificado != null) put("modificado", modificado)
@@ -445,12 +471,19 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 				if (it.descripcion.isNotBlank()) put("descripcion", it.descripcion)
 				if (it.imagen.isNotBlank()) put("imagen", it.imagen)
 				if (it.sitio.isNotBlank()) put("sitio", it.sitio)
-				// El podcast se ha mudado (itunes:new-feed-url)
-				if (it.nuevaUrl.isNotBlank() && podcastPorUrl(it.nuevaUrl) == null) put("url", it.nuevaUrl)
+				if (mudanza != null) put("url", mudanza)
 			}
 			put("error", error)
 			if (error.isEmpty()) put("ultima", System.currentTimeMillis())
 		}, "id = ?", arrayOf(id.toString()))
+		// La contraseña de un podcast privado se guarda por su dirección: se pasa a la nueva
+		if (mudanza != null && antigua != null && antigua != mudanza) {
+			val clave = com.xebolax.lector.datos.Secretos.leer(app, com.xebolax.lector.datos.Secretos.dePodcast(antigua))
+			if (clave.isNotEmpty()) {
+				com.xebolax.lector.datos.Secretos.guardar(app, com.xebolax.lector.datos.Secretos.dePodcast(mudanza), clave)
+				com.xebolax.lector.datos.Secretos.guardar(app, com.xebolax.lector.datos.Secretos.dePodcast(antigua), "")
+			}
+		}
 	}
 
 	// --- Episodios -----------------------------------------------------------------------

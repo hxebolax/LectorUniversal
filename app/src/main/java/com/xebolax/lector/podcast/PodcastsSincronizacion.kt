@@ -25,7 +25,7 @@ import java.util.UUID
 object PodcastsSincronizacion {
 
 	class Cambios(val anadir: List<String>, val quitar: List<String>, val marca: Long)
-	class Accion(val podcast: String, val episodio: String, val posicion: Long, val total: Long, val cuando: Long)
+	class Accion(val podcast: String, val episodio: String, val posicion: Long, val total: Long, val cuando: Long, val guid: String = "")
 
 	private interface Servicio {
 		fun entrar()
@@ -64,7 +64,7 @@ object PodcastsSincronizacion {
 
 	/** Para empezar de cero (al cambiar de cuenta). */
 	fun olvidar(c: Context) {
-		Podcasts.prefs(c).edit().remove("pod_sinc_marca_subs").remove("pod_sinc_marca_acciones").remove("pod_sinc_conocidas").apply()
+		Podcasts.prefs(c).edit().remove("pod_sinc_marca_subs").remove("pod_sinc_marca_acciones").remove("pod_sinc_conocidas").remove("pod_sinc_pendientes").apply()
 	}
 
 	class Resultado(val anadidos: Int, val quitados: Int, val acciones: Int)
@@ -82,15 +82,28 @@ object PodcastsSincronizacion {
 			val remotos = s.suscripciones(if (primeraVez) 0 else p.getLong("pod_sinc_marca_subs", 0))
 			var anadidos = 0
 			var quitados = 0
-			for (url in remotos.anadir) if (url !in locales) {
-				runCatching { Podcasts.suscribir(c, url) }.onSuccess { anadidos++ }
+			// Las altas que fallaron otras veces (el feed no respondía) se vuelven a intentar
+			val antes = p.getStringSet("pod_sinc_pendientes", null).orEmpty() - remotos.quitar.toSet()
+			val fallidas = HashSet<String>()
+			for (url in (remotos.anadir + antes).distinct()) if (url !in locales) {
+				try {
+					Podcasts.suscribir(c, url)
+					anadidos++
+				} catch (e: kotlinx.coroutines.CancellationException) {
+					throw e
+				} catch (e: Exception) {
+					fallidas += url
+				}
 			}
+			p.edit().putStringSet("pod_sinc_pendientes", fallidas).apply()
 			if (!primeraVez) for (url in remotos.quitar) db.podcastPorUrl(url)?.let {
+				db.dePodcast(it.id, false).filter { e -> e.descargado || e.descarga != 0L }.forEach { e -> Podcasts.borrarDescarga(c, e) }
 				db.borrarPodcast(it.id)
 				quitados++
 			}
 			val ahora = db.podcasts().map { it.url }.toSet()
-			val subir = if (primeraVez) ahora - remotos.anadir.toSet() else (ahora - conocidas!!) - remotos.anadir.toSet()
+			// Las reintentadas ya están en el servidor: no se vuelven a subir
+			val subir = if (primeraVez) ahora - remotos.anadir.toSet() - antes else (ahora - conocidas!!) - remotos.anadir.toSet() - antes
 			val bajar = if (primeraVez) emptySet() else (conocidas!! - locales) - remotos.quitar.toSet()
 			var marca = remotos.marca
 			if (subir.isNotEmpty() || bajar.isNotEmpty()) marca = s.enviarSuscripciones(subir.toList(), bajar.toList())
@@ -100,7 +113,8 @@ object PodcastsSincronizacion {
 			val urls = db.podcasts().associate { it.id to it.url }
 			val lista = JSONArray()
 			for (e in pendientes) {
-				val total = e.duracion / 1000
+				// Escuchado sin duración conocida: 1 de 1 (con 0 de 0 los demás no lo dan por escuchado)
+				val total = if (e.terminado) (e.duracion / 1000).coerceAtLeast(1) else e.duracion / 1000
 				val posicion = if (e.terminado) total else e.posicion / 1000
 				if (posicion <= 0 && !e.terminado) continue
 				lista.put(JSONObject()
@@ -119,12 +133,13 @@ object PodcastsSincronizacion {
 				for (i in t until minOf(t + 500, lista.length())) trozo.put(lista.get(i))
 				s.enviarAcciones(trozo)
 			}
-			db.enviados(pendientes.map { it.id })
+			db.enviados(pendientes)
 			// 3. Lo escuchado en otros dispositivos
 			val (acciones, marcaAcciones) = s.acciones(p.getLong("pod_sinc_marca_acciones", 0))
 			var aplicadas = 0
 			for (a in acciones.sortedBy { it.cuando }) {
-				val e = db.episodioPorAudio(a.episodio) ?: continue
+				// Por la dirección del audio y, si ha cambiado (direcciones de seguimiento), por su guid
+				val e = db.episodioPorAudio(a.episodio) ?: db.episodioPorGuid(a.guid) ?: continue
 				if (a.cuando < e.escuchado) continue
 				val terminado = a.total > 0 && a.posicion >= a.total - 5
 				db.aplicarRemoto(e.id, a.posicion * 1000, terminado, a.cuando)
@@ -173,7 +188,8 @@ object PodcastsSincronizacion {
 		val acciones = (0 until a.length()).mapNotNull { i ->
 			val x = a.optJSONObject(i) ?: return@mapNotNull null
 			if (!x.optString("action").equals("play", true)) return@mapNotNull null
-			Accion(x.optString("podcast"), x.optString("episode"), x.optLong("position"), x.optLong("total"), leerFecha(x.optString("timestamp")))
+			Accion(x.optString("podcast"), x.optString("episode"), x.optLong("position"), x.optLong("total"), leerFecha(x.optString("timestamp")),
+				x.optString("guid").takeIf { it != "null" }.orEmpty())
 		}
 		return acciones to o.optLong("timestamp")
 	}

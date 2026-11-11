@@ -35,6 +35,7 @@ enum class ZonaAcciones(val titulo: Int) {
 	GRABACION(R.string.zona_grabacion),
 	PROGRAMACION(R.string.zona_programacion),
 	COMPARTIDO(R.string.zona_compartido),
+	DISPOSITIVO(R.string.zona_dispositivo),
 }
 
 /** Una acción del catálogo: clave guardada, textos con los que aparece, si sale sin tocar nada y su nombre en Ajustes. */
@@ -72,6 +73,11 @@ object AccionesTalkBack {
 			e("leido", R.string.comp_marcar_leido, R.string.comp_marcar_no_leido), e("navegador", R.string.abrir_navegador),
 			e("compartir", R.string.compartir), e("borrar", R.string.borrar), o("renombrar", R.string.renombrar),
 			o("copiar", R.string.comp_copiar_enlace), o("info", R.string.informacion),
+		)
+		// Libros del dispositivo (Biblioteca, Añadir, Buscar en el dispositivo)
+		ZonaAcciones.DISPOSITIVO -> listOf(
+			e("abrir", R.string.disp_abrir_anadir, R.string.disp_ya_abrir, R.string.disp_ya_compartidos_abrir), e("anadir", R.string.disp_anadir),
+			e("carpeta", R.string.disp_anadir_carpeta), e("info", R.string.informacion),
 		)
 		ZonaAcciones.PARRAFO -> {
 			val nombres = c.resources.getStringArray(R.array.acciones_nombres)
