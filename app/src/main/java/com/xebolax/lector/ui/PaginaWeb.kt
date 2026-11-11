@@ -180,7 +180,9 @@ object PaginaWeb {
 		// Un documento descargado: se añade con su formato real y se leen su título y autor por detrás
 		if (titulo == null) {
 			// Era un enlace pendiente de descargar: esa misma fila pasa a ser el documento (no se duplica ni se queda pendiente)
-			db.porOrigen(url)?.takeIf { com.xebolax.lector.compartidos.DescargasPendientes.pendiente(it.ajustes) }?.let { p ->
+			// (se busca la fila pendiente entre todas: puede haber otra con ese origen, y puede estar en la biblioteca;
+			// la fila se queda donde estaba, en Compartidos o en la biblioteca)
+			db.todosConCompartidos().firstOrNull { it.origen == url && com.xebolax.lector.compartidos.DescargasPendientes.pendiente(it.ajustes) }?.let { p ->
 				val formato = Formato.deExtension(Fuente.extensionDe(archivo.name)).takeIf { it != Formato.DESCONOCIDO } ?: Formato.TXT
 				// El aviso de «pendiente» que se guardó en su lugar ya no hace falta
 				Uri.parse(p.uri).path?.takeIf { it.startsWith(File(c.filesDir, "web").absolutePath) }?.let { File(it).delete() }

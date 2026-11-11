@@ -448,11 +448,19 @@ object LectorVoz {
 		tts?.let { if (motorActual == deseado) return it }
 		tts?.shutdown()
 		listo = false
+		motorIniciado = false
 		vocesMotor = emptyList()
 		motorActual = deseado
 		var creado: TextToSpeech? = null
 		val nuevo = TextToSpeech(app, { estado ->
 			if (estado == TextToSpeech.SUCCESS) {
+				// El motor ya arrancó: el plazo se acaba aquí (pedir las voces puede tardar y no es un fallo)
+				principal.post {
+					if (tts === creado) {
+						motorIniciado = true
+						principal.removeCallbacks(plazoMotor)
+					}
+				}
 				// Las voces se piden una vez y fuera del hilo principal: con un motor lento, pedirlas colgaría la pantalla
 				Thread {
 					val lista = runCatching { creado?.voices?.toList() }.getOrNull().orEmpty()
@@ -523,12 +531,16 @@ object LectorVoz {
 	}
 
 	/** Si el motor no está listo en unos segundos al pedir que lea, se da por fallido. */
-	private val plazoMotor = Runnable { if (!listo && leyendo) motorFallido(null) }
+	private val plazoMotor = Runnable { if (!listo && !motorIniciado && leyendo) motorFallido(null) }
+
+	/** El motor actual respondió a su arranque (aunque aún no tenga las voces). */
+	private var motorIniciado = false
 
 	private fun esperarMotor() {
 		pendiente = true
 		principal.removeCallbacks(plazoMotor)
-		principal.postDelayed(plazoMotor, 8000)
+		// Un motor «frío» (el primer arranque tras encender el móvil) puede tardar bastante
+		if (!motorIniciado) principal.postDelayed(plazoMotor, 15_000)
 	}
 
 	/** Las voces del motor otra vez, en otro hilo (una voz recién instalada): si ya está la elegida, se aplica. */
@@ -556,7 +568,8 @@ object LectorVoz {
 	/** Quien muestra la lectura (la pantalla del libro) dice los errores de la voz con TalkBack. */
 	var alError: ((String) -> Unit)? = null
 
-	private const val AVISO_ERROR = 7301
+	/** Libre: 9, 41-42, 71-72, 1001 (Media3), 7301-7305 y 710000+ ya se usan. */
+	private const val AVISO_ERROR = 7401
 
 	/** Un error de la lectura: en la pantalla del libro (o en un Toast) y en una notificación, que no se pierde. */
 	private fun avisarError(texto: String) {
@@ -648,7 +661,18 @@ object LectorVoz {
 	/** Los motores instalados y, si hay clave, ElevenLabs. */
 	fun motores(alObtener: (List<Pair<String, String>>) -> Unit) = conMotor {
 		val nubes = if (ElevenLabs.configurada(app)) listOf(ElevenLabs.MOTOR to app.getString(R.string.el_motor)) else emptyList()
-		alObtener(tts?.engines?.map { it.name to it.label }.orEmpty() + nubes)
+		alObtener(motoresInstalados() + nubes)
+	}
+
+	/** Los motores de voz instalados: los del motor si lo hay; si no (falló al arrancar), los del sistema. */
+	private fun motoresInstalados(): List<Pair<String, String>> {
+		tts?.engines?.takeIf { it.isNotEmpty() }?.let { lista -> return lista.map { it.name to it.label } }
+		val pm = app.packageManager
+		return runCatching {
+			pm.queryIntentServices(android.content.Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0)
+				.mapNotNull { r -> r.serviceInfo?.let { it.packageName to r.loadLabel(pm).toString() } }
+				.distinctBy { it.first }
+		}.getOrDefault(emptyList())
 	}
 
 	private fun conMotor(bloque: () -> Unit) {
@@ -1123,7 +1147,8 @@ object LectorVoz {
 			var nuevoBloque = false
 			if (f >= lista.size) {
 				b = siguienteBloqueLegible(b + 1)
-				if (b >= doc.bloques.size) return
+				// Fin del documento: se sale por alimentar(), que lo termina (fin, siguiente de la lista…) aunque lo último fueran frases vacías
+				if (b >= doc.bloques.size) break
 				lista = frasesDe(b)
 				f = 0
 				nuevoBloque = true

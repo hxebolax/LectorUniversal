@@ -13,10 +13,13 @@ import java.nio.ByteBuffer
  * al momento, sin cortar lo que suena. Vale para audiolibros, podcasts y radio.
  */
 @UnstableApi
-object MezclaMono : BaseAudioProcessor() {
+class MezclaMono : BaseAudioProcessor() {
 
-	@Volatile
-	var activo = false
+	companion object {
+		/** Lo comparten todos los reproductores (uno por cada vez que se crea el servicio de audio). */
+		@Volatile
+		var activo = false
+	}
 
 	override fun onConfigure(formato: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
 		// Solo PCM de 16 bits (lo normal); con otro formato no hace nada
@@ -25,6 +28,7 @@ object MezclaMono : BaseAudioProcessor() {
 	}
 
 	override fun queueInput(entrada: ByteBuffer) {
+		if (!entrada.hasRemaining()) return
 		val salida = replaceOutputBuffer(entrada.remaining())
 		if (activo && inputAudioFormat.channelCount == 2) {
 			while (entrada.remaining() >= 4) {

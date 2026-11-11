@@ -16,7 +16,18 @@ class LectorApp : Application() {
 		lateinit var instancia: LectorApp
 			private set
 
-		fun texto(recurso: Int, vararg args: Any): String = instancia.getString(recurso, *args)
+		fun texto(recurso: Int, vararg args: Any): String = contextoIdioma().getString(recurso, *args)
+
+		// En Android 7 a 12 el contexto de la aplicación no sigue el idioma elegido en la app: uno propio, rehecho al cambiarlo
+		private var idiomaGuardado: Pair<String, android.content.Context>? = null
+
+		@Synchronized
+		private fun contextoIdioma(): android.content.Context {
+			val etiqueta = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales().toLanguageTags() + "|" +
+				android.content.res.Resources.getSystem().configuration.locales.toLanguageTags()
+			idiomaGuardado?.let { if (it.first == etiqueta) return it.second }
+			return com.xebolax.lector.ui.contextoConIdiomaDeLaApp(instancia).also { idiomaGuardado = etiqueta to it }
+		}
 
 		/** Tareas de fondo que no dependen de ninguna pantalla (importar, leer datos de libros). */
 		val ambito = CoroutineScope(SupervisorJob() + Dispatchers.IO)

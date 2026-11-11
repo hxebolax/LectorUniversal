@@ -345,6 +345,8 @@ class ExportadorAudio(private val c: Context) {
 				}
 				vaciar(false)
 			}
+			// El codificador no admite el final: el archivo quedaría incompleto, así que el capítulo no se da por hecho
+			throw java.io.IOException(c.getString(R.string.lectura_exportar_fin_fallido))
 		}
 
 		/** Suelta el codificador y el archivo (también si se canceló a medias). */

@@ -60,7 +60,8 @@ class WidgetLectura : AppWidgetProvider() {
 				audio != null -> db.libro(audio.first)
 				else -> db.ultimoAbierto()
 			}
-			val conAudio = !estado.activo && audio != null && libro?.audio == true
+			// Cualquier libro cargado en el reproductor (también un DAISY o un EPUB con narración, que no son «audio»)
+			val conAudio = !estado.activo && audio != null && libro?.id == audio.first
 			val titulo = libro?.tituloVisible ?: estado.titulo.ifBlank { contexto.getString(R.string.widget_sin_libro) }
 			v.setTextViewText(R.id.widget_titulo, titulo)
 			val detalle = libro?.let { contexto.getString(R.string.porcentaje_n, it.progreso.toInt()) }.orEmpty()

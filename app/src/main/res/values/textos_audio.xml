@@ -20,6 +20,9 @@
 	<string name="audio_pospuesto_hasta">Pospuesto hasta las %1$s</string>
 	<!-- Radio, Programar: línea de estado con un despertador pospuesto («mañana a las 7:40») -->
 	<string name="audio_despertador_pospuesto">Despertador pospuesto: suena %1$s.</string>
+	<!-- Radio, Programar: botón para cancelar el despertador pospuesto, y lo que se dice al hacerlo -->
+	<string name="audio_cancelar_pospuesto">Cancelar despertador pospuesto</string>
+	<string name="audio_pospuesto_cancelado">Despertador pospuesto cancelado</string>
 	<!-- Radio: canal de los avisos de grabaciones que fallan -->
 	<string name="audio_canal_grabacion_avisos">Avisos de las grabaciones</string>
 </resources>

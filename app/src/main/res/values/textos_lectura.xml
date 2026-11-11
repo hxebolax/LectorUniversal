@@ -6,4 +6,5 @@
 	<string name="lectura_detectar_idioma_desc">Aunque el libro no lo indique, lee con la voz de su idioma los párrafos que estén en otro (sin internet). Funciona cuando «Cambiar de voz según el idioma» está activado aquí o en la voz de un libro o de una sección. Puede equivocarse con párrafos cortos o con muchos nombres.</string>
 	<string name="lectura_traductor_no_instalado">Google Traductor no está instalado. Puedes traducir con la IA o con otra app.</string>
 	<string name="lectura_exportar_sin_elevenlabs">La voz de este libro es de ElevenLabs, pero el audio se exporta con la voz del móvil.</string>
+	<string name="lectura_exportar_fin_fallido">El codificador de audio del móvil no ha podido cerrar el archivo del capítulo.</string>
 </resources>

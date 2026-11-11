@@ -48,7 +48,7 @@ class ServicioAudio : MediaSessionService() {
 				androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(contexto)
 					.setEnableFloatOutput(flotante)
 					.setEnableAudioTrackPlaybackParams(parametros)
-					.setAudioProcessors(arrayOf(MezclaMono))
+					.setAudioProcessors(arrayOf(MezclaMono()))
 					.build()
 		}.setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 		val exo = ExoPlayer.Builder(this, decodificadores)

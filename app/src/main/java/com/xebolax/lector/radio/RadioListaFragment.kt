@@ -161,6 +161,8 @@ class RadioListaFragment : Fragment() {
 	private var clavePulsada: String? = null
 	/** Lo que se está grabando según la cabecera (para rehacerla si la grabación empieza o acaba sola). */
 	private var cabeceraGrabando: String? = null
+	/** Si la cabecera de Programar tiene «Cancelar despertador pospuesto». */
+	private var cabeceraPospuesto = false
 
 	// Cambios en segundo plano (una canción nueva, una grabación): se recarga sin anunciar el recuento
 	private val oyenteDb = RadioBaseDatos.Oyente { view?.post { recargar(anunciar = false) } }
@@ -247,6 +249,7 @@ class RadioListaFragment : Fragment() {
 		clavePulsada = null
 		c.removeAllViews()
 		cabeceraGrabando = ServicioGrabacion.grabando?.uuid
+		cabeceraPospuesto = modo == Modo.PROGRAMAR && RadioProgramador.pospuestoHasta(requireContext()) > 0
 		when (modo) {
 			Modo.FAVORITAS -> {
 				val nombres = resources.getStringArray(R.array.radio_ordenes_favoritas).toList()
@@ -331,10 +334,17 @@ class RadioListaFragment : Fragment() {
 				}
 				c.addView(fila(*botones.toTypedArray()))
 			}
-			Modo.PROGRAMAR -> c.addView(fila(
-				boton(getString(R.string.radio_nuevo_despertador)) { editarProgramacion(null, Programacion.DESPERTADOR, null) },
-				boton(getString(R.string.radio_nueva_grabacion)) { editarProgramacion(null, Programacion.GRABACION, null) },
-			))
+			Modo.PROGRAMAR -> {
+				c.addView(fila(
+					boton(getString(R.string.radio_nuevo_despertador)) { editarProgramacion(null, Programacion.DESPERTADOR, null) },
+					boton(getString(R.string.radio_nueva_grabacion)) { editarProgramacion(null, Programacion.GRABACION, null) },
+				))
+				// Con un despertador pospuesto, cancelarlo también desde aquí (no solo desde su aviso)
+				if (cabeceraPospuesto) c.addView(fila(boton(getString(R.string.audio_cancelar_pospuesto)) {
+					RadioProgramador.cancelarPospuesto(requireContext())
+					actividad?.avisar(getString(R.string.audio_pospuesto_cancelado))
+				}))
+			}
 		}
 		// Pauta 34: los botones son nuevos y MemoriaFoco no encuentra el que se pulsó; se lleva el foco al que lo sustituye
 		if (volverA != null) devolverFoco(c, volverA, conDialogo)
@@ -748,6 +758,8 @@ class RadioListaFragment : Fragment() {
 			ponerEstado(estado(), anunciar)
 			// La grabación ha empezado o acabado sola: el botón «Detener la grabación de…» de la cabecera, al día
 			if (modo == Modo.HISTORIAL && vista == VistaHistorial.GRABACIONES && ServicioGrabacion.grabando?.uuid != cabeceraGrabando) construirCabecera()
+			// Se ha pospuesto, ha sonado o se ha cancelado un despertador: el botón de cancelarlo, al día
+			if (modo == Modo.PROGRAMAR && (RadioProgramador.pospuestoHasta(app) > 0) != cabeceraPospuesto) construirCabecera()
 		}
 	}
 

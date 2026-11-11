@@ -28,14 +28,15 @@ import java.util.Date
  */
 object AccionesCompartido {
 
-	fun acciones(a: AppCompatActivity, l: Libro): List<Accion> {
+	/** alQuitar: se llama al hacer una acción que lo quita de la lista en la que está (para llevar el foco a su vecina). */
+	fun acciones(a: AppCompatActivity, l: Libro, alQuitar: () -> Unit = {}): List<Accion> {
 		val db = BaseDatos.obtener(a)
 		val web = l.origen.takeIf { it.startsWith("http") }
 		val lista = mutableListOf<Accion>(a.getString(R.string.abrir) to { Abiertos.abrirPantalla(a, l) })
 		if (!l.audio) lista += a.getString(R.string.leer_en_voz_alta) to { AccionesLibro.leerEnVozAlta(a, l) }
 		// Su propia voz (lo que no cambie sigue a la voz de Compartidos)
 		if (!l.audio) lista += a.getString(R.string.voz_de_esto) to { com.xebolax.lector.voz.VozPerfilActivity.abrirLibro(a, l.id, l.tituloVisible) }
-		lista += a.getString(R.string.comp_mover_biblioteca) to { moverABiblioteca(a, l) }
+		lista += a.getString(R.string.comp_mover_biblioteca) to { moverABiblioteca(a, l, alQuitar) }
 		// Favoritos: no se borran solos
 		lista += if (l.favorito) a.getString(R.string.quitar_favoritos) to {
 			a.enSegundoPlano({ db.cambiarFavorito(l.id, false) }) { a.avisar(a.getString(R.string.quitado_favoritos)) }
@@ -43,11 +44,13 @@ object AccionesCompartido {
 			a.enSegundoPlano({ db.cambiarFavorito(l.id, true) }) { a.avisar(a.getString(R.string.anadido_favoritos)) }
 		}
 		lista += if (l.estado == Estado.TERMINADO) a.getString(R.string.comp_marcar_no_leido) to {
+			alQuitar()
 			// Vuelve a pendientes sin perder por dónde ibas
 			a.enSegundoPlano({ if (l.posicion != null) db.marcarNoLeido(l.id) else db.cambiarEstado(l.id, Estado.NUEVO) }) {
 				a.avisar(a.getString(R.string.comp_marcado_no_leido))
 			}
 		} else a.getString(R.string.comp_marcar_leido) to {
+			alQuitar()
 			a.enSegundoPlano({ db.cambiarEstado(l.id, Estado.TERMINADO) }) { a.avisar(a.getString(R.string.comp_marcado_leido)) }
 		}
 		// Una página web: descargarla otra vez (si cambió, o si quedó pendiente sin conexión)
@@ -74,6 +77,7 @@ object AccionesCompartido {
 		lista += a.getString(R.string.borrar) to {
 			a.confirmar(a.getString(R.string.comp_confirmar_borrar, l.tituloVisible), a.getString(R.string.borrar)) {
 				AccionesLibro.pararSiSeUsa(listOf(l.id))
+				alQuitar()
 				a.enSegundoPlano({ Compartidos.borrar(a.applicationContext, l) }) { a.avisar(a.getString(R.string.comp_borrado)) }
 			}
 		}
@@ -97,10 +101,11 @@ object AccionesCompartido {
 	}
 
 	/** Pasarlo a la biblioteca: se elige el tipo (con el que le toca ya marcado) y la carpeta. */
-	fun moverABiblioteca(a: AppCompatActivity, l: Libro) {
+	fun moverABiblioteca(a: AppCompatActivity, l: Libro, alQuitar: () -> Unit = {}) {
 		val db = BaseDatos.obtener(a)
 		AccionesLibro.elegirTipo(a, l.claveTipo, a.getString(R.string.comp_que_es)) { tipo ->
 			AccionesLibro.elegirCarpeta(a, a.getString(R.string.comp_a_que_carpeta), null, tipo.ifBlank { l.claveTipo }) { carpeta ->
+				alQuitar()
 				a.enSegundoPlano({
 					// Si la carpeta es de un tipo, manda la carpeta
 					val tipoFinal = carpeta?.let { db.carpeta(it)?.tipo }?.takeIf { it.isNotEmpty() } ?: tipo

@@ -20,6 +20,9 @@
 	<string name="audio_pospuesto_hasta">Snoozed until %1$s</string>
 	<!-- Radio, Schedule: status line with a snoozed alarm («tomorrow at 7:40») -->
 	<string name="audio_despertador_pospuesto">Snoozed alarm: rings %1$s.</string>
+	<!-- Radio, Schedule: button to cancel the snoozed alarm, and what is announced when doing so -->
+	<string name="audio_cancelar_pospuesto">Cancel snoozed alarm</string>
+	<string name="audio_pospuesto_cancelado">Snoozed alarm cancelled</string>
 	<!-- Radio: channel for notices of recordings that fail -->
 	<string name="audio_canal_grabacion_avisos">Recording notices</string>
 </resources>

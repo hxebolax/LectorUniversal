@@ -111,6 +111,8 @@ object RadioProgramador {
 			.setContentText(c.getString(R.string.audio_pospuesto_hasta, DateFormat.getTimeInstance(DateFormat.SHORT).format(cuando)))
 			.setContentIntent(abrir)
 			.setOnlyAlertOnce(true)
+			// Fijo hasta que suene o se cancele
+			.setOngoing(true)
 			.addAction(R.drawable.ic_detener, c.getString(R.string.cancelar), cancelar)
 			.build()
 		runCatching { NotificationManagerCompat.from(c).notify(NOTIFICACION_POSPUESTO, n) }
@@ -260,6 +262,8 @@ object RadioProgramador {
 			val pr = Radio.prefs(c)
 			pr.edit().remove("radio_pospuesta_cuando").apply()
 			NotificationManagerCompat.from(c).cancel(NOTIFICACION_POSPUESTO)
+			// La línea de estado de Programar deja de decir «pospuesto»
+			RadioBaseDatos.obtener(c).avisar()
 			val e = Emisora.deJson(pr.getString("radio_pospuesta", "").orEmpty()) ?: return
 			despertar(c, Programacion(0, Programacion.DESPERTADOR, e, 0, 0, 0, pr.getInt("radio_despertador_duracion", 30), true))
 			return

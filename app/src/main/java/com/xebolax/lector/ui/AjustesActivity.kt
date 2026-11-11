@@ -824,7 +824,8 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		}
 		// Saltar los silencios: se aplica al momento a lo que suene (como al cargarlo)
 		findPreference<Preference>("saltar_silencios")?.setOnPreferenceChangeListener { _, nuevo ->
-			(nuevo as? Boolean)?.let { activo -> view?.post { audio.cambiarSaltarSilencios(activo) } }
+			// La radio en directo nunca salta silencios (es música y voz en directo): con ella sonando solo se guarda el ajuste
+			(nuevo as? Boolean)?.let { activo -> view?.post { if (audio.externo?.directo != true) audio.cambiarSaltarSilencios(activo) } }
 			true
 		}
 		// Franja del temporizador automático: una hora válida (HH:MM); «23.00» o «2300» se guardan como «23:00»

@@ -53,6 +53,12 @@ class CompartidosFragment : Fragment() {
 	private var carga: Job? = null
 	/** La fila sobre la que se usó la última acción (su id). */
 	private var ultimaUsada: Long? = null
+	private var usadaCuando = 0L
+
+	private fun apuntarQuitada(id: Long) {
+		ultimaUsada = id
+		usadaCuando = android.os.SystemClock.elapsedRealtime()
+	}
 
 	private val recargaDiferida = Runnable { recargar() }
 	private val oyente = BaseDatos.Oyente {
@@ -71,8 +77,11 @@ class CompartidosFragment : Fragment() {
 		modo = runCatching { Modo.valueOf(requireArguments().getString("modo", Modo.PENDIENTES.name)) }.getOrDefault(Modo.PENDIENTES)
 		val a = requireActivity() as AppCompatActivity
 		adaptador = AdaptadorLibros(a, { f -> (f as? Fila.DeCompartido)?.let { Abiertos.abrirPantalla(a, it.libro) } }) { f ->
-			// Se apunta sobre cuál se hizo la acción: si desaparece (borrar, pasar a la biblioteca, marcar leído), el foco va a su vecina
-			(f as? Fila.DeCompartido)?.let { fila -> AccionesCompartido.acciones(a, fila.libro).map { (texto, hacer) -> texto to { ultimaUsada = fila.id; hacer() } } }.orEmpty()
+			// Las acciones que quitan la fila de la lista (borrar, pasar a la biblioteca, marcar leído o no leído):
+			// se apunta cuál era para que, al desaparecer, el foco vaya a su vecina
+			(f as? Fila.DeCompartido)?.let { fila ->
+				AccionesCompartido.acciones(a, fila.libro) { apuntarQuitada(fila.id) }
+			}.orEmpty()
 		}
 		b.recycler.layoutManager = LinearLayoutManager(requireContext())
 		b.recycler.sinFocoPropio()
@@ -88,6 +97,8 @@ class CompartidosFragment : Fragment() {
 				override fun onTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
 				override fun afterTextChanged(s: Editable?) {
 					busqueda = s?.toString().orEmpty().trim()
+					// Al filtrar, las filas que desaparecen no son de una acción: el foco se queda en el buscador
+					ultimaUsada = null
 					recargar()
 				}
 			})
@@ -151,11 +162,12 @@ class CompartidosFragment : Fragment() {
 			if (_b == null) return@launch
 			// La fila de la última acción ya no está aquí: el foco de TalkBack iría a ninguna parte (MemoriaFoco
 			// la busca y no la encuentra), así que se pone en la que ocupa su lugar, o en la anterior si era la última
-			val usada = ultimaUsada
+			// Se consume en esta recarga, y solo vale unos segundos tras la acción
+			val usada = ultimaUsada?.takeIf { android.os.SystemClock.elapsedRealtime() - usadaCuando < 10_000 }
+			ultimaUsada = null
 			val antes = adaptador.filas
 			val posicion = usada?.let { u -> antes.indexOfFirst { it.id == u } } ?: -1
 			val desaparece = posicion >= 0 && filas.none { it.id == usada }
-			if (desaparece) ultimaUsada = null
 			adaptador.reemplazar(filas) { if (desaparece) enfocarVecina(posicion) }
 			if (b.estado.text.toString() != estado) b.estado.text = estado
 		}

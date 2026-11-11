@@ -464,7 +464,14 @@ object Podcasts {
 		val siguiente = withContext(Dispatchers.IO) { db.cola().firstOrNull { it.id != e.id } } ?: return false
 		withContext(Dispatchers.IO) { alAcabarEpisodio(c, e, sigueSonando = true) }
 		// Temporizador «al final del episodio» o «tras N episodios»: este cuenta; si toca parar, no se sigue
-		if (ControlAudio.pasarEpisodio()) return true
+		if (ControlAudio.pasarEpisodio()) {
+			// Se deja preparado el siguiente, en pausa: Reproducir o agitar siguen por él (no por el ya escuchado)
+			val ext = preparar(c, siguiente)
+			ControlAudio.cargarExterno(ext)
+			buscarCapitulos(c.applicationContext, ext, siguiente.capitulos)
+			withContext(Dispatchers.IO) { borrarPendientes(c) }
+			return true
+		}
 		sonar(c, siguiente)
 		// Ya no suena: si había que borrar su descarga, ahora
 		withContext(Dispatchers.IO) { borrarPendientes(c) }

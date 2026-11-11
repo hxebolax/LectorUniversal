@@ -169,10 +169,28 @@ object AccionesTalkBack {
 
 	private fun preferencia(zona: ZonaAcciones) = "acciones_zona_${zona.name.lowercase()}"
 
-	/** Las claves elegidas en esa zona, en su orden. */
+	/** Las claves que existían cuando se guardó la lista de esa zona (para añadir al final las acciones nuevas). */
+	private fun preferenciaConocidas(zona: ZonaAcciones) = preferencia(zona) + "_conocidas"
+
+	/**
+	 * Acciones que se añadieron después de que hubiera listas guardadas sin
+	 * las claves conocidas: para esas listas, son las únicas nuevas.
+	 */
+	private val NUEVAS_SIN_CONOCIDAS = mapOf(
+		ZonaAcciones.LIBRO to setOf("seleccion"),
+		ZonaAcciones.COMPARTIDO to setOf("favorito", "descargar"),
+	)
+
+	/** Las claves elegidas en esa zona, en su orden. Las acciones por defecto nuevas (que no existían al guardar) salen al final. */
 	fun elegidas(c: Context, zona: ZonaAcciones): List<String> {
 		val p = PreferenceManager.getDefaultSharedPreferences(c)
-		p.getString(preferencia(zona), null)?.let { guardado -> return guardado.split(',').filter { it.isNotBlank() } }
+		p.getString(preferencia(zona), null)?.let { guardado ->
+			val lista = guardado.split(',').filter { it.isNotBlank() }
+			val todas = entradas(c, zona)
+			val conocidas = p.getString(preferenciaConocidas(zona), null)?.split(',')?.toSet()
+				?: (todas.map { it.clave }.toSet() - NUEVAS_SIN_CONOCIDAS[zona].orEmpty())
+			return lista + todas.filter { it.porDefecto && it.clave !in conocidas && it.clave !in lista }.map { it.clave }
+		}
 		// Las de los párrafos se elegían antes en Ajustes, Navegación (sin orden): se respetan
 		if (zona == ZonaAcciones.PARRAFO) p.getStringSet("acciones_parrafo", null)?.let { antes ->
 			return listOf("enlaces", "describir") + PARRAFO_CLAVES.filter { it in antes }
@@ -181,11 +199,15 @@ object AccionesTalkBack {
 	}
 
 	fun guardar(c: Context, zona: ZonaAcciones, claves: List<String>) {
-		PreferenceManager.getDefaultSharedPreferences(c).edit().putString(preferencia(zona), claves.joinToString(",")).apply()
+		PreferenceManager.getDefaultSharedPreferences(c).edit()
+			.putString(preferencia(zona), claves.joinToString(","))
+			// Las que existen ahora: las que se añadan en otra versión saldrán solas al final
+			.putString(preferenciaConocidas(zona), entradas(c, zona).joinToString(",") { it.clave })
+			.apply()
 	}
 
 	fun restablecer(c: Context, zona: ZonaAcciones) {
-		val editor = PreferenceManager.getDefaultSharedPreferences(c).edit().remove(preferencia(zona))
+		val editor = PreferenceManager.getDefaultSharedPreferences(c).edit().remove(preferencia(zona)).remove(preferenciaConocidas(zona))
 		if (zona == ZonaAcciones.PARRAFO) editor.remove("acciones_parrafo")
 		editor.apply()
 	}

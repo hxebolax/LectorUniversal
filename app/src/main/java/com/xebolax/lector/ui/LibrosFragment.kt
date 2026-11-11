@@ -97,6 +97,8 @@ class LibrosFragment : Fragment() {
 	 */
 	private var enfocarAlCargar = false
 	private var filaAEnfocar: Long? = null
+	/** Lo que se dice tras poner el foco al entrar en un autor, una serie o una colección (su nombre). */
+	private var avisoAlCargar: String? = null
 
 	private fun pedirFoco(fila: Long? = null) {
 		enfocarAlCargar = true
@@ -506,8 +508,9 @@ class LibrosFragment : Fragment() {
 			}
 			adaptador.seleccionados = seleccionados.toSet()
 			// Tras abrir una carpeta o subir: dónde se está (se dice después de poner el foco)
-			val aviso = if (anunciarAlCargar) getString(R.string.carpeta_x, vista.nombreCarpeta.ifBlank { nombreVista() }) else null
+			val aviso = avisoAlCargar ?: if (anunciarAlCargar) getString(R.string.carpeta_x, vista.nombreCarpeta.ifBlank { nombreVista() }) else null
 			anunciarAlCargar = false
+			avisoAlCargar = null
 			val enfocar = enfocarAlCargar
 			val fila = filaAEnfocar
 			enfocarAlCargar = false
@@ -574,8 +577,9 @@ class LibrosFragment : Fragment() {
 				grupo = fila.clave
 				nombreGrupoActual = fila.nombre
 				pedirFoco()
+				// Su nombre se dice después de poner el foco (si no, el foco lo cortaría)
+				avisoAlCargar = fila.nombre
 				recargar()
-				a.avisar(fila.nombre, mostrar = false)
 			}
 		}
 	}

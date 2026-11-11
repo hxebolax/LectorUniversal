@@ -161,6 +161,7 @@ object ControlAudio {
 		externo = e
 		idLibro = e.id
 		terminadoId = 0
+		paradoTrasEpisodio = false
 		cancion = ""
 		problema = ""
 		reintentos = 0
@@ -761,10 +762,12 @@ object ControlAudio {
 			if (alFinalDelCapitulo) {
 				val (_, siguiente) = limitesCapitulo()
 				val (pista, ms) = posicion()
-				// Sin más capítulos en esta pista (último capítulo, o sin capítulos): para al final de la pista.
+				// Al final de la pista solo si ahí acaba el capítulo: el siguiente empieza al principio de la pista
+				// siguiente (no a mitad de un capítulo de varias pistas, DAISY o carpetas) o es la última pista.
 				// Un audio externo termina solo y lo para terminarExterno (así cuenta como terminado)
-				val finPista = (siguiente == null || siguiente.pista != pista) && externo == null &&
-					duracionPista().let { d -> d > 0 && d - ms in 0..1200 }
+				val ultimaPista = (libro?.pistas?.size ?: 1) - 1
+				val finPista = externo == null && duracionPista().let { d -> d > 0 && d - ms in 0..1200 } &&
+					(if (siguiente == null) pista == ultimaPista else siguiente.pista == pista + 1 && siguiente.ms <= 300)
 				if (finPista || (siguiente != null && siguiente.pista == pista && siguiente.ms - ms in 0..1200)) {
 					alFinalDelCapitulo = false
 					pausar()
@@ -796,7 +799,8 @@ object ControlAudio {
 			reproduciendo && minutos != 0 -> temporizador(minutos)
 			!reproduciendo && paradoPorTemporizador > 0 && SystemClock.elapsedRealtime() - paradoPorTemporizador < 3 * 60_000L -> {
 				val e = externo
-				if (e != null && !e.directo && terminadoId == e.id) {
+				// paradoTrasEpisodio: el temporizador lo paró al terminar este mismo episodio (se borra al cargar otro)
+				if (e != null && !e.directo && paradoTrasEpisodio && e.id == idLibro) {
 					// Paró al terminar el episodio: se sigue con la cola (no se vuelve a empezar el mismo)
 					paradoTrasEpisodio = false
 					temporizador(minutos)
