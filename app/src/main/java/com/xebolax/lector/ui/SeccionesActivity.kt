@@ -44,6 +44,8 @@ class SeccionesActivity : AppCompatActivity() {
 		orden = OrdenSecciones.orden(this)
 		b.recycler.layoutManager = LinearLayoutManager(this)
 		b.recycler.sinFocoPropio()
+		// Mostrar u ocultar repinta la fila en su sitio: sin animación no se pierde el foco de TalkBack
+		b.recycler.sinAnimarCambios()
 		b.recycler.adapter = Adaptador().also { it.setHasStableIds(true) }
 	}
 

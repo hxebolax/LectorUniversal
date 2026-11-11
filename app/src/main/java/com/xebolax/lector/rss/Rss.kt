@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.preference.PreferenceManager
 import com.xebolax.lector.formatos.LectorHtml
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.sync.Semaphore
@@ -38,9 +39,25 @@ object Rss {
 		Triple("Usable y accesible", "https://olgacarreras.blogspot.com/feeds/posts/default", "Accesibilidad"),
 	)
 
-	class Resultado(val nuevos: Int, val errores: Int, val avisos: List<Pair<Fuente, RssLector.Elemento>>)
+	/** sincronizacion: el resultado de la sincronización con la cuenta, si la hay (para preguntar si subir fuentes). */
+	class Resultado(val nuevos: Int, val errores: Int, val avisos: List<Pair<Fuente, RssLector.Elemento>>,
+		val sincronizacion: RssSincronizacion.Resultado? = null)
 
 	fun prefs(c: Context) = PreferenceManager.getDefaultSharedPreferences(c)
+
+	/** Fuentes de ejemplo que el usuario ha tocado (editado, movido o añadido él): esas sí se suben a la cuenta. */
+	private const val EJEMPLO_TOCADAS = "rss_ejemplo_tocadas"
+
+	/** ¿Es una de las fuentes de ejemplo y el usuario no la ha tocado? (no se sube a la cuenta de sincronización) */
+	fun esEjemploSinTocar(c: Context, f: Fuente): Boolean =
+		PREDETERMINADAS.any { it.second == f.url } && f.id.toString() !in prefs(c).getStringSet(EJEMPLO_TOCADAS, emptySet()).orEmpty()
+
+	/** El usuario ha hecho algo con esta fuente (si es de ejemplo, pasa a ser suya). */
+	fun tocarFuente(c: Context, id: Long) {
+		val p = prefs(c)
+		val tocadas = p.getStringSet(EJEMPLO_TOCADAS, emptySet()).orEmpty()
+		if (id.toString() !in tocadas) p.edit().putStringSet(EJEMPLO_TOCADAS, tocadas + id.toString()).apply()
+	}
 
 	/** La primera vez: las fuentes que había en la versión anterior (o las de ejemplo). */
 	fun preparar(c: Context) {
@@ -97,17 +114,18 @@ object Rss {
 	 * y para las que llegan del servidor de sincronización.
 	 */
 	fun filtro(db: RssBaseDatos, f: Fuente): (RssLector.Elemento) -> Boolean {
-		// Palabras silenciadas: esos artículos no se guardan
-		val silenciadas = f.silenciar.split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+		// Palabras silenciadas: esos artículos no se guardan. Como en las reglas: palabras completas
+		// («pan» no salta con «España»), sin tildes ni mayúsculas, y con * para buscar dentro de otras
+		val silenciadas = f.silenciar.split(',').map { it.trim() }.filter { it.trim('*').isNotBlank() }
 		// «Solo con estas palabras»: si la fuente lo tiene, el resto no se guarda
-		val soloCon = f.soloCon.split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+		val soloCon = f.soloCon.split(',').map { it.trim() }.filter { it.trim('*').isNotBlank() }
 		// Sin duplicados: lo que ya llegó por otra fuente (mismo enlace o mismo titular) no se guarda
 		val (titulosOtras, enlacesOtras) = if (f.sinDuplicados) db.recibidosDeOtras(f.id) else emptyList<String>() to emptySet()
 		val titularesOtras = titulosOtras.map { normal(it) }.filter { it.length > 15 }.toSet()
 		return { e ->
-			val texto = e.titulo.lowercase() + " " + e.resumen.lowercase()
-			silenciadas.none { s -> texto.contains(s) } &&
-				(soloCon.isEmpty() || soloCon.any { s -> texto.contains(s) }) &&
+			val texto = Reglas.normal(e.titulo + " " + e.resumen)
+			silenciadas.none { s -> Reglas.contiene(texto, s) } &&
+				(soloCon.isEmpty() || soloCon.any { s -> Reglas.contiene(texto, s) }) &&
 				(!f.sinDuplicados || e.enlace !in enlacesOtras && normal(e.titulo) !in titularesOtras)
 		}
 	}
@@ -122,13 +140,16 @@ object Rss {
 		val db = RssBaseDatos.obtener(c)
 		val inicio = System.currentTimeMillis()
 		val enlazada = RssSincronizacion.configurado(c) && !db.remotosDeFuentes()[f.id].isNullOrBlank()
-		val n = if (enlazada) {
-			val r = RssSincronizacion.sincronizar(c)
-			prefs(c).edit().putString("rss_sinc_error", "").apply()
-			r.nuevos
-		} else actualizar(c, f).size
-		runCatching { Reglas.aplicar(c, db.recibidosDesde(inicio)) }
-		n
+		try {
+			if (enlazada) {
+				val r = RssSincronizacion.sincronizar(c)
+				prefs(c).edit().putString("rss_sinc_error", "").apply()
+				r.nuevos
+			} else actualizar(c, f).size
+		} finally {
+			// Aunque se cancele (Cancelar o salir), las reglas se aplican a lo que ya se ha guardado
+			withContext(NonCancellable) { runCatching { Reglas.aplicar(c, db.recibidosDesde(inicio)) } }
+		}
 	}
 
 	/** Actualiza todas las fuentes (4 a la vez). progreso(hechas, total), desde otro hilo. */
@@ -140,47 +161,51 @@ object Rss {
 		val avisos = ArrayList<Pair<Fuente, RssLector.Elemento>>()
 		// Con cuenta en un servidor, las fuentes de la cuenta se traen de allí
 		var sincronizadas = emptySet<Long>()
-		if (RssSincronizacion.configurado(c)) {
-			runCatching { RssSincronizacion.sincronizar(c) }
-				.onSuccess {
-					nuevos += it.nuevos
-					avisos += it.avisos
-					prefs(c).edit().putString("rss_sinc_error", "").apply()
-				}
-				.onFailure {
-					if (it is kotlinx.coroutines.CancellationException) throw it
-					errores++
-					prefs(c).edit().putString("rss_sinc_error", it.message ?: it.javaClass.simpleName).apply()
-				}
-			sincronizadas = db.remotosDeFuentes().keys
-		}
-		val fuentes = db.fuentes().filter { !it.pausada && it.id !in sincronizadas }
-		val limite = Semaphore(4)
-		var hechas = 0
-		fuentes.map { f ->
-			async(Dispatchers.IO) {
-				limite.withPermit {
-					val r = runCatching { actualizar(c, f) }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-					val lista = r.getOrDefault(emptyList())
-					// Los contadores se tocan desde varias fuentes a la vez: dentro del bloqueo
-					synchronized(avisos) {
-						if (r.isFailure) errores++
-						nuevos += lista.size
-						if (f.avisar) lista.forEach { avisos += f to it }
-						hechas++
-						progreso(hechas, fuentes.size)
+		var sincronizacion: RssSincronizacion.Resultado? = null
+		try {
+			if (RssSincronizacion.configurado(c)) {
+				runCatching { RssSincronizacion.sincronizar(c) }
+					.onSuccess {
+						nuevos += it.nuevos
+						avisos += it.avisos
+						sincronizacion = it
+						prefs(c).edit().putString("rss_sinc_error", "").apply()
+					}
+					.onFailure {
+						if (it is kotlinx.coroutines.CancellationException) throw it
+						errores++
+						prefs(c).edit().putString("rss_sinc_error", it.message ?: it.javaClass.simpleName).apply()
+					}
+				sincronizadas = db.remotosDeFuentes().keys
+			}
+			val fuentes = db.fuentes().filter { !it.pausada && it.id !in sincronizadas }
+			val limite = Semaphore(4)
+			var hechas = 0
+			fuentes.map { f ->
+				async(Dispatchers.IO) {
+					limite.withPermit {
+						val r = runCatching { actualizar(c, f) }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+						val lista = r.getOrDefault(emptyList())
+						// Los contadores se tocan desde varias fuentes a la vez: dentro del bloqueo
+						synchronized(avisos) {
+							if (r.isFailure) errores++
+							nuevos += lista.size
+							if (f.avisar) lista.forEach { avisos += f to it }
+							hechas++
+							progreso(hechas, fuentes.size)
+						}
 					}
 				}
+			}.awaitAll()
+		} finally {
+			// Limpiar y aplicar las reglas (y alertas) a lo que ha llegado, aunque se haya cancelado a medias
+			withContext(NonCancellable) {
+				runCatching { db.limpiar(prefs(c).getString("rss_dias", "30")?.toIntOrNull() ?: 30) }
+				runCatching { Reglas.aplicar(c, db.recibidosDesde(inicio)) }
 			}
-		}.awaitAll()
-		// Limpiar y aplicar reglas toca la base de datos: fuera del hilo principal
-		withContext(Dispatchers.IO) {
-			db.limpiar(prefs(c).getString("rss_dias", "30")?.toIntOrNull() ?: 30)
-			// Reglas y alertas con los artículos que acaban de llegar
-			runCatching { Reglas.aplicar(c, db.recibidosDesde(inicio)) }
 		}
 		prefs(c).edit().putLong("rss_ultima", System.currentTimeMillis()).apply()
-		Resultado(nuevos, errores, avisos)
+		Resultado(nuevos, errores, avisos, sincronizacion)
 	}
 
 	// --- Buscar y añadir fuentes ------------------------------------------------------------

@@ -10,6 +10,7 @@ import androidx.preference.PreferenceManager
 import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.R
 import com.xebolax.lector.datos.Preferencias
+import com.xebolax.lector.ui.avisar
 import com.xebolax.lector.ui.conEspera
 import com.xebolax.lector.ui.mensaje
 import kotlinx.coroutines.CancellationException
@@ -318,9 +319,12 @@ object VocesMotor {
 		val p = Preferencias(app)
 		pararPrueba(app)
 		val numero = ++numeroPrueba
-		if (ElevenLabs.esMotor(perfil.motorEfectivo(p))) return probarNube(app, perfil, texto, numero)
+		if (ElevenLabs.esMotor(perfil.motorEfectivo(p))) return probarNube(c, perfil, texto, numero)
 		conMotor(app, perfil.motorEfectivo(p)) { t ->
-			t ?: return@conMotor
+			if (t == null) {
+				if (numero == numeroPrueba) pruebaFallida(c)
+				return@conMotor
+			}
 			// Otra prueba empezó mientras arrancaba este motor: no suena
 			if (numero != numeroPrueba) {
 				runCatching { t.shutdown() }
@@ -335,13 +339,24 @@ object VocesMotor {
 			// Buscar la voz también es una llamada al motor: fuera del hilo principal
 			Thread {
 				if (nombre.isNotBlank()) runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull()?.let { runCatching { t.voice = it } }
-				runCatching { t.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba_perfil") }
+				val r = runCatching { t.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba_perfil") }.getOrDefault(TextToSpeech.ERROR)
+				if (r != TextToSpeech.SUCCESS) principal.post { if (motorPrueba === t) pruebaFallida(c) }
 			}.start()
 		}
 	}
 
+	/** La prueba no ha podido sonar: se suelta todo (motor y turno de audio) y se dice en la pantalla desde la que se probó. */
+	private fun pruebaFallida(c: Context) {
+		val app = c.applicationContext
+		pararPrueba(app)
+		val texto = app.getString(R.string.voz_motor_no_responde)
+		val pantalla = (c as? android.app.Activity)?.takeIf { !it.isFinishing && !it.isDestroyed }
+		if (pantalla != null) pantalla.avisar(texto) else android.widget.Toast.makeText(app, texto, android.widget.Toast.LENGTH_LONG).show()
+	}
+
 	/** Prueba con ElevenLabs (a la velocidad y el tono elegidos); si falla, la voz del móvil dice por qué. */
-	private fun probarNube(app: Context, perfil: PerfilVoz, texto: String, numero: Int) {
+	private fun probarNube(c: Context, perfil: PerfilVoz, texto: String, numero: Int) {
+		val app = c.applicationContext
 		val p = Preferencias(app)
 		ElevenLabs.probar(app, texto, perfil.vozEfectiva(p)) { archivo, error ->
 			principal.post {
@@ -368,7 +383,10 @@ object VocesMotor {
 						soltar()
 					}
 				} else conMotor(app, "") { t ->
-					t ?: return@conMotor
+					if (t == null) {
+						if (numero == numeroPrueba) pruebaFallida(c)
+						return@conMotor
+					}
 					if (numero != numeroPrueba) {
 						runCatching { t.shutdown() }
 						return@conMotor
@@ -376,7 +394,7 @@ object VocesMotor {
 					motorPrueba = t
 					t.setOnUtteranceProgressListener(oyentePrueba(app, t))
 					pedirFoco(app)
-					t.speak(ElevenLabs.mensaje(app, error ?: Exception()), TextToSpeech.QUEUE_FLUSH, null, "error_nube")
+					if (t.speak(ElevenLabs.mensaje(app, error ?: Exception()), TextToSpeech.QUEUE_FLUSH, null, "error_nube") != TextToSpeech.SUCCESS) pruebaFallida(c)
 				}
 			}
 		}

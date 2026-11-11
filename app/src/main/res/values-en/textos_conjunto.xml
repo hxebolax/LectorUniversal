@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texts from the whole-app review (notification permission, errors, formats…) -->
+<resources>
+	<!-- Notification permission, asked in context -->
+	<string name="cj_avisos_titulo">Allow notifications</string>
+	<string name="cj_avisos_permitir">Allow</string>
+	<string name="cj_avisos_si_no">If you don\'t allow them, the app works just the same. You can change it any time in the system Settings, Apps, Lector Universal, Notifications.</string>
+	<string name="cj_avisos_sin_permiso">No permission for notifications. The app works just the same, but you won\'t see its notifications.</string>
+	<string name="cj_avisos_por_lectura">While you read or listen with the screen off, Lector Universal can notify you of what is going on: the controls of what is playing, the sleep timer, the progress of an export or a recording, and any problem that stops it.</string>
+	<string name="cj_avisos_por_noticias">To notify you of new articles from the feeds you choose, Lector Universal needs permission to show notifications.</string>
+	<string name="cj_avisos_por_podcasts">To notify you of new episodes from the podcasts you choose, Lector Universal needs permission to show notifications.</string>
+	<string name="cj_avisos_por_descargas">To show you the progress of podcast downloads and tell you if one fails, Lector Universal needs permission to show notifications.</string>
+
+	<!-- Settings -->
+	<string name="cj_por_defecto_x">Default: %1$s</string>
+	<string name="cj_hora_pista">Time (for example, 23:00)</string>
+	<string name="cj_hora_no_valida">This is not a valid time. Type the hours and minutes, for example 23:00 or 7:30.</string>
+	<string name="cj_exportar_sin_tiempo">Android stopped the export because the time it gives these tasks each day ran out. The chapters already exported are in the folder you chose; you can export the book again later.</string>
+
+	<!-- Common errors -->
+	<string name="cj_error_inesperado">An unexpected error occurred. Try again and, if it happens again, report the problem from Settings, General.</string>
+	<string name="cj_sin_espacio">There is not enough space on the device.</string>
+
+	<!-- Updates -->
+	<string name="cj_act_sin_direccion">There is no custom address for updates. Type it in Settings, General.</string>
+	<string name="cj_act_github_sin_versiones">GitHub has no published versions in %1$s.</string>
+	<string name="cj_act_github_limite">GitHub does not allow more checks for now (request limit). Try again in a while.</string>
+	<string name="cj_act_github_respondio">GitHub answered with an error (%1$d). Try again later.</string>
+	<string name="cj_act_github_sin_apk">The latest version on GitHub does not include the app file (APK).</string>
+	<string name="cj_act_github_apk_no_valido">The address of the app file on GitHub is not valid.</string>
+	<string name="cj_act_github_sin_numero">The latest version on GitHub does not say its number.</string>
+	<string name="cj_act_servidor_respondio">The server answered with an error (%1$d). Try again later.</string>
+	<string name="cj_act_version_no_valida">The server\'s version file is not valid.</string>
+	<string name="cj_act_respuesta_no_valida">The server\'s answer is not valid. Try again later.</string>
+	<string name="cj_act_servidor_respondio_descarga">The server answered with an error (%1$d) while downloading. Try again later.</string>
+	<string name="cj_act_cortes">The connection was cut several times. Try again.</string>
+	<string name="cj_act_incompleta">The download is incomplete. Try again.</string>
+	<string name="cj_act_sha">The downloaded file does not match the published one. It will not be installed.</string>
+	<string name="cj_act_no_guardada">The update could not be saved.</string>
+	<string name="cj_act_no_app">The downloaded file is not a valid app.</string>
+	<string name="cj_act_no_lector">The downloaded file is not Lector Universal.</string>
+	<string name="cj_act_no_nueva">The downloaded file is not newer than the installed version.</string>
+	<string name="cj_act_firma">The update is not signed with the Lector Universal key. It will not be installed.</string>
+	<string name="cj_act_sin_instalador">the system app installer could not be opened.</string>
+
+	<!-- Backups -->
+	<string name="cj_copia_contrasena_incorrecta">The password is not correct, or the backup is damaged.</string>
+	<string name="cj_copia_con_contrasena">The backup is protected with a password.</string>
+	<string name="cj_copia_no_es_copia">The file is not a Lector Universal backup.</string>
+	<string name="cj_copia_incompleta">The backup is incomplete: it may not have finished saving or copying.</string>
+	<string name="cj_copia_danada">The backup is damaged.</string>
+	<string name="cj_copia_mas_nueva">The backup is from a newer version of the app. Update Lector Universal and try again.</string>
+	<string name="cj_copia_no_restaurado">%1$s could not be restored.</string>
+
+	<!-- Crash report (you send it to the author) -->
+	<string name="cj_fallo_hilo">Thread: %1$s</string>
+	<string name="cj_fallo_movil">Phone: %1$s</string>
+	<string name="cj_fallo_fecha">Date: %1$s</string>
+
+	<!-- Audiobook details (Information) -->
+	<string name="cj_audiolibro">Audiobook</string>
+	<string name="cj_meta_autor">Author</string>
+	<string name="cj_meta_narrador">Narrator</string>
+	<string name="cj_meta_album">Album</string>
+	<string name="cj_meta_titulo_pista">Track title</string>
+	<string name="cj_meta_genero">Genre</string>
+	<string name="cj_meta_fecha">Date</string>
+	<string name="cj_meta_duracion">Duration</string>
+	<string name="cj_meta_duracion_total">Total duration</string>
+	<string name="cj_meta_capitulos">Chapters</string>
+	<string name="cj_meta_pistas">Tracks</string>
+	<string name="cj_meta_archivo">File</string>
+
+	<!-- Format names (in the library and in Information) -->
+	<string name="formato_epub">EPUB</string>
+	<string name="formato_pdf">PDF</string>
+	<string name="formato_word">Word</string>
+	<string name="formato_word_antiguo">Word 97-2003</string>
+	<string name="formato_opendocument">OpenDocument</string>
+	<string name="formato_rtf">RTF</string>
+	<string name="formato_texto">Text</string>
+	<string name="formato_html">HTML</string>
+	<string name="formato_markdown">Markdown</string>
+	<string name="formato_fictionbook">FictionBook</string>
+	<string name="formato_kindle">Kindle</string>
+	<string name="formato_powerpoint">PowerPoint</string>
+	<string name="formato_hoja_calculo">Spreadsheet</string>
+	<string name="formato_chm">CHM help</string>
+	<string name="formato_braille">Braille</string>
+	<string name="formato_daisy">DAISY</string>
+	<string name="formato_audio">Audio</string>
+	<string name="formato_lista">Playlist</string>
+	<string name="formato_carpeta">Folder</string>
+	<string name="formato_comic">Comic</string>
+	<string name="formato_zip">ZIP</string>
+	<string name="formato_desconocido">Unknown</string>
+
+	<!-- Why a document cannot be opened -->
+	<string name="fmt_no_compatible">This file format is not supported.</string>
+	<string name="fmt_no_valido">This file is not valid (format: %1$s). It may be damaged or not really in that format.</string>
+	<string name="fmt_danado">The file is damaged or incomplete and cannot be read.</string>
+	<string name="fmt_falta_parte">A part of the file is missing or cannot be read. It may be damaged or incomplete.</string>
+	<string name="fmt_parte_no_legible">«%1$s», which is inside the file, cannot be read.</string>
+	<string name="fmt_vacio">The file contains nothing that can be read.</string>
+	<string name="fmt_zip_sin_documento">The compressed file does not contain any document that can be read.</string>
+	<string name="fmt_no_descomprimir">The file could not be decompressed. It may be damaged or use a compression the app does not know.</string>
+	<string name="fmt_cifrado">The file is protected with a password and cannot be opened. Open it with the program it was made with and save it without a password.</string>
+	<string name="fmt_hoja_cifrada_o_antigua">The spreadsheet is protected with a password or is an old Excel file (.xls). Open it with your spreadsheet program and save it as .xlsx, without a password.</string>
+	<string name="fmt_ppt_antiguo">Old PowerPoint presentations (.ppt) cannot be opened. Save it as .pptx and open it again.</string>
+	<string name="fmt_xls_antiguo">Old Excel spreadsheets (.xls) cannot be opened. Save it as .xlsx and open it again.</string>
+	<string name="fmt_doc_muy_antiguo">This Word document is too old or damaged. Save it as .docx and open it again.</string>
+	<string name="fmt_manipulado">The document is damaged or tampered with and, for safety, it will not be opened.</string>
+	<string name="fmt_drm">This book has DRM (copy protection) and cannot be opened. Use the app of the store where you bought it.</string>
+	<string name="fmt_clave_incorrecta">Wrong password.</string>
+	<string name="fmt_clave_necesaria">This document needs a password.</string>
+	<string name="fmt_demasiado_grande">The file is too big (%1$d MB).</string>
+	<string name="fmt_demasiado_grande_mas">The file is too big (more than %1$d MB).</string>
+	<string name="fmt_parte_grande">There is a file that is too big inside the book: %1$s.</string>
+	<string name="fmt_sin_espacio">There is no space to decompress the book, or the compressed file has been tampered with.</string>
+	<string name="fmt_sin_memoria">The document is too big for the device\'s memory.</string>
+	<string name="fmt_no_leido">The file could not be read. It may be damaged or its format may not be supported.</string>
+	<string name="fmt_no_encontrado">The file cannot be found. It may have been moved or deleted.</string>
+	<string name="fmt_sin_permiso">The app no longer has permission to open this file. Add it to the library again.</string>
+	<string name="fmt_carpeta_no_abre">The folder cannot be opened.</string>
+	<string name="fmt_carpeta_abre_archivo">This folder is not a DAISY book or an audiobook. Open the file directly.</string>
+	<string name="fmt_carpeta_sin_libro">This folder does not contain a DAISY book or audio files.</string>
+	<string name="fmt_carpeta_audio_no">The audio files in this folder cannot be played.</string>
+	<string name="fmt_lista_carpeta">To open a playlist, add the folder that contains it.</string>
+	<string name="fmt_lista_vacia">The playlist is empty or its files do not exist.</string>
+	<string name="fmt_daisy_carpeta">To open a DAISY book, choose its whole folder or the ZIP file.</string>
+	<string name="fmt_daisy_no_encontrado">No DAISY book was found: its start file (ncc.html or the .opf package) is missing.</string>
+</resources>

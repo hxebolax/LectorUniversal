@@ -29,6 +29,8 @@ import com.xebolax.lector.ui.elegir
 import com.xebolax.lector.ui.mensaje
 import com.xebolax.lector.ui.pedirTexto
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -101,10 +103,11 @@ class RssActivity : AppCompatActivity() {
 		b.paginas.offscreenPageLimit = 1
 		ponerPestanas(b.barra, b.paginas, b.pestanas, pestanas.map { it.nombre to it.icono }, getString(R.string.noticias))
 		RssTrabajo.programar(this)
-		// Al entrar, actualizar si hace más de 15 minutos
+		// Al entrar, actualizar si hace más de 15 minutos (no con «Solo a mano», ni con datos móviles si es solo con wifi)
 		val soloWifi = Rss.prefs(this).getBoolean("rss_solo_wifi", false) &&
 			(getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager).isActiveNetworkMetered
-		if (savedInstanceState == null && !soloWifi && System.currentTimeMillis() - Rss.prefs(this).getLong("rss_ultima", 0) > 15 * 60_000L) actualizarTodo(silencioso = true)
+		val automatica = RssTrabajo.minutos(this, RssTrabajo.NOTICIAS) > 0
+		if (savedInstanceState == null && automatica && !soloWifi && System.currentTimeMillis() - Rss.prefs(this).getLong("rss_ultima", 0) > 15 * 60_000L) actualizarTodo(silencioso = true)
 		if (savedInstanceState == null) {
 			compartido(intent)
 			desdeAviso(intent)
@@ -180,7 +183,14 @@ class RssActivity : AppCompatActivity() {
 	fun irAFuente(id: Long) {
 		val i = pestanas.indexOf(RssListaFragment.Modo.FUENTES)
 		b.paginas.setCurrentItem(i, false)
-		b.paginas.post { (supportFragmentManager.findFragmentByTag("f$i") as? RssListaFragment)?.abrirFuente(id) }
+		// La pestaña puede no estar creada aún (desde Buscar): se espera un poco a que lo esté
+		lifecycleScope.launch {
+			repeat(20) {
+				val f = supportFragmentManager.findFragmentByTag("f$i") as? RssListaFragment
+				if (f != null && f.view != null) return@launch f.abrirFuente(id)
+				delay(100)
+			}
+		}
 	}
 
 	/** «Marcar todo como leído» (o solo lo anterior a un día). Si no hay nada sin leer, se dice en lugar de preguntar. */
@@ -202,6 +212,8 @@ class RssActivity : AppCompatActivity() {
 		val db = RssBaseDatos.obtener(this)
 		lifecycleScope.launch {
 			val ids = withContext(Dispatchers.IO) { db.marcarTodoLeido(antesDe = antesDe) }
+			// Nada que marcar (por ejemplo, ninguno de hace más de un día): solo se dice, sin Deshacer
+			if (ids.isEmpty()) return@launch avisar(getString(if (antesDe > 0) R.string.noticias_ninguno_antiguo else R.string.noticias_nada_sin_leer))
 			conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) {
 				RssAcciones.enFondo(this@RssActivity, { db.marcarLeidos(ids, false) })
 			}
@@ -219,6 +231,8 @@ class RssActivity : AppCompatActivity() {
 				else -> getString(R.string.rss_sin_nuevos)
 			} + if (r.errores > 0) " " + resources.getQuantityString(R.plurals.rss_errores, r.errores, r.errores) else ""
 			if (!silencioso || r.nuevos > 0) avisar(texto)
+			// A mano: si hay fuentes de este móvil que aún no están en la cuenta de sincronización, se pregunta si subirlas
+			if (!silencioso) r.sincronizacion?.let { RssSincronizacion.preguntarSubir(this@RssActivity, it) }
 			// Después, los artículos completos de los nuevos (si está pedido)
 			Rss.completarPendientes(this@RssActivity)
 		}
@@ -291,11 +305,23 @@ class RssActivity : AppCompatActivity() {
 		val db = RssBaseDatos.obtener(this)
 		lifecycleScope.launch {
 			val f = withContext(Dispatchers.IO) {
-				if (db.fuentePorUrl(url) != null) null else db.fuente(db.anadirFuente(url, titulo, categoria = categoria))
+				if (db.fuentePorUrl(url) != null) null
+				else db.anadirFuente(url, titulo, categoria = categoria).let { id ->
+					// La ha añadido el usuario: es suya aunque sea una de las de ejemplo (se sube a la cuenta)
+					Rss.tocarFuente(this@RssActivity, id)
+					db.fuente(id)
+				}
 			} ?: return@launch avisar(getString(R.string.rss_ya_suscrito, titulo))
 			// Ventana de espera hasta que la fuente está suscrita y con sus artículos (y las reglas aplicadas)
-			val n = runCatching { conEspera(getString(R.string.pod_suscribirse), getString(R.string.pod_suscribiendo)) { Rss.actualizarUna(this@RssActivity, f) } }
-				.getOrElse { if (it is kotlinx.coroutines.CancellationException) throw it; -1 }
+			val n = try {
+				conEspera(getString(R.string.pod_suscribirse), getString(R.string.pod_suscribiendo)) { Rss.actualizarUna(this@RssActivity, f) }
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				// Se ha cerrado la pantalla: nada más. Con Cancelar: la fuente ya está añadida y se dice
+				if (!isActive) throw e
+				return@launch avisar(getString(R.string.noticias_suscrito_luego, titulo))
+			} catch (e: Exception) {
+				-1
+			}
 			if (n < 0) mensaje(getString(R.string.rss_anadir_fuente), getString(R.string.rss_error_fuente, titulo))
 			else avisar(getString(R.string.rss_suscrito, titulo) + ". " + resources.getQuantityString(R.plurals.rss_n_articulos, n, n))
 			// Añadida fuera de una carpeta: se ofrece ponerla en una (o crear una nueva)
@@ -366,8 +392,13 @@ class RssActivity : AppCompatActivity() {
 					val repetida = withContext(Dispatchers.IO) {
 						(url != f.url && db.fuentePorUrl(url) != null).also { if (!it) db.editarFuente(editada) }
 					}
+					// Editada por el usuario: si era de ejemplo, ya es suya (se sube a la cuenta)
+					if (!repetida) Rss.tocarFuente(this@RssActivity, f.id)
 					if (repetida) mensaje(getString(R.string.rss_editar_fuente), getString(R.string.rss_direccion_repetida))
-					else avisar(getString(R.string.guardado))
+					else {
+						avisar(getString(R.string.guardado))
+						if (editada.avisar && !f.avisar) com.xebolax.lector.ui.PermisoAvisos.pedir(this@RssActivity, R.string.cj_avisos_por_noticias)
+					}
 				}
 			}
 			.setNegativeButton(R.string.cancelar, null)

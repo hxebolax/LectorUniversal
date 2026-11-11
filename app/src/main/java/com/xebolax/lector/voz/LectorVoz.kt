@@ -490,9 +490,12 @@ object LectorVoz {
 
 	private fun motorListo(t: TextToSpeech?, voces: List<Voice>) {
 		if (t == null || tts !== t) return
+		principal.removeCallbacks(plazoMotor)
 		vocesMotor = voces
 		listo = true
 		aplicarAjustes()
+		// Algunos motores aún no tienen la lista justo al arrancar: se vuelve a pedir en un momento
+		if (voces.isEmpty()) principal.postDelayed({ if (tts === t) refrescarVoces(t) }, 1500)
 		if (pendiente) {
 			pendiente = false
 			hablar()
@@ -501,14 +504,83 @@ object LectorVoz {
 
 	private fun motorFallido(t: TextToSpeech?) {
 		if (t != null && tts !== t) return
+		principal.removeCallbacks(plazoMotor)
+		// Se suelta el motor roto: la próxima vez se arranca de nuevo (si no, se quedaría sin estar listo para siempre)
+		runCatching { tts?.shutdown() }
+		tts = null
+		motorActual = null
 		listo = false
+		pendiente = false
+		vocesMotor = emptyList()
 		// El motor no arranca: se suelta todo y se dice (si no, el móvil seguiría despierto sin sonar)
 		leyendo = false
+		jugador?.pause()
 		soltarFoco()
 		bloquearCpu(false)
 		principal.removeCallbacks(latido)
-		android.widget.Toast.makeText(app, R.string.voz_motor_no_responde, android.widget.Toast.LENGTH_LONG).show()
+		avisarError(app.getString(R.string.voz_motor_no_responde))
 		avisar()
+	}
+
+	/** Si el motor no está listo en unos segundos al pedir que lea, se da por fallido. */
+	private val plazoMotor = Runnable { if (!listo && leyendo) motorFallido(null) }
+
+	private fun esperarMotor() {
+		pendiente = true
+		principal.removeCallbacks(plazoMotor)
+		principal.postDelayed(plazoMotor, 8000)
+	}
+
+	/** Las voces del motor otra vez, en otro hilo (una voz recién instalada): si ya está la elegida, se aplica. */
+	private var pidiendoVoces = false
+
+	private fun refrescarVoces(t: TextToSpeech) {
+		if (pidiendoVoces) return
+		pidiendoVoces = true
+		Thread {
+			val lista = runCatching { t.voices?.toList() }.getOrNull().orEmpty()
+			principal.post {
+				pidiendoVoces = false
+				if (tts !== t || lista.isEmpty()) return@post
+				vocesMotor = lista
+				val nombre = perfil.vozEfectiva(Preferencias(app))
+				if (vozElegida == null && lista.any { it.name == nombre }) {
+					aplicarAjustes()
+					rehacer = true
+					if (leyendo) hablar()
+				}
+			}
+		}.start()
+	}
+
+	/** Quien muestra la lectura (la pantalla del libro) dice los errores de la voz con TalkBack. */
+	var alError: ((String) -> Unit)? = null
+
+	private const val AVISO_ERROR = 7301
+
+	/** Un error de la lectura: en la pantalla del libro (o en un Toast) y en una notificación, que no se pierde. */
+	private fun avisarError(texto: String) {
+		val pantalla = alError
+		if (pantalla != null) pantalla(texto) else android.widget.Toast.makeText(app, texto, android.widget.Toast.LENGTH_LONG).show()
+		if (documento == null) return
+		runCatching {
+			val gestor = app.getSystemService(android.app.NotificationManager::class.java) ?: return@runCatching
+			if (Build.VERSION.SDK_INT >= 26) {
+				gestor.createNotificationChannel(android.app.NotificationChannel("lectura_voz", app.getString(R.string.canal_voz), android.app.NotificationManager.IMPORTANCE_LOW))
+			}
+			val aviso = androidx.core.app.NotificationCompat.Builder(app, "lectura_voz")
+				.setSmallIcon(R.drawable.ic_voz)
+				.setContentTitle(titulo.ifBlank { app.getString(R.string.canal_voz) })
+				.setContentText(texto)
+				.setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(texto))
+				.setAutoCancel(true)
+				.build()
+			gestor.notify(AVISO_ERROR, aviso)
+		}
+	}
+
+	private fun quitarAvisoError() {
+		runCatching { app.getSystemService(android.app.NotificationManager::class.java)?.cancel(AVISO_ERROR) }
 	}
 
 	/**
@@ -549,6 +621,8 @@ object LectorVoz {
 		}
 		val nombre = perfil.vozEfectiva(p)
 		vozElegida = if (nombre.isNotBlank() && !ElevenLabs.esVozSuya(nombre)) vocesMotor.firstOrNull { it.name == nombre } else null
+		// La voz elegida no está en la lista guardada (quizá se instaló después): se vuelven a pedir y se aplica al llegar
+		if (vozElegida == null && nombre.isNotBlank() && !ElevenLabs.esVozSuya(nombre)) refrescarVoces(t)
 		if (vozElegida != null) t.voice = vozElegida
 		else {
 			val idioma = documento?.idioma?.takeIf { it.isNotBlank() }?.let { Locale.forLanguageTag(it) } ?: Locale.getDefault()
@@ -602,8 +676,8 @@ object LectorVoz {
 		vocesMotor = emptyList()
 		rehacer = true
 		if (estaba) {
-			pendiente = true
 			motor()
+			esperarMotor()
 		}
 	}
 
@@ -748,10 +822,11 @@ object LectorVoz {
 		bloquearCpu(true)
 		principal.removeCallbacks(latido)
 		principal.post(latido)
+		quitarAvisoError()
 		val j = jugador()
 		motor()
 		when {
-			!listo -> pendiente = true
+			!listo -> esperarMotor()
 			rehacer || j.mediaItemCount == 0 -> {
 				aplicarAjustes()
 				hablar()
@@ -976,8 +1051,8 @@ object LectorVoz {
 	private fun hablar() {
 		val t = tts
 		if (t == null || !listo) {
-			pendiente = true
 			motor()
+			if (leyendo) esperarMotor() else pendiente = true
 			return
 		}
 		generacion++
@@ -1014,6 +1089,25 @@ object LectorVoz {
 	private val CORCHETES = Regex("""\s*\[[^\[\]]{0,300}]""")
 	private val NOTAS = Regex("""\[\d{1,4}\]|\[[*†‡]\]""")
 
+	/**
+	 * Lo que se dice de un trozo del libro: sin notas, direcciones, paréntesis
+	 * o corchetes (según Ajustes), con el diccionario de pronunciación y, al
+	 * principio de un bloque con página, «Página n». Lo usa también
+	 * ExportadorAudio, para que el audio exportado diga lo mismo.
+	 */
+	fun textoParaDecir(c: Context, p: Preferencias, doc: Documento, b: Int, original: String, inicioDeBloque: Boolean, pron: Pronunciador?): String {
+		var texto = original
+		if (p.saltarNotas) texto = NOTAS.replace(texto, "")
+		if (p.saltarUrls) texto = URLS.replace(texto, "")
+		if (p.saltarParentesis) texto = PARENTESIS.replace(texto, "")
+		if (p.saltarCorchetes) texto = CORCHETES.replace(texto, "")
+		pron?.let { if (!it.vacio) texto = it.aplicar(texto) }
+		if (inicioDeBloque && p.leerPaginas && doc.bloques.getOrNull(b)?.tiene(Marca.PAGINA) == true) {
+			doc.paginaDe(b)?.let { pagina -> texto = c.getString(R.string.pagina_n, pagina.etiqueta) + ". " + texto }
+		}
+		return texto
+	}
+
 	/** Pide al motor que genere las 'cuantas' frases siguientes a la última pedida. */
 	private fun pedir(t: TextToSpeech, cuantas: Int, primeraTanda: Boolean = false) {
 		val doc = documento ?: return
@@ -1021,6 +1115,8 @@ object LectorVoz {
 		var (b, f) = ultimaPedida
 		var pedidas = 0
 		var primera = primeraTanda
+		// Frases que quedan vacías tras los filtros (una dirección suelta, una nota): se saltan sin contarlas como fallos
+		var vacias = 0
 		while (pedidas < cuantas) {
 			var lista = if (b == bloque) frases else frasesDe(b)
 			f++
@@ -1034,14 +1130,11 @@ object LectorVoz {
 			}
 			val bloqueDoc = doc.bloques[b]
 			val rango = lista[f]
-			var texto = bloqueDoc.texto.substring(rango.first, rango.last + 1)
-			if (p.saltarNotas) texto = NOTAS.replace(texto, "")
-			if (p.saltarUrls) texto = URLS.replace(texto, "")
-			if (p.saltarParentesis) texto = PARENTESIS.replace(texto, "")
-			if (p.saltarCorchetes) texto = CORCHETES.replace(texto, "")
-			pronunciador?.let { if (!it.vacio) texto = it.aplicar(texto) }
-			if (f == 0 && p.leerPaginas && bloqueDoc.tiene(Marca.PAGINA)) {
-				doc.paginaDe(b)?.let { pagina -> texto = app.getString(R.string.pagina_n, pagina.etiqueta) + ". " + texto }
+			val texto = textoParaDecir(app, p, doc, b, bloqueDoc.texto.substring(rango.first, rango.last + 1), f == 0, pronunciador)
+			if (texto.isBlank()) {
+				ultimaPedida = b to f
+				if (++vacias > 200) break
+				continue
 			}
 			val segmento = Segmento(generacion, b, f, File(carpeta(), "${generacion}_${b}_$f.wav"), nuevoBloque && !primera)
 			primera = false
@@ -1160,7 +1253,7 @@ object LectorVoz {
 				else {
 					tandasFallidas = 0
 					pausar()
-					android.widget.Toast.makeText(app, R.string.voz_motor_no_responde, android.widget.Toast.LENGTH_LONG).show()
+					avisarError(app.getString(R.string.voz_motor_no_responde))
 				}
 			}
 			return

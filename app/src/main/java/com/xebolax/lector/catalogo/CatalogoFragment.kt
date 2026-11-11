@@ -205,6 +205,11 @@ class CatalogoFragment : Fragment() {
 	}
 
 	private fun guardarFuentes(lista: List<Fuente>) {
+		// La contraseña de un catálogo borrado (o al que se le cambió la dirección) no se queda guardada
+		val antes = prefs().getString(CLAVE, null)?.let { texto -> runCatching { JSONArray(texto) }.getOrNull() }
+			?.let { a -> List(a.length()) { a.optJSONObject(it)?.optString("url").orEmpty() } }.orEmpty()
+		val ahora = lista.map { it.url }.toSet()
+		antes.filter { it.isNotBlank() && it !in ahora }.forEach { com.xebolax.lector.datos.Secretos.guardar(requireContext(), com.xebolax.lector.datos.Secretos.deCatalogo(it), "") }
 		// Las contraseñas van aparte, con las demás claves (para que no salgan en las copias sin querer)
 		lista.forEach { com.xebolax.lector.datos.Secretos.guardar(requireContext(), com.xebolax.lector.datos.Secretos.deCatalogo(it.url), it.clave) }
 		prefs().edit().putString(CLAVE, JSONArray(lista.map { it.json().apply { remove("clave") } }).toString()).apply()
@@ -267,33 +272,41 @@ class CatalogoFragment : Fragment() {
 			addView(cUsuario)
 			addView(cClave)
 		}
-		MaterialAlertDialogBuilder(c)
+		val dialogo = MaterialAlertDialogBuilder(c)
 			.setTitle(if (original == null) getString(R.string.anadir_catalogo) else getString(R.string.etiqueta_valor, getString(R.string.editar_catalogo), original.nombre))
 			.setView(android.widget.ScrollView(c).apply { addView(formulario) })
-			.setPositiveButton(R.string.guardar) { _, _ ->
-				val u = url.text.toString().trim().let { if (it.isNotEmpty() && !it.contains("://")) "https://$it" else it }
-				if (u.length < 10) return@setPositiveButton
-				val n = nombre.text.toString().trim()
-				val credenciales = if (tipo == Tipo.WEB) Feed.Credenciales("", "") to false else Feed.Credenciales(usuario.text.toString().trim(), clave.text.toString()) to true
-				fun guardar(web: Boolean, titulo: String) {
-					val (cred, conClave) = credenciales
-					val nueva = Fuente(n.ifBlank { titulo.ifBlank { Uri.parse(u).host ?: u } }, u,
-						if (conClave && !web) cred.usuario else "", if (conClave && !web) cred.clave else "", web)
-					val lista = fuentes().toMutableList()
-					val i = original?.let { o -> lista.indexOfFirst { it.url == o.url && it.nombre == o.nombre } } ?: -1
-					if (i >= 0) lista[i] = nueva else lista += nueva
-					guardarFuentes(lista)
-					mostrarFuentes()
-					if (web && original?.web != true) actividad?.mensaje(nueva.nombre, getString(R.string.biblioteca_web_anadida, nueva.nombre))
-				}
-				when (tipo) {
-					Tipo.OPDS -> guardar(false, "")
-					Tipo.WEB -> guardar(true, "")
-					Tipo.AVERIGUAR -> averiguarTipo(u, credenciales.first.takeIf { it.usuario.isNotBlank() }) { web, titulo -> guardar(web, titulo) }
-				}
-			}
+			.setPositiveButton(R.string.guardar, null)
 			.setNegativeButton(R.string.cancelar, null)
 			.show()
+		// Guardar: si la dirección no vale, se dice en el campo (TalkBack lo lee) y la ventana sigue abierta con lo escrito
+		dialogo.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+			val u = url.text.toString().trim().let { if (it.isNotEmpty() && !it.contains("://")) "https://$it" else it }
+			if (u.length < 10 || Uri.parse(u).host.isNullOrBlank()) {
+				cUrl.error = getString(R.string.cat_direccion_no_valida)
+				url.requestFocus()
+				return@setOnClickListener
+			}
+			cUrl.error = null
+			dialogo.dismiss()
+			val n = nombre.text.toString().trim()
+			val credenciales = if (tipo == Tipo.WEB) Feed.Credenciales("", "") to false else Feed.Credenciales(usuario.text.toString().trim(), clave.text.toString()) to true
+			fun guardar(web: Boolean, titulo: String) {
+				val (cred, conClave) = credenciales
+				val nueva = Fuente(n.ifBlank { titulo.ifBlank { Uri.parse(u).host ?: u } }, u,
+					if (conClave && !web) cred.usuario else "", if (conClave && !web) cred.clave else "", web)
+				val lista = fuentes().toMutableList()
+				val i = original?.let { o -> lista.indexOfFirst { it.url == o.url && it.nombre == o.nombre } } ?: -1
+				if (i >= 0) lista[i] = nueva else lista += nueva
+				guardarFuentes(lista)
+				mostrarFuentes()
+				if (web && original?.web != true) actividad?.mensaje(nueva.nombre, getString(R.string.biblioteca_web_anadida, nueva.nombre))
+			}
+			when (tipo) {
+				Tipo.OPDS -> guardar(false, "")
+				Tipo.WEB -> guardar(true, "")
+				Tipo.AVERIGUAR -> averiguarTipo(u, credenciales.first.takeIf { it.usuario.isNotBlank() }) { web, titulo -> guardar(web, titulo) }
+			}
+		}
 	}
 
 	/**

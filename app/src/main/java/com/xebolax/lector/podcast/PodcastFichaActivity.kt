@@ -110,8 +110,9 @@ class PodcastFichaActivity : AppCompatActivity() {
 
 	override fun onResume() {
 		super.onResume()
-		// Al volver (por ejemplo tras suscribirse desde otra pantalla), el botón dice si ya lo estás
-		if (canal != null) construirCabecera()
+		// Al volver (por ejemplo tras suscribirse desde otra pantalla), el botón dice si ya lo estás.
+		// Solo cambia su texto: rehacer la cabecera haría perder el foco (pauta 34)
+		if (canal != null) ponerSuscripcion()
 	}
 
 	private fun cargar() {
@@ -159,9 +160,8 @@ class PodcastFichaActivity : AppCompatActivity() {
 		cabecera.removeAllViews()
 		val fila = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 		fun anadir(v: android.view.View) = fila.addView(v, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-		val suscrito = PodcastsBaseDatos.obtener(this).podcastPorUrl(url)
-		anadir(if (suscrito == null) boton(getString(R.string.pod_suscribirse)) { suscribir() }
-		else boton(getString(R.string.pod_ver_suscrito)) { verSuscrito(suscrito.id) })
+		anadir(boton("") {}.also { botonSuscripcion = it })
+		ponerSuscripcion()
 		if (c.sitio.isNotBlank()) anadir(boton(getString(R.string.rss_web_corto)) { navegador(c.sitio) })
 		c.trailer?.let { (titulo, audio) ->
 			anadir(boton(getString(R.string.pod_trailer)) {
@@ -174,6 +174,16 @@ class PodcastFichaActivity : AppCompatActivity() {
 			elegir(getString(R.string.pod_apoyar), c.apoyo.map { (texto, direccion) -> texto.ifBlank { Uri.parse(direccion).host.orEmpty() } to { navegador(direccion) } })
 		})
 		cabecera.addView(fila)
+	}
+
+	/** El botón de suscribirse, que pasa a «Ver en Suscripciones» al estar suscrito. */
+	private var botonSuscripcion: MaterialButton? = null
+
+	private fun ponerSuscripcion() {
+		val boton = botonSuscripcion ?: return
+		val suscrito = PodcastsBaseDatos.obtener(this).podcastPorUrl(url)
+		boton.text = getString(if (suscrito == null) R.string.pod_suscribirse else R.string.pod_ver_suscrito)
+		boton.setOnClickListener { if (suscrito == null) suscribir() else verSuscrito(suscrito.id) }
 	}
 
 	private fun suscribir() {
@@ -191,7 +201,7 @@ class PodcastFichaActivity : AppCompatActivity() {
 						avisar(getString(R.string.movida_a_carpeta, destino))
 					}
 				}
-				construirCabecera()
+				ponerSuscripcion()
 			} catch (e: kotlinx.coroutines.CancellationException) {
 				throw e
 			} catch (e: Exception) {

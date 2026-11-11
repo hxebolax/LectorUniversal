@@ -36,7 +36,7 @@ object RegistroFallos {
 				val f = archivo(app)
 				f.parentFile?.mkdirs()
 				val traza = StringWriter().also { error.printStackTrace(PrintWriter(it)) }.toString()
-				f.writeText(datos() + "\n" + "Hilo: ${hilo.name}\n\n" + traza.take(60_000))
+				f.writeText(datos(app) + "\n" + app.getString(R.string.cj_fallo_hilo, hilo.name) + "\n\n" + traza.take(60_000))
 				// Es un fallo nuevo: se ofrecerá al abrir la app
 				PreferenceManager.getDefaultSharedPreferences(app).edit().putBoolean(OFRECIDO, false).commit()
 			}
@@ -45,12 +45,12 @@ object RegistroFallos {
 	}
 
 	/** Versión de la app, de Android y el modelo del móvil (nada personal). */
-	private fun datos(): String {
+	private fun datos(c: Context): String {
 		val fecha = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.ROOT).format(Date())
 		return "Lector Universal ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
 			"Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n" +
-			"Móvil: ${Build.MANUFACTURER} ${Build.MODEL}\n" +
-			"Fecha: $fecha\n"
+			c.getString(R.string.cj_fallo_movil, "${Build.MANUFACTURER} ${Build.MODEL}") + "\n" +
+			c.getString(R.string.cj_fallo_fecha, fecha) + "\n"
 	}
 
 	/** Al abrir la app: si la última vez se cerró por un fallo, ofrecer enviarlo (una sola vez). */
@@ -71,14 +71,16 @@ object RegistroFallos {
 
 	private fun ver(a: Activity) {
 		val f = archivo(a)
-		val texto = if (f.exists()) f.readText() else datos() + "\n" + a.getString(R.string.fallo_sin_fallo)
-		MaterialAlertDialogBuilder(a)
+		val hayFallo = f.exists()
+		val texto = if (hayFallo) f.readText() else datos(a) + "\n" + a.getString(R.string.fallo_sin_fallo)
+		val dialogo = MaterialAlertDialogBuilder(a)
 			.setTitle(R.string.fallo_informe)
 			.setMessage(texto.take(4000))
 			.setPositiveButton(R.string.fallo_enviar) { _, _ -> enviar(a, texto) }
-			.setNeutralButton(R.string.fallo_borrar) { _, _ -> f.delete() }
 			.setNegativeButton(R.string.cerrar, null)
-			.show()
+		// «Borrar» solo si hay un fallo guardado que borrar
+		if (hayFallo) dialogo.setNeutralButton(R.string.fallo_borrar) { _, _ -> f.delete() }
+		dialogo.show()
 	}
 
 	/** Lo mandas tú: correo, GitHub o la app que elijas, y puedes añadir qué estabas haciendo. */

@@ -6,4 +6,19 @@
 	<string name="noticias_filtro_todas">todas</string>
 	<!-- «Marcar todo como leído» cuando no hay nada sin leer -->
 	<string name="noticias_nada_sin_leer">No hay artículos sin leer.</string>
+	<!-- «Anteriores a un día» cuando no hay ninguno -->
+	<string name="noticias_ninguno_antiguo">No hay artículos sin leer de hace más de un día.</string>
+	<!-- Se canceló la espera al suscribirse: la fuente ya está añadida -->
+	<string name="noticias_suscrito_luego">Suscrito a %1$s; sus artículos llegarán al actualizar.</string>
+	<!-- Sincronización: subir a la cuenta las fuentes de este móvil -->
+	<string name="noticias_subir_titulo">Subir fuentes a la cuenta</string>
+	<plurals name="noticias_subir_pregunta">
+		<item quantity="one">¿Subir %d fuente de este móvil a la cuenta? Así la tendrás también en el servidor y en tus otros dispositivos.</item>
+		<item quantity="many">¿Subir %d fuentes de este móvil a la cuenta? Así las tendrás también en el servidor y en tus otros dispositivos.</item>
+		<item quantity="other">¿Subir %d fuentes de este móvil a la cuenta? Así las tendrás también en el servidor y en tus otros dispositivos.</item>
+	</plurals>
+	<string name="noticias_subir_si">Subir</string>
+	<string name="noticias_subir_no">No subir</string>
+	<!-- Frecuencia personalizada fuera de rango (Noticias y Podcasts) -->
+	<string name="noticias_frecuencia_rango">Escribe entre %1$d y %2$d minutos (una semana).</string>
 </resources>

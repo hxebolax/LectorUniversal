@@ -30,13 +30,24 @@ class DescargasPendientes(c: Context, p: WorkerParameters) : CoroutineWorker(c, 
 
 		/** ¿Está pendiente de descargar? */
 		fun pendiente(ajustes: String) = runCatching { org.json.JSONObject(ajustes).optBoolean("pendiente") }.getOrDefault(false)
+
+		/** Todo lo pendiente de descargar, esté en Compartidos o ya pasado a la biblioteca. */
+		fun pendientes(c: Context) = BaseDatos.obtener(c).todosConCompartidos().filter { pendiente(it.ajustes) && it.origen.startsWith("http") }
+
+		/**
+		 * Al abrir Compartidos: si queda algo pendiente, se vuelve a programar
+		 * (tras varios intentos fallidos el trabajo se rinde).
+		 */
+		suspend fun reprogramarSiHace(c: Context) {
+			val hay = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { pendientes(c).isNotEmpty() }
+			if (hay) programar(c)
+		}
 	}
 
 	override suspend fun doWork(): Result {
 		val c = applicationContext
-		val db = BaseDatos.obtener(c)
 		var fallos = 0
-		for (l in db.compartidos().filter { pendiente(it.ajustes) && it.origen.startsWith("http") }) {
+		for (l in pendientes(c)) {
 			try {
 				PaginaWeb.guardar(c, l.origen, compartido = true, forzar = true)
 			} catch (e: kotlinx.coroutines.CancellationException) {

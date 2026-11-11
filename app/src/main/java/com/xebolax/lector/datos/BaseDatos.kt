@@ -532,6 +532,15 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 
 	fun cambiarUri(id: Long, uri: String) = actualizar(id, ContentValues().apply { put("uri", uri) })
 
+	/** Un enlace pendiente de descargar que resultó ser un documento: la misma fila pasa a ser ese archivo. */
+	fun sustituirArchivo(id: Long, uri: String, nombre: String, formato: String, audio: Boolean, tamano: Long) = actualizar(id, ContentValues().apply {
+		put("uri", uri)
+		put("nombre", nombre)
+		put("formato", formato)
+		put("audio", if (audio) 1 else 0)
+		put("tamano", tamano)
+	})
+
 	/** Tipo elegido a mano (clave de Tipos; vacía = el que le toca por su formato). */
 	fun cambiarTipo(id: Long, tipo: String) = actualizar(id, ContentValues().apply { put("tipo", tipo) })
 
@@ -854,7 +863,7 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 
 	// --- Copia de seguridad ------------------------------------------------------------------
 
-	/** Toda la biblioteca en JSON (libros, carpetas, marcadores, pronunciación, estadísticas). */
+	/** Toda la biblioteca en JSON (libros, carpetas, marcadores, subrayados, colecciones, pronunciación, estadísticas). */
 	fun exportar(): JSONObject {
 		val db = readableDatabase
 		fun tabla(nombre: String): JSONArray = db.query(nombre, null, null, null, null, null, null).use { c ->
@@ -875,18 +884,22 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 		}
 		return JSONObject().apply {
 			put("version", VERSION)
-			for (t in listOf("carpetas", "libros", "marcadores", "estadisticas", "pronunciacion")) put(t, tabla(t))
+			for (t in TABLAS_COPIA) put(t, tabla(t))
 		}
 	}
 
-	/** Restaura una copia (sustituye la biblioteca actual). */
+	/** Las tablas de la copia, en el orden en que se restauran (primero aquello de lo que dependen las demás). */
+	private val TABLAS_COPIA = listOf("carpetas", "libros", "colecciones", "libro_coleccion", "subrayados", "marcadores", "estadisticas", "pronunciacion")
+
+	/** Restaura una copia (sustituye la biblioteca actual). Una copia antigua sin subrayados ni colecciones los deja vacíos. */
 	fun importar(copia: JSONObject) {
 		val db = writableDatabase
 		db.setForeignKeyConstraintsEnabled(false)
 		db.beginTransaction()
 		try {
-			for (t in listOf("estadisticas", "marcadores", "pronunciacion", "libros", "carpetas")) db.delete(t, null, null)
-			for (t in listOf("carpetas", "libros", "marcadores", "estadisticas", "pronunciacion")) {
+			// Todo lo que cuelga de los libros también: si no, quedarían subrayados y colecciones de libros que ya no son esos
+			for (t in TABLAS_COPIA.reversed()) db.delete(t, null, null)
+			for (t in TABLAS_COPIA) {
 				val filas = copia.optJSONArray(t) ?: continue
 				for (i in 0 until filas.length()) {
 					val o = filas.getJSONObject(i)

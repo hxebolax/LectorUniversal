@@ -14,4 +14,21 @@
 	<string name="zona_dispositivo">Libros del dispositivo</string>
 	<!-- Widget: un audiolibro se escucha en su pantalla -->
 	<string name="widget_escuchar_x">Escuchar %1$s</string>
+	<!-- Segunda auditoría -->
+	<plurals name="comp_no_guardados_n">
+		<item quantity="one">%1$d no se pudo guardar</item>
+		<item quantity="many">%1$d no se pudieron guardar</item>
+		<item quantity="other">%1$d no se pudieron guardar</item>
+	</plurals>
+	<string name="comp_pendiente_no_guardado">No se ha podido guardar el enlace para descargarlo después. %1$s</string>
+	<plurals name="tipo_salen_de_carpeta_n">
+		<item quantity="one">%1$d estaba en una carpeta de otro tipo y ha pasado a la raíz de la biblioteca.</item>
+		<item quantity="many">%1$d estaban en carpetas de otro tipo y han pasado a la raíz de la biblioteca.</item>
+		<item quantity="other">%1$d estaban en carpetas de otro tipo y han pasado a la raíz de la biblioteca.</item>
+	</plurals>
+	<string name="coleccion_renombrada">Colección renombrada: %1$s</string>
+	<string name="zona_grupo">Autores, series y colecciones de la biblioteca</string>
+	<string name="cat_direccion_no_valida">Escribe la dirección completa del catálogo, por ejemplo https://mi.servidor.com/opds</string>
+	<string name="bib_guardado_x">Guardado en tu biblioteca: %1$s</string>
+	<string name="widget_pausar_audio">Pausar %1$s</string>
 </resources>

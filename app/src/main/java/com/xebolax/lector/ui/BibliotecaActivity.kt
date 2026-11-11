@@ -256,7 +256,8 @@ class BibliotecaActivity : AppCompatActivity() {
 			else -> resources.getQuantityString(R.plurals.libros_anadidos, r.anadidos.size, r.anadidos.size)
 		}
 		avisar(texto, mostrar = true)
-		if (r.anadidos.isNotEmpty()) TareasInicio.completar(this, r.anadidos)
+		// Título y autor reales solo de los nuevos: los que ya estaban pueden tener los suyos editados
+		if (r.nuevos.isNotEmpty()) TareasInicio.completar(this, r.nuevos)
 	}
 
 	private fun revisar() {
@@ -267,7 +268,8 @@ class BibliotecaActivity : AppCompatActivity() {
 	}
 
 	/** Descarga una página web, guarda su contenido principal y la abre como un libro más. */
-	private fun abrirWeb(direccion: String? = null) {
+	/** deOtraApp: llega de otra app (se hace lo elegido en Ajustes, «Al recibir algo»). */
+	private fun abrirWeb(direccion: String? = null, deOtraApp: Boolean = false) {
 		if (direccion == null) {
 			pedirTexto(getString(R.string.abrir_pagina_web), getString(R.string.direccion_web), teclado = Teclado.DIRECCION) { abrirWeb(it) }
 			return
@@ -276,7 +278,7 @@ class BibliotecaActivity : AppCompatActivity() {
 		lifecycleScope.launch {
 			try {
 				val id = conEspera(getString(R.string.abrir_pagina_web), getString(R.string.descargando_pagina)) { PaginaWeb.guardar(this@BibliotecaActivity, url) }
-				Abiertos.abrirPantalla(this@BibliotecaActivity, id)
+				if (deOtraApp) recibido(id) else Abiertos.abrirPantalla(this@BibliotecaActivity, id)
 			} catch (e: kotlinx.coroutines.CancellationException) {
 				throw e
 			} catch (e: Exception) {
@@ -353,7 +355,7 @@ class BibliotecaActivity : AppCompatActivity() {
 	}
 
 	/** Guarda un texto (portapapeles, compartido) como documento de la biblioteca y lo abre. */
-	private fun guardarTexto(texto: String) {
+	private fun guardarTexto(texto: String, deOtraApp: Boolean = false) {
 		val titulo = texto.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.take(60) ?: getString(R.string.texto)
 		// Un texto compartido puede ser muy grande: se escribe fuera del hilo principal
 		lifecycleScope.launch {
@@ -363,7 +365,7 @@ class BibliotecaActivity : AppCompatActivity() {
 				archivo.writeText(texto)
 				BaseDatos.obtener(this@BibliotecaActivity).anadirLibro(Uri.fromFile(archivo).toString(), archivo.name, titulo, "", Formato.TXT.name, false, archivo.length(), null)
 			}
-			Abiertos.abrirPantalla(this@BibliotecaActivity, id)
+			if (deOtraApp) recibido(id) else Abiertos.abrirPantalla(this@BibliotecaActivity, id)
 		}
 	}
 
@@ -380,26 +382,49 @@ class BibliotecaActivity : AppCompatActivity() {
 				val enlace = texto?.let { com.xebolax.lector.compartidos.Compartidos.enlaceDe(it) }
 				when {
 					flujo != null -> abrirExterno(flujo)
-					enlace != null -> abrirWeb(enlace)
-					!texto.isNullOrBlank() -> guardarTexto(texto)
+					enlace != null -> abrirWeb(enlace, deOtraApp = true)
+					!texto.isNullOrBlank() -> guardarTexto(texto, deOtraApp = true)
 				}
 			}
 			Intent.ACTION_SEND_MULTIPLE -> {
 				@Suppress("DEPRECATION")
-				intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let { lista ->
+				intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.takeIf { it.isNotEmpty() }?.let { lista ->
 					lifecycleScope.launch {
-						val ids = runCatching {
-							conEspera(getString(R.string.seccion_biblioteca), getString(R.string.comp_guardando)) {
-								lista.mapNotNull { runCatching { aBiblioteca(Importador.anadirExterno(this@BibliotecaActivity, it)) }.getOrNull() }
+						val guardados = conEspera(getString(R.string.seccion_biblioteca), getString(R.string.comp_guardando)) {
+							lista.mapNotNull { uri ->
+								try {
+									val (id, nuevo) = Importador.anadirExternoNuevo(this@BibliotecaActivity, uri)
+									aBiblioteca(id) to nuevo
+								} catch (e: kotlinx.coroutines.CancellationException) {
+									throw e
+								} catch (e: Exception) {
+									null
+								}
 							}
-						}.getOrNull() ?: return@launch
-						TareasInicio.completar(this@BibliotecaActivity, ids)
-						avisar(resources.getQuantityString(R.plurals.libros_anadidos, ids.size, ids.size), mostrar = true)
+						}
+						val fallidos = lista.size - guardados.size
+						TareasInicio.completar(this@BibliotecaActivity, guardados.filter { it.second }.map { it.first })
+						// Los que no se pudieron guardar también se dicen (no se callan)
+						avisar(listOfNotNull(
+							resources.getQuantityString(R.plurals.libros_anadidos, guardados.size, guardados.size).takeIf { guardados.isNotEmpty() || fallidos == 0 },
+							resources.getQuantityString(R.plurals.comp_no_guardados_n, fallidos, fallidos).takeIf { fallidos > 0 },
+						).joinToString(". "), mostrar = true)
 					}
 				}
 			}
 		}
 		intent.action = null
+	}
+
+	/**
+	 * Lo que llega de otra app, ya en la biblioteca: se abre, se abre y se lee
+	 * en voz alta, o solo se avisa, como se eligió en Ajustes («Al recibir algo»).
+	 */
+	private suspend fun recibido(id: Long) {
+		if (com.xebolax.lector.compartidos.Compartidos.alRecibir(this) == "guardar") {
+			val titulo = withContext(Dispatchers.IO) { BaseDatos.obtener(this@BibliotecaActivity).libro(id)?.tituloVisible }.orEmpty()
+			avisar(getString(R.string.bib_guardado_x, titulo), mostrar = true)
+		} else com.xebolax.lector.compartidos.Compartidos.abrir(this, id)
 	}
 
 	/** Si ya estaba en Compartidos, pasa a la biblioteca (aquí es donde se quería). */
@@ -412,9 +437,12 @@ class BibliotecaActivity : AppCompatActivity() {
 	private fun abrirExterno(uri: Uri) {
 		lifecycleScope.launch {
 			try {
-				val id = conEspera(getString(R.string.seccion_biblioteca), getString(R.string.comp_guardando)) { aBiblioteca(Importador.anadirExterno(this@BibliotecaActivity, uri)) }
-				TareasInicio.completar(this@BibliotecaActivity, listOf(id))
-				Abiertos.abrirPantalla(this@BibliotecaActivity, id)
+				val (id, nuevo) = conEspera(getString(R.string.seccion_biblioteca), getString(R.string.comp_guardando)) {
+					Importador.anadirExternoNuevo(this@BibliotecaActivity, uri).let { (id, nuevo) -> aBiblioteca(id) to nuevo }
+				}
+				// Título y autor reales solo si es nuevo: si ya estaba, se respeta lo editado
+				if (nuevo) TareasInicio.completar(this@BibliotecaActivity, listOf(id))
+				recibido(id)
 			} catch (e: kotlinx.coroutines.CancellationException) {
 				throw e
 			} catch (e: Exception) {

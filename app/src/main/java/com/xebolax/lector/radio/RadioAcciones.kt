@@ -144,7 +144,8 @@ object RadioAcciones {
 		val f = java.io.File(g.archivo)
 		if (!f.exists()) return a.mensaje(a.getString(R.string.radio_grabaciones), a.getString(R.string.radio_grabacion_no_esta))
 		ControlAudio.externoPendiente = ControlAudio.Externo(
-			id = -6_000_000_000L - g.id,
+			// Tramo propio (antes caía dentro del de las emisoras); ver Emisora.idAudio
+			id = -(5L shl 32) - g.id,
 			titulo = f.nameWithoutExtension,
 			autor = g.emisora,
 			url = Uri.fromFile(f).toString(),

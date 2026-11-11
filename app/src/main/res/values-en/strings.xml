@@ -2344,19 +2344,10 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 		<item>Shared (recommended)</item>
 		<item>The library, as before</item>
 	</string-array>
-	<string-array name="comp_destino_valores">
-		<item>compartidos</item>
-		<item>biblioteca</item>
-	</string-array>
 	<string-array name="comp_al_recibir_nombres">
 		<item>Open it</item>
 		<item>Open it and read it aloud</item>
 		<item>Just save it</item>
-	</string-array>
-	<string-array name="comp_al_recibir_valores">
-		<item>abrir</item>
-		<item>leer</item>
-		<item>guardar</item>
 	</string-array>
 	<string-array name="comp_borrar_nombres">
 		<item>Never</item>
@@ -2364,19 +2355,9 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 		<item>After a week</item>
 		<item>After a month</item>
 	</string-array>
-	<string-array name="comp_borrar_valores">
-		<item>0</item>
-		<item>1</item>
-		<item>7</item>
-		<item>30</item>
-	</string-array>
 	<string-array name="tipo_ambiguos_nombres">
 		<item>Books</item>
 		<item>Documents</item>
-	</string-array>
-	<string-array name="tipo_ambiguos_valores">
-		<item>LIBRO</item>
-		<item>DOCUMENTO</item>
 	</string-array>
 	<!-- Radio: any station -->
 	<string name="radio_elige_sonido">That page has several streams. Which one is the station?</string>

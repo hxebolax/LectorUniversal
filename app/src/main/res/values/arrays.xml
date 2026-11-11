@@ -154,18 +154,6 @@
 		<item>copiar_tramo</item>
 		<item>marca_rapida</item>
 	</string-array>
-	<string-array name="acciones_defecto" translatable="false">
-		<item>leer_aqui</item>
-		<item>marcador</item>
-		<item>nota</item>
-		<item>copiar</item>
-		<item>siguiente_encabezado</item>
-		<item>anterior_encabezado</item>
-		<item>indice</item>
-		<item>buscar</item>
-		<item>ir_a</item>
-	</string-array>
-
 	<string-array name="auriculares_nombres">
 		<item>Capítulo anterior o siguiente</item>
 		<item>Retroceder o avanzar unos segundos</item>

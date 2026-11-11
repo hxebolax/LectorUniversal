@@ -59,7 +59,7 @@ object LectorBraille : LectorFormato {
 				Braille.Trozo.Tipo.PARRAFO -> c.parrafo(texto)
 			}
 		}
-		if (c.estaVacio()) throw ExcepcionFormato("El archivo braille está vacío.")
+		if (c.estaVacio()) throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_vacio)
 		return Contenido.Texto(c.construir())
 	}
 

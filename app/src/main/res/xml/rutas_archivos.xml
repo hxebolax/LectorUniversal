@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Archivos de la app que se pueden compartir o instalar (actualizaciones) -->
 <paths>
-	<files-path name="archivos" path="." />
-	<cache-path name="cache" path="." />
+	<!-- Solo las carpetas que de verdad se comparten (no toda la memoria de la app):
+	     libros y documentos guardados dentro de la app (Compartir un libro)… -->
+	<files-path name="biblioteca" path="biblioteca/" />
+	<files-path name="textos" path="textos/" />
+	<files-path name="web" path="web/" />
+	<!-- …grabaciones de la Radio si el móvil no tiene memoria externa… -->
+	<files-path name="musica_interna" path="musica/" />
+	<!-- …imágenes y páginas para describirlas (lector) y la actualización descargada (instalarla) -->
+	<cache-path name="imagenes" path="imagenes/" />
+	<cache-path name="actualizaciones" path="actualizaciones/" />
 	<!-- Grabaciones de la Radio (Android/data/…/files/Music/Radio) -->
 	<external-files-path name="musica" path="Music/" />
 	<!-- Libros añadidos con «Buscar libros en todo el dispositivo» (con permiso de todos los archivos) -->

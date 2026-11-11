@@ -1,5 +1,8 @@
 package com.xebolax.lector.formatos
 
+import android.content.Context
+import androidx.annotation.StringRes
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.Contenido
 
 /** Un lector de formato: convierte una fuente en un documento de texto o un libro de audio. */
@@ -7,36 +10,42 @@ interface LectorFormato {
 	fun leer(fuente: Fuente, ctx: ContextoLectura): Contenido
 }
 
-/** Formatos que la app sabe abrir. nombre: el que se muestra en la biblioteca. */
-enum class Formato(val nombre: String, val extensiones: List<String>, val audio: Boolean = false) {
-	EPUB("EPUB", listOf("epub", "epub3", "kepub")),
-	PDF("PDF", listOf("pdf")),
-	DOCX("Word", listOf("docx", "docm", "dotx")),
+/** Formatos que la app sabe abrir. textoNombre: el nombre que se muestra en la biblioteca, en el idioma de la app (ver [nombre]). */
+enum class Formato(@StringRes val textoNombre: Int, val extensiones: List<String>, val audio: Boolean = false) {
+	EPUB(R.string.formato_epub, listOf("epub", "epub3", "kepub")),
+	PDF(R.string.formato_pdf, listOf("pdf")),
+	DOCX(R.string.formato_word, listOf("docx", "docm", "dotx")),
 	/** Word 97-2003 (contenedor OLE). */
-	DOC("Word 97-2003", listOf("doc", "dot")),
-	ODT("OpenDocument", listOf("odt", "fodt", "ott")),
-	RTF("RTF", listOf("rtf", "wri")),
-	TXT("Texto", listOf("txt", "text", "log", "nfo", "csv", "tsv", "ini", "srt", "vtt", "json", "xml")),
-	HTML("HTML", listOf("html", "htm", "xhtml", "xht", "mht", "mhtml", "shtml")),
-	MARKDOWN("Markdown", listOf("md", "markdown", "mdown", "mkd", "rst")),
-	FB2("FictionBook", listOf("fb2", "fb2.zip", "fbz")),
-	MOBI("Kindle", listOf("mobi", "azw", "azw3", "prc", "pdb")),
-	PPTX("PowerPoint", listOf("pptx", "pptm", "odp", "fodp")),
-	XLSX("Hoja de cálculo", listOf("xlsx", "xlsm", "ods", "fods")),
-	CHM("Ayuda CHM", listOf("chm")),
+	DOC(R.string.formato_word_antiguo, listOf("doc", "dot")),
+	ODT(R.string.formato_opendocument, listOf("odt", "fodt", "ott")),
+	RTF(R.string.formato_rtf, listOf("rtf", "wri")),
+	TXT(R.string.formato_texto, listOf("txt", "text", "log", "nfo", "csv", "tsv", "ini", "srt", "vtt", "json", "xml")),
+	HTML(R.string.formato_html, listOf("html", "htm", "xhtml", "xht", "mht", "mhtml", "shtml")),
+	MARKDOWN(R.string.formato_markdown, listOf("md", "markdown", "mdown", "mkd", "rst")),
+	FB2(R.string.formato_fictionbook, listOf("fb2", "fb2.zip", "fbz")),
+	MOBI(R.string.formato_kindle, listOf("mobi", "azw", "azw3", "prc", "pdb")),
+	PPTX(R.string.formato_powerpoint, listOf("pptx", "pptm", "odp", "fodp")),
+	XLSX(R.string.formato_hoja_calculo, listOf("xlsx", "xlsm", "ods", "fods")),
+	CHM(R.string.formato_chm, listOf("chm")),
 	/** Libros en braille: BRA y BAN de la ONCE, BRF y PEF. */
-	BRAILLE("Braille", listOf("bra", "ban", "brf", "pef")),
-	DAISY("DAISY", listOf("opf", "ncc", "daisy")),
-	AUDIO("Audio", listOf("m4b", "m4a", "mp3", "aac", "ogg", "oga", "opus", "flac", "wav", "wma", "mka", "mp4", "3gp", "amr", "awb"), audio = true),
-	LISTA("Lista de reproducción", listOf("m3u", "m3u8", "pls", "cue"), audio = true),
+	BRAILLE(R.string.formato_braille, listOf("bra", "ban", "brf", "pef")),
+	DAISY(R.string.formato_daisy, listOf("opf", "ncc", "daisy")),
+	AUDIO(R.string.formato_audio, listOf("m4b", "m4a", "mp3", "aac", "ogg", "oga", "opus", "flac", "wav", "wma", "mka", "mp4", "3gp", "amr", "awb"), audio = true),
+	LISTA(R.string.formato_lista, listOf("m3u", "m3u8", "pls", "cue"), audio = true),
 	/** Carpeta: DAISY o audiolibro en varios archivos. */
-	CARPETA("Carpeta", emptyList()),
+	CARPETA(R.string.formato_carpeta, emptyList()),
 	/** Cómic: ZIP de imágenes (una por página). */
-	COMIC("Cómic", listOf("cbz")),
-	ZIP("ZIP", listOf("zip")),
-	DESCONOCIDO("Desconocido", emptyList());
+	COMIC(R.string.formato_comic, listOf("cbz")),
+	ZIP(R.string.formato_zip, listOf("zip")),
+	DESCONOCIDO(R.string.formato_desconocido, emptyList());
+
+	/** El nombre que se muestra (en la biblioteca, en Información…), en el idioma de la app. */
+	fun nombre(c: Context): String = c.getString(textoNombre)
 
 	companion object {
+		/** El nombre que se muestra de un formato guardado por su clave (EPUB, TXT…); si no se conoce, la clave. */
+		fun nombreDe(c: Context, clave: String): String = entries.firstOrNull { it.name == clave }?.nombre(c) ?: clave
+
 		private val porExtension: Map<String, Formato> by lazy {
 			entries.flatMap { f -> f.extensiones.map { it to f } }.toMap()
 		}

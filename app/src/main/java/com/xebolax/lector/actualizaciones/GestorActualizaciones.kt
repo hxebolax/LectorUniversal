@@ -95,13 +95,23 @@ class GestorActualizaciones(private val actividad: AppCompatActivity) {
 			} catch (e: CancellationException) {
 				throw e
 			} catch (e: Exception) {
-				// Sin conexión: se dice claro, sin el texto técnico
-				val motivo = if (e is java.io.IOException) actividad.getString(R.string.sin_conexion_servidor) else e.message.orEmpty()
-				actividad.mensaje(actividad.getString(R.string.actualizacion), actividad.getString(R.string.error_comprobar_actualizacion, motivo))
+				actividad.mensaje(actividad.getString(R.string.actualizacion), actividad.getString(R.string.error_comprobar_actualizacion, motivo(e)))
 			} finally {
 				comprobando = false
 			}
 		}
+	}
+
+	/**
+	 * Por qué falló, en lenguaje claro y nunca «null»: los fallos con su texto
+	 * (como el límite de consultas de GitHub) lo dicen tal cual; los de red,
+	 * sin conexión; una respuesta que no se entiende, que no es válida.
+	 */
+	private fun motivo(e: Throwable): String = when (e) {
+		is com.xebolax.lector.datos.ConTextoUsuario -> e.message ?: actividad.getString(R.string.cj_error_inesperado)
+		is java.io.IOException -> actividad.getString(R.string.sin_conexion_servidor)
+		is org.json.JSONException -> actividad.getString(R.string.cj_act_respuesta_no_valida)
+		else -> actividad.getString(R.string.cj_error_inesperado)
 	}
 
 	private fun tamano(bytes: Long) = Formatter.formatShortFileSize(actividad, bytes)
@@ -178,7 +188,7 @@ class GestorActualizaciones(private val actividad: AppCompatActivity) {
 				throw e
 			} catch (e: Exception) {
 				dialogo.dismiss()
-				actividad.mensaje(actividad.getString(R.string.actualizacion), actividad.getString(R.string.error_descargar_actualizacion, e.message))
+				actividad.mensaje(actividad.getString(R.string.actualizacion), actividad.getString(R.string.error_descargar_actualizacion, motivo(e)))
 			}
 		}
 	}
@@ -209,7 +219,8 @@ class GestorActualizaciones(private val actividad: AppCompatActivity) {
 		try {
 			actividad.startActivity(intent)
 		} catch (e: Exception) {
-			actividad.mensaje(actividad.getString(R.string.actualizacion), actividad.getString(R.string.error_descargar_actualizacion, e.message))
+			// Sin instalador que abra el APK (o no se pudo dar acceso al archivo)
+			actividad.mensaje(actividad.getString(R.string.actualizacion), actividad.getString(R.string.error_descargar_actualizacion, actividad.getString(R.string.cj_act_sin_instalador)))
 		}
 	}
 }

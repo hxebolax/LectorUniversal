@@ -42,7 +42,7 @@ import java.util.Locale
 class AjustesActivity : AppCompatActivity() {
 
 	companion object {
-		/** Abrir directamente una pestaña (GENERAL, BIBLIOTECA, COMPARTIDOS, PODCASTS, NOTICIAS, RADIO; o rss, podcasts, radio) o un apartado (copias). */
+		/** Abrir directamente una pestaña (GENERAL, BIBLIOTECA, COMPARTIDOS, PODCASTS, NOTICIAS, RADIO) o un apartado (copias). */
 		const val EXTRA_APARTADO = "apartado"
 		private const val ESTADO_PESTANA = "pestana"
 		private const val ESTADO_INICIAL = "inicial"
@@ -73,8 +73,12 @@ class AjustesActivity : AppCompatActivity() {
 	/** La pestaña con la que se abrió (Atrás vuelve a ella y, desde ella, sale). */
 	private var inicial = Pestana.GENERAL
 
-	/** Atrás: de un apartado a su pestaña, de otra pestaña a la inicial y, desde la inicial, salir. */
-	private val atras = object : androidx.activity.OnBackPressedCallback(true) {
+	/**
+	 * Atrás: de un apartado a su pestaña, de otra pestaña a la inicial y, desde la
+	 * inicial, salir. Solo está activo cuando hay algo a lo que volver: si no,
+	 * Atrás es el del sistema (con su animación predictiva) y sale.
+	 */
+	private val atras = object : androidx.activity.OnBackPressedCallback(false) {
 		override fun handleOnBackPressed() {
 			when {
 				supportFragmentManager.backStackEntryCount > 0 -> supportFragmentManager.popBackStack()
@@ -93,13 +97,7 @@ class AjustesActivity : AppCompatActivity() {
 		setContentView(b.root)
 		configurarBarra(b.barra, getString(R.string.ajustes))
 		onBackPressedDispatcher.addCallback(this, atras)
-		val pedida = when (val e = intent.getStringExtra(EXTRA_APARTADO)) {
-			"rss" -> Pestana.NOTICIAS
-			"podcasts" -> Pestana.PODCASTS
-			"radio" -> Pestana.RADIO
-			"compartidos" -> Pestana.COMPARTIDOS
-			else -> Pestana.entries.firstOrNull { it.name == e } ?: Pestana.GENERAL
-		}
+		val pedida = intent.getStringExtra(EXTRA_APARTADO).let { e -> Pestana.entries.firstOrNull { it.name == e } } ?: Pestana.GENERAL
 		inicial = savedInstanceState?.getInt(ESTADO_INICIAL, -1)?.let { Pestana.entries.getOrNull(it) } ?: pedida
 		pestana = savedInstanceState?.getInt(ESTADO_PESTANA, -1)?.let { Pestana.entries.getOrNull(it) } ?: pedida
 		// General y luego las secciones en su orden (el que se elige en Portada y secciones)
@@ -121,7 +119,16 @@ class AjustesActivity : AppCompatActivity() {
 			mostrarPestana(pestana)
 			if (intent.getStringExtra(EXTRA_APARTADO) == "copias") abrirApartado("copias", getString(R.string.aj_copias))
 		} else ponerTitulo()
-		supportFragmentManager.addOnBackStackChangedListener { ponerTitulo() }
+		supportFragmentManager.addOnBackStackChangedListener {
+			ponerTitulo()
+			actualizarAtras()
+		}
+		actualizarAtras()
+	}
+
+	/** Atrás propio solo si hay un apartado abierto o se está en otra pestaña que la inicial. */
+	private fun actualizarAtras() {
+		atras.isEnabled = supportFragmentManager.backStackEntryCount > 0 || pestana != inicial
 	}
 
 	override fun onSaveInstanceState(estado: Bundle) {
@@ -143,6 +150,7 @@ class AjustesActivity : AppCompatActivity() {
 		supportFragmentManager.popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
 		supportFragmentManager.beginTransaction().replace(R.id.contenedor, AjustesFragment.nuevo(p.xml, getString(p.titulo))).commitNow()
 		ponerTitulo()
+		actualizarAtras()
 	}
 
 	fun abrirApartado(xml: String, titulo: String) {
@@ -201,6 +209,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			"general" -> configurarGeneral()
 			"copias" -> configurarCopias()
 			"voz" -> configurarVoz()
+			"audio" -> configurarAudio()
 			"documentos" -> configurarDocumentos()
 			"biblioteca" -> configurarBiblioteca()
 			"aspecto" -> configurarAspecto()
@@ -211,6 +220,11 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				configurarCuenta(if (xml == "rss") "rss" else "pod")
 				if (xml == "rss") alPulsar("rss_medios") { mediosSuscritos() }
 				if (xml == "rss") alPulsar("ir_voz_noticias") { com.xebolax.lector.voz.VozPerfilActivity.abrirNoticias(requireContext()) }
+				// Activar los avisos de Noticias: permiso de avisos, explicado (una vez)
+				if (xml == "rss") findPreference<Preference>("rss_avisos")?.setOnPreferenceChangeListener { _, nuevo ->
+					if (nuevo == true) view?.post { activity?.let { PermisoAvisos.pedir(it, R.string.cj_avisos_por_noticias) } }
+					true
+				}
 			}
 		}
 		// Portada y secciones: el orden se elige en su propia pantalla (filas que se mueven)
@@ -262,16 +276,29 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			reprogramar()
 			true
 		}
+		// De 5 minutos a una semana: lo que no cabe se dice en el propio campo al escribirlo, y no se acepta
+		val maximo = 7L * 24 * 60
+		fun fueraDeRango(t: String) = t.trim().toLongOrNull().let { it == null || it < com.xebolax.lector.rss.RssTrabajo.MINIMO || it > maximo }
+		val errorRango = getString(R.string.noticias_frecuencia_rango, com.xebolax.lector.rss.RssTrabajo.MINIMO.toInt(), maximo.toInt())
 		minutos?.apply {
-			setOnBindEditTextListener { it.inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+			setOnBindEditTextListener { campo ->
+				campo.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+				campo.addTextChangedListener(object : android.text.TextWatcher {
+					override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
+					override fun onTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
+					override fun afterTextChanged(s: android.text.Editable?) {
+						val t = s?.toString().orEmpty()
+						campo.error = if (t.isNotBlank() && fueraDeRango(t)) errorRango else null
+					}
+				})
+			}
 			summaryProvider = Preference.SummaryProvider<androidx.preference.EditTextPreference> { p ->
 				val m = p.text?.trim()?.toLongOrNull()
 				if (m == null) getString(R.string.aj_frecuencia_minutos_desc) else getString(R.string.aj_frecuencia_cada, m.coerceAtLeast(com.xebolax.lector.rss.RssTrabajo.MINIMO).toInt())
 			}
 			setOnPreferenceChangeListener { _, nuevo ->
-				val m = (nuevo as String).trim().toLongOrNull()
-				if (m == null || m < com.xebolax.lector.rss.RssTrabajo.MINIMO) {
-					(activity as? AppCompatActivity)?.avisar(getString(R.string.aj_frecuencia_minutos_desc))
+				if (fueraDeRango(nuevo as String)) {
+					(activity as? AppCompatActivity)?.avisar(errorRango)
 					false
 				} else {
 					reprogramar()
@@ -282,6 +309,23 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		if (pre == "rss") findPreference<Preference>("rss_solo_wifi")?.setOnPreferenceChangeListener { _, _ ->
 			reprogramar()
 			true
+		}
+	}
+
+	/**
+	 * Un texto que, vacío, usa un valor por defecto: este no se guarda (si no, no
+	 * se pondría al día con una versión nueva); se ve en el resumen y como pista al escribir.
+	 */
+	private fun conPorDefecto(pref: androidx.preference.EditTextPreference, defecto: String, tipo: Int? = null) {
+		// Lo leído al crear la pantalla puede ser el valor por defecto que se acaba de borrar
+		pref.text = PreferenceManager.getDefaultSharedPreferences(requireContext()).getString(pref.key, null)
+		pref.summaryProvider = Preference.SummaryProvider<androidx.preference.EditTextPreference> { p ->
+			p.text?.trim()?.takeIf { it.isNotEmpty() } ?: getString(R.string.cj_por_defecto_x, defecto)
+		}
+		pref.setOnBindEditTextListener { campo ->
+			tipo?.let { campo.inputType = it }
+			campo.hint = defecto
+			campo.setSelection(campo.text.length)
 		}
 	}
 
@@ -298,7 +342,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		val apartados = listOf(
 			"ir_portada" to "portada", "ir_copias" to "copias", "ir_general" to "general", "ir_aspecto" to "aspecto", "ir_navegacion" to "navegacion", "ir_voz" to "voz",
 			"ir_audio" to "audio", "ir_podcasts" to "podcasts", "ir_rss" to "rss", "ir_radio" to "radio", "ir_ia" to "ia", "ir_documentos" to "documentos", "ir_biblioteca" to "biblioteca",
-			"ir_compartidos" to "compartidos", "ir_elevenlabs" to "elevenlabs",
+			"ir_elevenlabs" to "elevenlabs",
 		)
 		for ((clave, xml) in apartados) {
 			val pref = findPreference<Preference>(clave) ?: continue
@@ -518,9 +562,9 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			"ia_modelo_openai" to com.xebolax.lector.ia.AsistenteIA.MODELO_OPENAI,
 			"ia_modelo_claude" to com.xebolax.lector.ia.AsistenteIA.MODELO_CLAUDE,
 		)
-		for ((clave, defecto) in modelos) findPreference<androidx.preference.EditTextPreference>(clave)?.apply {
-			if (text.isNullOrBlank()) text = defecto
-		}
+		// Vacío = el modelo por defecto de esta versión (no se guarda: así se pone al día solo)
+		TareasInicio.quitarPorDefectoGuardados(requireContext())
+		for ((clave, defecto) in modelos) findPreference<androidx.preference.EditTextPreference>(clave)?.let { conPorDefecto(it, defecto) }
 		findPreference<Preference>("ia_modelo_local")?.let { pref ->
 			actualizarModeloLocal(pref)
 			pref.setOnPreferenceClickListener {
@@ -599,6 +643,8 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			setOnPreferenceChangeListener { _, nuevo ->
 				val etiqueta = nuevo as String
 				AppCompatDelegate.setApplicationLocales(if (etiqueta.isEmpty()) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(etiqueta))
+				// Los accesos directos del icono (mantener pulsado), en el idioma nuevo
+				com.xebolax.lector.compartidos.Compartidos.ponerAtajos(contextoConIdiomaDeLaApp(requireContext()))
 				true
 			}
 		}
@@ -623,9 +669,10 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				true
 			}
 		}
-		findPreference<androidx.preference.EditTextPreference>("url_actualizaciones")?.apply {
-			if (text.isNullOrBlank()) text = Preferencias(requireContext()).urlActualizaciones
-			setOnBindEditTextListener { it.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI }
+		// Vacía = la dirección por defecto de esta versión (no se guarda: así se pone al día sola)
+		TareasInicio.quitarPorDefectoGuardados(requireContext())
+		findPreference<androidx.preference.EditTextPreference>("url_actualizaciones")?.let {
+			conPorDefecto(it, com.xebolax.lector.BuildConfig.URL_ACTUALIZACIONES, android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI)
 		}
 		// Dirección personalizada: una carpeta web con version.json o un repositorio de GitHub
 		findPreference<androidx.preference.EditTextPreference>("url_personalizada")?.apply {
@@ -687,16 +734,23 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		val motor = findPreference<ListPreference>("motor_voz")
 		val idioma = findPreference<ListPreference>("idioma_voces")
 		val voz = findPreference<ListPreference>("voz")
+		// Las listas se llenan después: mientras, con su opción por defecto y sin poder abrirse (vacías, cierran la app)
+		cargandoLista(motor, R.string.motor_por_defecto)
+		cargandoLista(idioma, R.string.todos_los_idiomas)
+		cargandoLista(voz, R.string.voz_por_defecto)
 		LectorVoz.motores { lista ->
 			if (!isAdded) return@motores
 			motor?.entries = (listOf(getString(R.string.motor_por_defecto)) + lista.map { it.second }).toTypedArray()
 			motor?.entryValues = (listOf("") + lista.map { it.first }).toTypedArray()
 			motor?.let { it.summary = it.entry ?: getString(R.string.motor_por_defecto) }
+			motor?.isEnabled = true
 		}
 		fun cargarVoces() {
 			// Las voces del motor de Ajustes, con un motor aparte (el de la lectura puede ser otro: el propio de un libro)
 			com.xebolax.lector.voz.VocesMotor.voces(requireContext(), PreferenceManager.getDefaultSharedPreferences(requireContext()).getString("motor_voz", "").orEmpty()) { voces ->
 				if (!isAdded) return@voces
+				idioma?.isEnabled = true
+				voz?.isEnabled = true
 				val idiomas = voces.map { it.locale.language }.distinct().sortedBy { Locale(it).displayLanguage }
 				idioma?.entries = (listOf(getString(R.string.todos_los_idiomas)) + idiomas.map { Locale(it).getDisplayLanguage(Locale.getDefault()).replaceFirstChar { c -> c.uppercase() } }).toTypedArray()
 				idioma?.entryValues = (listOf("") + idiomas).toTypedArray()
@@ -716,6 +770,8 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				PreferenceManager.getDefaultSharedPreferences(requireContext()).edit().putString("voz", "").apply()
 				voz?.value = ""
 				LectorVoz.reiniciarMotor()
+				// Las voces del motor anterior no valen: no se puede elegir hasta tener las nuevas
+				cargandoLista(voz, R.string.voz_por_defecto)
 				cargarVoces()
 			}
 			true
@@ -754,6 +810,42 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				startActivity(Intent("com.android.settings.TTS_SETTINGS"))
 			} catch (_: ActivityNotFoundException) {
 				(activity as? AppCompatActivity)?.avisar(getString(R.string.no_disponible))
+			}
+		}
+	}
+
+	private fun configurarAudio() {
+		val audio = com.xebolax.lector.audio.ControlAudio
+		// La velocidad es la de los audiolibros: se aplica al momento si suena uno (un episodio o la radio tienen la suya)
+		findPreference<Preference>("velocidad_audio")?.setOnPreferenceChangeListener { _, nuevo ->
+			val v = nuevo as? Int
+			if (v != null && audio.idLibro > 0 && audio.externo == null && audio.jugador != null) view?.post { audio.cambiarVelocidad(v) }
+			true
+		}
+		// Saltar los silencios: se aplica al momento a lo que suene (como al cargarlo)
+		findPreference<Preference>("saltar_silencios")?.setOnPreferenceChangeListener { _, nuevo ->
+			(nuevo as? Boolean)?.let { activo -> view?.post { audio.cambiarSaltarSilencios(activo) } }
+			true
+		}
+		// Franja del temporizador automático: una hora válida (HH:MM); «23.00» o «2300» se guardan como «23:00»
+		for (clave in listOf("temporizador_auto_desde", "temporizador_auto_hasta")) {
+			findPreference<androidx.preference.EditTextPreference>(clave)?.apply {
+				setOnBindEditTextListener {
+					it.inputType = android.text.InputType.TYPE_CLASS_DATETIME or android.text.InputType.TYPE_DATETIME_VARIATION_TIME
+					it.setSelection(it.text.length)
+				}
+				setOnPreferenceChangeListener { pref, nuevo ->
+					val escrito = (nuevo as? String).orEmpty().trim()
+					val hora = normalizarHora(escrito)
+					val campo = pref as androidx.preference.EditTextPreference
+					if (hora == null) {
+						// No se guarda: se vuelve a pedir con lo escrito y el error dicho en el campo
+						view?.post { context?.pedirHora(campo.title.toString(), escrito, conError = true) { campo.text = it } }
+					} else if (hora != nuevo) {
+						view?.post { campo.text = hora }
+					}
+					hora != null && hora == nuevo
+				}
 			}
 		}
 	}
@@ -896,12 +988,17 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				if (p.text.isNullOrBlank()) "" else getString(R.string.aj_ia_clave_puesta)
 			}
 		}
-		// Otra cuenta: empiezan de cero con ella (los ids de la anterior no valen en otro servidor)
+		// Otra cuenta: empiezan de cero con ella (los ids de la anterior no valen en otro servidor).
+		// Solo si de verdad cambia: Aceptar sin tocar nada no debe borrar los cambios aún sin enviar
 		for (clave in listOf("${pre}_sinc_tipo", "${pre}_sinc_url", "${pre}_sinc_usuario")) {
-			findPreference<Preference>(clave)?.setOnPreferenceChangeListener { _, _ ->
+			findPreference<Preference>(clave)?.setOnPreferenceChangeListener { _, nuevo ->
 				val c = requireContext().applicationContext
-				if (pre == "pod") com.xebolax.lector.podcast.PodcastsSincronizacion.olvidar(c)
-				else com.xebolax.lector.LectorApp.ambito.launch { com.xebolax.lector.rss.RssBaseDatos.obtener(c).olvidarRemotos() }
+				fun normal(v: String?) = v.orEmpty().trim().trimEnd('/')
+				val antes = PreferenceManager.getDefaultSharedPreferences(c).getString(clave, "")
+				if (normal(nuevo as? String) != normal(antes)) {
+					if (pre == "pod") com.xebolax.lector.podcast.PodcastsSincronizacion.olvidar(c)
+					else com.xebolax.lector.LectorApp.ambito.launch { com.xebolax.lector.rss.RssSincronizacion.olvidarCuenta(c) }
+				}
 				true
 			}
 		}
@@ -919,10 +1016,13 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			val listo = if (pre == "rss") com.xebolax.lector.rss.RssSincronizacion.configurado(a) else com.xebolax.lector.podcast.PodcastsSincronizacion.configurado(a)
 			if (!listo) return@alPulsar a.avisar(getString(R.string.sinc_falta_cuenta))
 			lifecycleScope.launch {
+				// Noticias: para preguntar después si se suben a la cuenta las fuentes de este móvil
+				var resultadoRss: com.xebolax.lector.rss.RssSincronizacion.Resultado? = null
 				val texto = try {
 					a.conEspera(getString(R.string.aj_sinc_ahora), getString(R.string.sinc_sincronizando)) {
 						if (pre == "rss") {
 							val r = com.xebolax.lector.rss.RssSincronizacion.sincronizar(a)
+							resultadoRss = r
 							getString(R.string.sinc_rss_hecho, r.fuentes, r.nuevos)
 						} else {
 							val r = com.xebolax.lector.podcast.PodcastsSincronizacion.sincronizar(a)
@@ -937,6 +1037,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				}
 				ahora?.summary = texto
 				a.avisar(texto)
+				resultadoRss?.let { com.xebolax.lector.rss.RssSincronizacion.preguntarSubir(a, it) }
 			}
 		}
 	}

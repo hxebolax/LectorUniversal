@@ -73,6 +73,7 @@ object AccionesCompartido {
 		lista += a.getString(R.string.informacion) to { informacion(a, l) }
 		lista += a.getString(R.string.borrar) to {
 			a.confirmar(a.getString(R.string.comp_confirmar_borrar, l.tituloVisible), a.getString(R.string.borrar)) {
+				AccionesLibro.pararSiSeUsa(listOf(l.id))
 				a.enSegundoPlano({ Compartidos.borrar(a.applicationContext, l) }) { a.avisar(a.getString(R.string.comp_borrado)) }
 			}
 		}
@@ -115,7 +116,7 @@ object AccionesCompartido {
 
 	private fun informacion(a: AppCompatActivity, l: Libro) {
 		val fecha = { t: Long -> if (t > 0) DateFormat.getMediumDateFormat(a).format(Date(t)) + " " + DateFormat.getTimeFormat(a).format(Date(t)) else "—" }
-		val formato = runCatching { Formato.valueOf(l.formato).nombre }.getOrDefault(l.formato)
+		val formato = Formato.nombreDe(a, l.formato)
 		val texto = buildString {
 			appendLine(a.getString(R.string.info_titulo, l.tituloVisible))
 			appendLine(a.getString(R.string.comp_info_tipo, Tipos.de(a, l.claveTipo)?.nombreSingular ?: Tipos.nombre(a, l.claveTipo)))

@@ -149,19 +149,59 @@ class PodcastListaFragment : Fragment() {
 
 	// --- Cabecera ------------------------------------------------------------------------
 
-	private fun boton(texto: String, accion: () -> Unit) = MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+	/** El botón de la cabecera que se pulsó (pauta 34: si la cabecera se rehace, el foco vuelve a su equivalente). */
+	private var clavePulsada: String? = null
+
+	private fun boton(texto: String, clave: String = texto, accion: () -> Unit) = MaterialButton(requireContext(), null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
 		text = texto
+		tag = clave
 		minHeight = dp(requireContext(), 48)
-		setOnClickListener { accion() }
+		setOnClickListener {
+			clavePulsada = clave
+			accion()
+		}
 	}
 
 	private fun construirCabecera() {
 		val c = b.cabecera
+		// El foco volverá al botón equivalente: si lo tenía uno de la cabecera, o si se rehace con un diálogo encima
+		val conDialogo = activity?.hasWindowFocus() == false
+		val volverA = claveConFoco(c) ?: clavePulsada?.takeIf { conDialogo }
+		clavePulsada = null
 		c.removeAllViews()
+		ponerCabecera(c)
+		if (volverA != null) devolverFoco(c, volverA, conDialogo)
+	}
+
+	/** La clave (tag) del botón de la cabecera que tiene el foco de TalkBack, si lo tiene alguno. */
+	private fun claveConFoco(v: View): String? {
+		if (!v.isShown) return null
+		if (v is ViewGroup) for (i in 0 until v.childCount) claveConFoco(v.getChildAt(i))?.let { return it }
+		return (v.tag as? String)?.takeIf { runCatching { v.createAccessibilityNodeInfo().isAccessibilityFocused }.getOrDefault(false) }
+	}
+
+	/**
+	 * Pauta 34: la cabecera se ha rehecho (sus botones son nuevos). El foco va al botón equivalente
+	 * o, si ya no está, al primero; tras un diálogo, después de que MemoriaFoco lo intente.
+	 */
+	private fun devolverFoco(c: ViewGroup, clave: String, conDialogo: Boolean) {
+		val destino = c.findViewWithTag<View>(clave) ?: primerBoton(c) ?: return
+		destino.postDelayed({
+			if (destino.isAttachedToWindow && destino.isShown) destino.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+		}, if (conDialogo) 700L else 100L)
+	}
+
+	private fun primerBoton(v: View): View? {
+		if (v.tag is String && v.isShown) return v
+		if (v is ViewGroup) for (i in 0 until v.childCount) primerBoton(v.getChildAt(i))?.let { return it }
+		return null
+	}
+
+	private fun ponerCabecera(c: ViewGroup) {
 		val fila = LinearLayout(requireContext()).apply { orientation = LinearLayout.HORIZONTAL }
 		fun anadir(v: View) = fila.addView(v, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 		val a = actividad
-		if (modo == Modo.EPISODIOS) c.addView(boton(getString(R.string.pod_ver, getString(vista.nombre))) {
+		if (modo == Modo.EPISODIOS) c.addView(boton(getString(R.string.pod_ver, getString(vista.nombre)), "ver") {
 			requireContext().elegirUno(getString(R.string.pod_pestana_episodios), VISTAS.map { getString(it.nombre) }, VISTAS.indexOf(vista)) { i ->
 				vista = VISTAS[i]
 				busqueda = ""
@@ -175,7 +215,7 @@ class PodcastListaFragment : Fragment() {
 				null -> getString(R.string.todas_las_carpetas)
 				"" -> getString(R.string.sin_carpeta)
 				else -> filtroCarpeta!!
-			})) {
+			}), "carpeta") {
 			val carpetas = db.carpetas()
 			val nombres = listOf(getString(R.string.todas_las_carpetas), getString(R.string.sin_carpeta)) + carpetas
 			val actual = when (filtroCarpeta) {
@@ -214,7 +254,7 @@ class PodcastListaFragment : Fragment() {
 				})
 			}
 			Modo.SUSCRIPCIONES -> if (podcast != null) {
-				anadir(boton(getString(if (soloSinEscuchar) R.string.rss_ver_todos else R.string.pod_ver_sin_escuchar)) {
+				anadir(boton(getString(if (soloSinEscuchar) R.string.rss_ver_todos else R.string.pod_ver_sin_escuchar), "sin_escuchar") {
 					soloSinEscuchar = !soloSinEscuchar
 					construirCabecera()
 					recargar()
@@ -222,7 +262,7 @@ class PodcastListaFragment : Fragment() {
 				anadir(boton(getString(R.string.pod_opciones_podcast)) { db.podcast(podcast!!)?.let { opcionesPodcast(it) } })
 				// Orden de sus episodios: los más nuevos o los más antiguos primero (series)
 				db.podcast(podcast!!)?.let { p ->
-					anadir(boton(getString(if (p.antiguosPrimero) R.string.pod_orden_antiguos else R.string.pod_orden_nuevos)) {
+					anadir(boton(getString(if (p.antiguosPrimero) R.string.pod_orden_antiguos else R.string.pod_orden_nuevos), "orden_episodios") {
 						db.ordenEpisodios(p.id, !p.antiguosPrimero)
 						a?.avisar(getString(if (p.antiguosPrimero) R.string.pod_orden_nuevos else R.string.pod_orden_antiguos))
 						construirCabecera()
@@ -249,7 +289,7 @@ class PodcastListaFragment : Fragment() {
 				// Orden de las suscripciones: a mano, por nombre, por episodios sin escuchar o por lo último publicado
 				val nombres = resources.getStringArray(R.array.pod_ordenes).toList()
 				val actual = Podcasts.prefs(requireContext()).getInt("pod_orden_suscripciones", 0).coerceIn(0, nombres.size - 1)
-				anadir(boton(getString(R.string.etiqueta_valor, getString(R.string.orden), nombres[actual])) {
+				anadir(boton(getString(R.string.etiqueta_valor, getString(R.string.orden), nombres[actual]), "orden") {
 					requireContext().elegirUno(getString(R.string.orden), nombres, actual) { i ->
 						Podcasts.prefs(requireContext()).edit().putInt("pod_orden_suscripciones", i).apply()
 						construirCabecera()
@@ -275,9 +315,9 @@ class PodcastListaFragment : Fragment() {
 			} else {
 				anadir(boton(getString(R.string.pod_buscar)) { a?.buscar() })
 				anadir(boton(getString(R.string.pod_buscar_episodios_todos)) { buscarEpisodios() })
-				anadir(boton(getString(Podcasts.CATEGORIAS.first { it.first == categoria }.second)) { elegirCategoria() })
+				anadir(boton(getString(Podcasts.CATEGORIAS.first { it.first == categoria }.second), "categoria") { elegirCategoria() })
 				// Los más escuchados van por país: se dice cuál y se puede cambiar
-				anadir(boton(getString(R.string.pod_pais_x, com.xebolax.lector.datos.Pais.nombre(com.xebolax.lector.datos.Pais.podcasts(requireContext())))) { elegirPais() })
+				anadir(boton(getString(R.string.pod_pais_x, com.xebolax.lector.datos.Pais.nombre(com.xebolax.lector.datos.Pais.podcasts(requireContext()))), "pais") { elegirPais() })
 			}
 			Modo.FAVORITOS, Modo.HISTORIAL -> {
 				val (contenedor, campo) = requireContext().campoTexto(getString(R.string.pod_buscar_episodios))
@@ -767,12 +807,15 @@ class PodcastListaFragment : Fragment() {
 			e.descarga != 0L -> r += getString(R.string.pod_cancelar_descarga) to { Podcasts.borrarDescarga(a, e); a.avisar(getString(R.string.pod_descarga_cancelada)) }
 			else -> r += getString(if (e.fallos >= 3) R.string.pod_reintentar_descarga else R.string.pod_descargar) to {
 				if (e.fallos >= 3) db.fallosDescarga(e.id, 0)
+				// La primera descarga: permiso de avisos (el progreso y el final se ven en ellos), explicado
+				fun permiso() = com.xebolax.lector.ui.PermisoAvisos.pedir(a, R.string.cj_avisos_por_descargas)
 				if (Podcasts.esperaWifi(a)) a.elegir(getString(R.string.pod_sin_wifi), listOf(
-					getString(R.string.pod_descargar_con_datos) to { Podcasts.descargar(a, e, datosMoviles = true); a.avisar(getString(R.string.pod_descargando, e.titulo)) },
-					getString(R.string.pod_esperar_wifi) to { Podcasts.descargar(a, e); a.avisar(getString(R.string.pod_esperando_wifi_aviso, e.titulo)) },
+					getString(R.string.pod_descargar_con_datos) to { Podcasts.descargar(a, e, datosMoviles = true); a.avisar(getString(R.string.pod_descargando, e.titulo)); permiso() },
+					getString(R.string.pod_esperar_wifi) to { Podcasts.descargar(a, e); a.avisar(getString(R.string.pod_esperando_wifi_aviso, e.titulo)); permiso() },
 				)) else {
 					Podcasts.descargar(a, e)
 					a.avisar(getString(R.string.pod_descargando, e.titulo))
+					permiso()
 				}
 			}
 		}

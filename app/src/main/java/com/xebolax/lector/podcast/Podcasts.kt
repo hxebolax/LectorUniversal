@@ -137,15 +137,30 @@ object Podcasts {
 
 	// --- Suscribirse y actualizar ------------------------------------------------------------
 
-	/** Se suscribe y trae los episodios (los antiguos quedan como escuchados salvo los 3 últimos). */
-	suspend fun suscribir(c: Context, url: String, titulo: String = "", autor: String = "", carpeta: String = "", usuario: String = "", clave: String = ""): Long {
+	/**
+	 * Se suscribe y trae los episodios (los antiguos quedan como escuchados salvo los 3 últimos).
+	 * lanzar: si el feed no responde, se quita la suscripción y se lanza el error (la sincronización
+	 * la apunta para reintentarla); si no, queda suscrito con el error a la vista.
+	 */
+	suspend fun suscribir(c: Context, url: String, titulo: String = "", autor: String = "", carpeta: String = "", usuario: String = "", clave: String = "", lanzar: Boolean = false): Long {
 		val db = PodcastsBaseDatos.obtener(c)
 		db.podcastPorUrl(url)?.let { return it.id }
 		// Con usuario y contraseña, primero se comprueba que el servidor los acepta
 		if (usuario.isNotBlank()) withContext(Dispatchers.IO) { PodcastLector.descargar(url, usuario = usuario, clave = clave) }
 		val id = db.anadirPodcast(url, titulo.ifBlank { url }, autor, carpeta = carpeta)
 		if (usuario.isNotBlank()) db.credenciales(id, usuario, clave)
-		db.podcast(id)?.let { runCatching { actualizar(c, it) } }
+		db.podcast(id)?.let { p ->
+			try {
+				actualizar(c, p)
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				if (lanzar) {
+					withContext(Dispatchers.IO) { db.borrarPodcast(id) }
+					throw e
+				}
+			}
+		}
 		return id
 	}
 
@@ -359,25 +374,42 @@ object Podcasts {
 	/** Episodios cuya descarga se borra cuando dejen de sonar (escuchados por el umbral, con «Borrar descarga al terminar»). */
 	private const val BORRAR_LUEGO = "pod_borrar_pendientes"
 
-	private fun borrarPendientes(c: Context) {
+	/** Un solo cerrojo para leer y escribir la lista de descargas por borrar (desde varios hilos). */
+	private val cerrojoBorrar = Any()
+
+	/** ¿Está cargado en el reproductor? (su descarga no se puede borrar todavía) */
+	private fun suena(id: Long) = ControlAudio.idLibro == -1_000_000_000L - id
+
+	/** Apunta la descarga de un episodio para borrarla cuando deje de sonar. */
+	private fun borrarLuego(c: Context, id: Long) = synchronized(cerrojoBorrar) {
+		val p = prefs(c)
+		p.edit().putStringSet(BORRAR_LUEGO, p.getStringSet(BORRAR_LUEGO, null).orEmpty() + id.toString()).apply()
+	}
+
+	/** Borra ya, o si suena la apunta para luego. */
+	private fun borrarSiNoSuena(c: Context, e: Episodio) {
+		if (suena(e.id)) borrarLuego(c, e.id) else borrarDescarga(c, e)
+	}
+
+	private fun borrarPendientes(c: Context) = synchronized(cerrojoBorrar) {
 		val p = prefs(c)
 		val ids = p.getStringSet(BORRAR_LUEGO, null).orEmpty()
-		if (ids.isEmpty()) return
+		if (ids.isEmpty()) return@synchronized
 		val db = PodcastsBaseDatos.obtener(c)
 		val quedan = ids.filter { s ->
 			val id = s.toLongOrNull() ?: return@filter false
 			// Sigue en el reproductor: se borra más adelante
-			if (ControlAudio.idLibro == -1_000_000_000L - id) return@filter true
-			db.episodio(id)?.takeIf { it.terminado && !it.favorito }?.let { borrarDescarga(c, it) }
+			if (suena(id)) return@filter true
+			db.episodio(id)?.takeIf { !it.favorito }?.let { borrarDescarga(c, it) }
 			false
 		}.toSet()
 		p.edit().putStringSet(BORRAR_LUEGO, quedan).apply()
 	}
 
-	/** Borra las descargas de los episodios ya escuchados (salvo favoritos). Devuelve cuántas. */
+	/** Borra las descargas de los episodios ya escuchados (salvo favoritos; la del que suena, cuando deje de sonar). Devuelve cuántas. */
 	fun borrarEscuchados(c: Context): Int {
 		val lista = PodcastsBaseDatos.obtener(c).descargados().filter { it.terminado && !it.favorito && it.descargado }
-		lista.forEach { borrarDescarga(c, it) }
+		lista.forEach { borrarSiNoSuena(c, it) }
 		return lista.size
 	}
 
@@ -431,6 +463,8 @@ object Podcasts {
 		val db = PodcastsBaseDatos.obtener(c)
 		val siguiente = withContext(Dispatchers.IO) { db.cola().firstOrNull { it.id != e.id } } ?: return false
 		withContext(Dispatchers.IO) { alAcabarEpisodio(c, e, sigueSonando = true) }
+		// Temporizador «al final del episodio» o «tras N episodios»: este cuenta; si toca parar, no se sigue
+		if (ControlAudio.pasarEpisodio()) return true
 		sonar(c, siguiente)
 		// Ya no suena: si había que borrar su descarga, ahora
 		withContext(Dispatchers.IO) { borrarPendientes(c) }
@@ -451,21 +485,22 @@ object Podcasts {
 			db.marcarEscuchados(listOf(e.id), true)
 		}
 		if (!prefs(c).getBoolean("pod_borrar_al_terminar", false) || actual.favorito || !(actual.descargado || actual.descarga != 0L)) return
-		if (sigueSonando) {
-			val p = prefs(c)
-			p.edit().putStringSet(BORRAR_LUEGO, p.getStringSet(BORRAR_LUEGO, null).orEmpty() + e.id.toString()).apply()
-		} else borrarDescarga(c, actual)
+		if (sigueSonando || suena(e.id)) borrarLuego(c, e.id) else borrarDescarga(c, actual)
 	}
 
 	private fun alTerminar(c: Context, e: Episodio) {
 		val db = PodcastsBaseDatos.obtener(c)
 		val siguiente = db.cola().firstOrNull { it.id != e.id }
-		alAcabarEpisodio(c, e, sigueSonando = false)
+		// Sigue cargado en el reproductor (con «saltar final», en pausa): su descarga se borra al pasar a otro o en la próxima comprobación
+		alAcabarEpisodio(c, e, sigueSonando = true)
 		// Temporizador «al final del episodio» o «tras N episodios»: ControlAudio ya lo ha contado al terminar
 		if (ControlAudio.pararTrasEpisodio()) return
 		if (siguiente != null && prefs(c).getBoolean("pod_seguir_cola", true)) {
 			kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
-				runCatching { sonar(c, siguiente) }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+				runCatching {
+					sonar(c, siguiente)
+					withContext(Dispatchers.IO) { borrarPendientes(c) }
+				}.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
 			}
 		}
 	}
@@ -625,14 +660,16 @@ object Podcasts {
 		if (n <= 0) return
 		val db = PodcastsBaseDatos.obtener(c)
 		db.descargados().filter { it.descargado }.groupBy { it.podcast }.values.forEach { lista ->
-			lista.sortedByDescending { it.fecha }.drop(n).filter { !it.favorito && !it.enCola }.forEach { borrarDescarga(c, it) }
+			// La del que suena, cuando deje de sonar
+			lista.sortedByDescending { it.fecha }.drop(n).filter { !it.favorito && !it.enCola }.forEach { borrarSiNoSuena(c, it) }
 		}
 	}
 
 	/** Escucha un episodio sin suscribirse (desde la ficha de un podcast): no se guarda nada. */
 	suspend fun escucharSinSuscribir(c: Context, podcast: String, e: PodcastLector.Elemento) {
 		val ext = ControlAudio.Externo(
-			id = -3_000_000_000L - (e.audio.hashCode().toLong() and 0x7fffffff),
+			// Tramo propio (antes se pisaba con el de las emisoras); ver Emisora.idAudio
+			id = -(3L shl 32) - (e.audio.hashCode().toLong() and 0xffffffffL),
 			titulo = e.titulo,
 			autor = podcast,
 			url = e.audio,

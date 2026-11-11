@@ -57,7 +57,8 @@ object Reglas {
 	 */
 	fun contiene(texto: String, termino: String): Boolean {
 		val t = normal(termino.trim().removeSurrounding("\""))
-		if (t.isBlank()) return false
+		// Vacío o solo asteriscos: no es una palabra (si no, «*» casaría con todo)
+		if (t.trim('*').isBlank()) return false
 		val alPrincipio = t.startsWith("*")
 		val alFinal = t.endsWith("*")
 		val base = Regex.escape(t.trim('*'))

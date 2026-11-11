@@ -15,6 +15,7 @@ import com.xebolax.lector.databinding.ActivityAjustesBinding
 import com.xebolax.lector.datos.Preferencias
 import com.xebolax.lector.ui.DeslizadorAjuste
 import com.xebolax.lector.ui.avisar
+import com.xebolax.lector.ui.cargandoLista
 import com.xebolax.lector.ui.configurarBarra
 import com.xebolax.lector.ui.confirmar
 import java.util.Locale
@@ -169,6 +170,10 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 		})
 		fun comoEn(valor: String) = getString(R.string.como_en_x, deDonde, valor)
 
+		// Las listas se llenan después: mientras, con su opción por defecto y sin poder abrirse (vacías, cierran la app)
+		cargandoLista(motor, R.string.motor_por_defecto)
+		cargandoLista(idioma, R.string.todos_los_idiomas)
+		cargandoLista(voz, R.string.voz_por_defecto)
 		// Motores: «Como en … (el que hereda)», los instalados y ElevenLabs si hay clave
 		LectorVoz.motores { lista ->
 			if (!isAdded) return@motores
@@ -177,12 +182,15 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 			motor?.entryValues = (listOf("") + lista.map { it.first }).toTypedArray()
 			motor?.value = almacen.perfil.motor.orEmpty()
 			motor?.summary = motor?.entry
+			motor?.isEnabled = true
 		}
 
 		fun cargarVoces() {
 			// Las voces del motor que se usará (el propio o el heredado), con un motor aparte
 			VocesMotor.voces(c, almacen.efectivo.motorEfectivo(p)) { voces ->
 				if (!isAdded) return@voces
+				idioma?.isEnabled = true
+				voz?.isEnabled = true
 				val idiomas = voces.map { it.locale.language }.distinct().sortedBy { Locale(it).displayLanguage }
 				idioma?.entries = (listOf(getString(R.string.todos_los_idiomas)) + idiomas.map { Locale(it).getDisplayLanguage(Locale.getDefault()).replaceFirstChar { ch -> ch.uppercase() } }).toTypedArray()
 				idioma?.entryValues = (listOf("") + idiomas).toTypedArray()
@@ -202,6 +210,8 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 		motor?.setOnPreferenceChangeListener { pref, _ ->
 			view?.post {
 				pref.summary = (pref as ListPreference).entry
+				// Las voces del motor anterior no valen: no se puede elegir hasta tener las nuevas
+				cargandoLista(voz, R.string.voz_por_defecto)
 				cargarVoces()
 			}
 			true

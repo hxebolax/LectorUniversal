@@ -16,7 +16,7 @@ import java.io.File
 object LectorZip : LectorFormato {
 
 	override fun leer(fuente: Fuente, ctx: ContextoLectura): Contenido {
-		val zip = fuente.contenedor() as? ContenedorZip ?: throw ExcepcionFormato("No es un ZIP válido.")
+		val zip = fuente.contenedor() as? ContenedorZip ?: throw ExcepcionFormato.noValido(Formato.ZIP)
 		zip.use { z ->
 			val entradas = z.entradas().filterNot { it.startsWith("__MACOSX") || it.substringAfterLast('/').startsWith(".") }
 			val formatos = entradas.associateWith { Formato.deExtension(Fuente.extensionDe(it)) }
@@ -34,8 +34,9 @@ object LectorZip : LectorFormato {
 					// Primero a un temporal y después se renombra: una copia cortada no se queda como buena
 					val parte = File(destino.path + "." + Thread.currentThread().id + ".parte")
 					try {
-						z.abrir(ruta)?.use { e -> parte.outputStream().use { e.copyTo(it) } } ?: throw ExcepcionFormato("No se puede leer $ruta dentro del ZIP.")
-						if (!parte.renameTo(destino) && !destino.exists()) throw ExcepcionFormato("No se puede leer $ruta dentro del ZIP.")
+						val noLegible = { ExcepcionFormato(ExcepcionFormato.texto(com.xebolax.lector.R.string.fmt_parte_no_legible, ruta.substringAfterLast('/'))) }
+						z.abrir(ruta)?.use { e -> parte.outputStream().use { e.copyTo(it) } } ?: throw noLegible()
+						if (!parte.renameTo(destino) && !destino.exists()) throw noLegible()
 					} finally {
 						parte.delete()
 					}
@@ -48,7 +49,7 @@ object LectorZip : LectorFormato {
 				val carpeta = LectorDaisy.extraerZip(fuente, ctx, "audiolibros")
 				return LectorCarpeta.leer(Fuente(ctx.app, Uri.fromFile(carpeta), fuente.nombre.substringBeforeLast('.')), ctx)
 			}
-			if (textos.isEmpty()) throw ExcepcionFormato("El ZIP no contiene ningún documento que se pueda leer.")
+			if (textos.isEmpty()) throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_zip_sin_documento)
 			val c = ctx.nuevoConstructor()
 			c.titulo = fuente.nombre.substringBeforeLast('.')
 			for ((i, ruta) in textos.withIndex()) {

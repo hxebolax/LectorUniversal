@@ -1,5 +1,6 @@
 package com.xebolax.lector.formatos
 
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.ConstructorDocumento
 import com.xebolax.lector.modelo.Contenido
 import com.xebolax.lector.modelo.Marca
@@ -75,7 +76,7 @@ object LectorChm : LectorFormato {
 		val orden = LinkedHashSet<String>()
 		for (e in toc) orden += e.ruta
 		orden += paginas.keys
-		if (orden.isEmpty()) throw ExcepcionFormato("El archivo CHM no contiene páginas que se puedan leer.")
+		if (orden.isEmpty()) throw ExcepcionFormato(R.string.fmt_vacio)
 		val lista = orden.take(PAGINAS_MAXIMAS)
 		val primeraEntrada = HashMap<String, EntradaToc>()
 		for (e in toc) {
@@ -113,8 +114,8 @@ object LectorChm : LectorFormato {
 			ConversorHtml(c, ruta, ctx.opciones).convertir(doc.body())
 		}
 		if (c.estaVacio()) {
-			if (fallos > 0) throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
-			throw ExcepcionFormato("El archivo CHM no contiene texto.")
+			if (fallos > 0) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
+			throw ExcepcionFormato(R.string.fmt_vacio)
 		}
 		if (fallos > 0) c.avisos += "El archivo CHM está dañado: $fallos páginas no se han podido leer."
 
@@ -262,14 +263,14 @@ private class ArchivoChm(archivo: File) : Closeable {
 			throw e
 		} catch (e: Exception) {
 			raf.close()
-			throw ExcepcionFormato("El archivo CHM está dañado.", e)
+			throw ExcepcionFormato(R.string.fmt_danado, e)
 		}
 	}
 
 	override fun close() = raf.close()
 
 	private fun bytes(pos: Long, n: Long): ByteArray {
-		if (pos < 0 || n < 0 || pos + n > tamano || n > 256L * 1024 * 1024) throw ExcepcionFormato("El archivo CHM está dañado o incompleto.")
+		if (pos < 0 || n < 0 || pos + n > tamano || n > 256L * 1024 * 1024) throw ExcepcionFormato(R.string.fmt_danado)
 		val b = ByteArray(n.toInt())
 		raf.seek(pos)
 		raf.readFully(b)
@@ -277,28 +278,28 @@ private class ArchivoChm(archivo: File) : Closeable {
 	}
 
 	private fun leerCabecera() {
-		if (tamano < 0x60) throw ExcepcionFormato("El archivo no es una ayuda de Windows (CHM) válida.")
+		if (tamano < 0x60) throw ExcepcionFormato.noValido(Formato.CHM)
 		val cab = bytes(0, 0x60)
-		if (!firmaChm(cab, 0, "ITSF")) throw ExcepcionFormato("El archivo no es una ayuda de Windows (CHM) válida.")
+		if (!firmaChm(cab, 0, "ITSF")) throw ExcepcionFormato.noValido(Formato.CHM)
 		val version = le32(cab, 4)
 		lcid = le32(cab, 0x14).toInt()
 		val inicioDirectorio = le64(cab, 0x48)
 		val largoDirectorio = le64(cab, 0x50)
 		inicioContenido = if (version >= 3) le64(cab, 0x58) else inicioDirectorio + largoDirectorio
 		leerDirectorio(inicioDirectorio)
-		if (entradas.isEmpty()) throw ExcepcionFormato("El archivo CHM no tiene directorio de archivos.")
+		if (entradas.isEmpty()) throw ExcepcionFormato(R.string.fmt_danado)
 	}
 
 	private fun leerDirectorio(inicio: Long) {
 		val cab = bytes(inicio, 0x54)
-		if (!firmaChm(cab, 0, "ITSP")) throw ExcepcionFormato("El directorio del archivo CHM está dañado.")
+		if (!firmaChm(cab, 0, "ITSP")) throw ExcepcionFormato(R.string.fmt_danado)
 		val largoCabecera = le32(cab, 8)
 		val tamTrozo = le32(cab, 0x10)
 		val primero = le32(cab, 0x20).toInt()
 		val ultimo = le32(cab, 0x24).toInt()
 		val cuantos = le32(cab, 0x2C)
 		if (tamTrozo < 32 || tamTrozo > 1 shl 20 || cuantos <= 0 || cuantos > 1_000_000) {
-			throw ExcepcionFormato("El directorio del archivo CHM está dañado.")
+			throw ExcepcionFormato(R.string.fmt_danado)
 		}
 		val base = inicio + largoCabecera
 		val desde = if (primero in 0 until cuantos) primero.toLong() else 0L
@@ -370,9 +371,9 @@ private class ArchivoChm(archivo: File) : Closeable {
 		}
 		val tabla = nombreTabla?.let { crudo(it) }
 		if (contenido == null || contenido.seccion != 0 || control == null || tabla == null) {
-			throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
+			throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		}
-		if (control.size < 0x18 || !firmaChm(control, 4, "LZXC")) throw ExcepcionFormato("El archivo CHM usa una compresión desconocida.")
+		if (control.size < 0x18 || !firmaChm(control, 4, "LZXC")) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		val version = le32(control, 8)
 		var intervalo = le32(control, 0x0C)
 		var ventana = le32(control, 0x10)
@@ -388,18 +389,18 @@ private class ArchivoChm(archivo: File) : Closeable {
 			0x80000L -> 19
 			0x100000L -> 20
 			0x200000L -> 21
-			else -> throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
+			else -> throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		}
-		if (intervalo <= 0 || intervalo % 0x8000 != 0L) throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
+		if (intervalo <= 0 || intervalo % 0x8000 != 0L) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		marcosPorGrupo = (intervalo / 0x8000).toInt()
-		if (tabla.size < 0x28) throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
+		if (tabla.size < 0x28) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		val n = le32(tabla, 4).toInt()
 		val tamEntrada = le32(tabla, 8).toInt()
 		val desdeTabla = le32(tabla, 0x0C).toInt()
 		tamDescomprimido = le64(tabla, 0x10)
 		tamComprimido = le64(tabla, 0x18)
 		if (n <= 0 || (tamEntrada != 8 && tamEntrada != 4) || desdeTabla < 0 || desdeTabla + n.toLong() * tamEntrada > tabla.size) {
-			throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
+			throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		}
 		reinicios = LongArray(n) { i ->
 			val o = desdeTabla + i * tamEntrada
@@ -413,7 +414,7 @@ private class ArchivoChm(archivo: File) : Closeable {
 	private fun leerSeccion1(desplazamiento: Long, largo: Long): ByteArray {
 		prepararLzx()
 		if (desplazamiento + largo > tamDescomprimido || largo > 256L * 1024 * 1024) {
-			throw ExcepcionFormato("El archivo CHM está dañado o incompleto.")
+			throw ExcepcionFormato(R.string.fmt_danado)
 		}
 		val salida = ByteArray(largo.toInt())
 		val tamGrupo = marcosPorGrupo.toLong() * 0x8000
@@ -433,15 +434,15 @@ private class ArchivoChm(archivo: File) : Closeable {
 	/** Descomprime (o saca de la caché) un grupo de marcos entre dos reinicios. */
 	private fun grupo(g: Int): ByteArray {
 		cache[g]?.let { return it }
-		if (g in fallidos) throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
+		if (g in fallidos) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		try {
 			val marco = g.toLong() * marcosPorGrupo
 			val marcos = (tamDescomprimido + 0x7FFF) / 0x8000
-			if (marco >= reinicios.size || marco >= marcos) throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
+			if (marco >= reinicios.size || marco >= marcos) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 			val inicio = reinicios[marco.toInt()]
 			val siguiente = marco + marcosPorGrupo
 			val fin = if (siguiente < marcos && siguiente < reinicios.size) reinicios[siguiente.toInt()] else tamComprimido
-			if (fin < inicio || fin > tamComprimido) throw ExcepcionFormato("No se pudo descomprimir este archivo CHM.")
+			if (fin < inicio || fin > tamComprimido) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 			val comprimido = bytes(inicioComprimido + inicio, fin - inicio)
 			val tam = minOf(marcosPorGrupo.toLong() * 0x8000, tamDescomprimido - marco * 0x8000).toInt()
 			// Margen: una coincidencia puede pasarse del final del marco
@@ -453,7 +454,7 @@ private class ArchivoChm(archivo: File) : Closeable {
 			throw e
 		} catch (e: Exception) {
 			fallidos += g
-			throw if (e is ExcepcionFormato) e else ExcepcionFormato("No se pudo descomprimir este archivo CHM.", e)
+			throw if (e is ExcepcionFormato) e else ExcepcionFormato(R.string.fmt_no_descomprimir, e)
 		}
 	}
 }

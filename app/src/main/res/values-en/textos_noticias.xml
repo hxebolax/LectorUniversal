@@ -6,4 +6,18 @@
 	<string name="noticias_filtro_todas">all</string>
 	<!-- "Mark all as read" when there is nothing unread -->
 	<string name="noticias_nada_sin_leer">There are no unread articles.</string>
+	<!-- "Older than a day" when there are none -->
+	<string name="noticias_ninguno_antiguo">There are no unread articles older than a day.</string>
+	<!-- The wait was cancelled while subscribing: the feed is already added -->
+	<string name="noticias_suscrito_luego">Subscribed to %1$s; its articles will arrive when you update.</string>
+	<!-- Sync: upload this phone's feeds to the account -->
+	<string name="noticias_subir_titulo">Upload feeds to the account</string>
+	<plurals name="noticias_subir_pregunta">
+		<item quantity="one">Upload %d feed from this phone to the account? You will also have it on the server and your other devices.</item>
+		<item quantity="other">Upload %d feeds from this phone to the account? You will also have them on the server and your other devices.</item>
+	</plurals>
+	<string name="noticias_subir_si">Upload</string>
+	<string name="noticias_subir_no">Don\'t upload</string>
+	<!-- Custom frequency out of range (News and Podcasts) -->
+	<string name="noticias_frecuencia_rango">Enter between %1$d and %2$d minutes (one week).</string>
 </resources>

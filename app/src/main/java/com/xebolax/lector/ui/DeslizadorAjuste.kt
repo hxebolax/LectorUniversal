@@ -29,7 +29,9 @@ class DeslizadorAjuste @JvmOverloads constructor(contexto: Context, atributos: A
 		return when (key) {
 			"velocidad_audio", "velocidad_voz", "tono_voz", "interlineado", "vp_velocidad", "vp_tono" -> c.getString(R.string.valor_por_ciento, v)
 			"salto_atras", "salto_adelante", "retroceso_reanudar" -> c.resources.getQuantityString(R.plurals.valor_segundos, v, v)
-			"tamano_letra" -> c.resources.getQuantityString(R.plurals.valor_puntos, v, v)
+			// Márgenes y espacios, en las mismas unidades que la letra; el de las letras, en tanto por ciento de su tamaño
+			"tamano_letra", "margen", "espacio_parrafos" -> c.resources.getQuantityString(R.plurals.valor_puntos, v, v)
+			"espacio_letras" -> c.getString(R.string.valor_por_ciento, v)
 			"pausa_parrafos", "pausa_frases", "vp_pausa" -> c.getString(R.string.valor_milisegundos, v)
 			else -> v.toString()
 		}

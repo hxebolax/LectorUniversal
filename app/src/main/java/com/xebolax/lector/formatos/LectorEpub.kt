@@ -25,7 +25,7 @@ object LectorEpub : LectorFormato {
 		fuente.contenedor().use { z ->
 			// Un .epub dentro de un ZIP
 			if (z.buscar("META-INF/container.xml") == null && z.entradas().none { it.lowercase().endsWith(".opf") }) {
-				throw ExcepcionFormato("No es un EPUB válido: falta el archivo del paquete (OPF).")
+				throw ExcepcionFormato.noValido(Formato.EPUB)
 			}
 			comprobarDrm(z)
 			// EPUB 3 con narración sincronizada: con su audio, como un DAISY de texto y audio (si se quiere así en Ajustes)
@@ -57,13 +57,13 @@ object LectorEpub : LectorFormato {
 			// Solo fuentes ofuscadas no impide leer; contenido cifrado sí
 			val referencias = xml.select("CipherReference, enc|CipherReference").map { it.attr("URI").lowercase() }
 			if (referencias.isEmpty() || referencias.any { it.endsWith("html") || it.endsWith("htm") || it.endsWith("xml") }) {
-				throw ExcepcionDrm("Este libro tiene DRM (protección anticopia) y no se puede abrir. Usa la aplicación de la tienda donde lo compraste.")
+				throw ExcepcionDrm()
 			}
 		}
 	}
 
 	private fun xml(z: Contenedor, ruta: String): Document =
-		Jsoup.parse(z.texto(ruta) ?: throw ExcepcionFormato("Falta $ruta en el EPUB."), "", Parser.xmlParser())
+		Jsoup.parse(z.texto(ruta) ?: throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_falta_parte), "", Parser.xmlParser())
 
 	private fun local(e: Element) = e.normalName().substringAfter(':')
 
@@ -77,7 +77,7 @@ object LectorEpub : LectorFormato {
 			buscarTodos(xml(z, cont), "rootfile").firstOrNull { it.attr("media-type").contains("oebps") || it.hasAttr("full-path") }
 				?.attr("full-path")
 		}?.let { z.buscar(it) } ?: z.entradas().firstOrNull { it.lowercase().endsWith(".opf") }
-		?: throw ExcepcionFormato("No es un EPUB válido: falta el archivo del paquete (OPF).")
+		?: throw ExcepcionFormato.noValido(Formato.EPUB)
 		val opf = xml(z, rutaOpf)
 
 		// --- Metadatos
@@ -129,7 +129,7 @@ object LectorEpub : LectorFormato {
 		val spine = buscarTodos(opf, "spine").firstOrNull()
 		val orden = spine?.let { s -> hijosLocales(s, "itemref").mapNotNull { manifiesto[it.attr("idref")] } }.orEmpty()
 			.filter { it.tipo.contains("html") || it.tipo.contains("xml") || it.ruta.lowercase().endsWith("htm") || it.ruta.lowercase().endsWith("html") }
-		if (orden.isEmpty()) throw ExcepcionFormato("El EPUB no tiene capítulos que leer.")
+		if (orden.isEmpty()) throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_vacio)
 
 		// --- Imágenes de adorno (idea de Paperback): sin descripción, una imagen
 		// pequeña (menos de 150 píxeles de lado) o que se repite (separadores,

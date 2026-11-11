@@ -223,6 +223,8 @@ class ReproductorActivity : AppCompatActivity() {
 		b.botonReproducir.setOnClickListener {
 			ControlAudio.alternar()
 			avisar(getString(if (ControlAudio.reproduciendo) R.string.reproduciendo else R.string.en_pausa), mostrar = false)
+			// La primera vez que se reproduce: permiso de avisos, explicado
+			if (ControlAudio.reproduciendo) com.xebolax.lector.ui.PermisoAvisos.pedir(this, R.string.cj_avisos_por_lectura)
 			// Si se acaba de poner solo el temporizador de la noche, se dice
 			if (ControlAudio.temporizadorAutomatico) {
 				ControlAudio.temporizadorAutomatico = false
@@ -231,7 +233,7 @@ class ReproductorActivity : AppCompatActivity() {
 			}
 		}
 		b.botonReproducir.conTemporizadorAlMantener {
-			elegirTemporizador(getString(R.string.reproducir_con_temporizador), conQuitar = false, conEpisodios = ControlAudio.externo != null) { minutos ->
+			elegirTemporizador(getString(R.string.reproducir_con_temporizador), conQuitar = false, conEpisodios = ControlAudio.externo != null, conCapitulo = hayVariosCapitulos()) { minutos ->
 				if (!ControlAudio.reproduciendo) ControlAudio.reproducir()
 				ControlAudio.temporizador(minutos)
 				avisar(getString(R.string.temporizador_puesto, nombreTemporizador(minutos)))
@@ -583,7 +585,7 @@ class ReproductorActivity : AppCompatActivity() {
 	}
 
 	private fun temporizador() {
-		elegirTemporizador(getString(R.string.temporizador), conQuitar = true, conEpisodios = ControlAudio.externo != null) { minutos ->
+		elegirTemporizador(getString(R.string.temporizador), conQuitar = true, conEpisodios = ControlAudio.externo != null, conCapitulo = hayVariosCapitulos()) { minutos ->
 			ControlAudio.temporizador(minutos)
 			avisar(if (minutos == 0) getString(R.string.temporizador_quitado) else getString(R.string.temporizador_puesto, nombreTemporizador(minutos)))
 			actualizar()
@@ -599,6 +601,9 @@ class ReproductorActivity : AppCompatActivity() {
 				.putExtra(LectorActivity.EXTRA_BLOQUE, ultimoTextoBloque.coerceAtLeast(0))
 		)
 	}
+
+	/** «Al final del capítulo» solo tiene sentido con más de un capítulo. */
+	private fun hayVariosCapitulos() = ControlAudio.marcas(UnidadAudio.CAPITULO).size > 1
 
 	/** El episodio de podcast que suena (si lo es). */
 	private fun episodio(): com.xebolax.lector.podcast.Episodio? {

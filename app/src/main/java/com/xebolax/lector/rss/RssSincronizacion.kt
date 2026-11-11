@@ -3,7 +3,14 @@ package com.xebolax.lector.rss
 import android.content.Context
 import android.util.Base64
 import com.xebolax.lector.BuildConfig
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.xebolax.lector.R
+import com.xebolax.lector.ui.avisar
+import com.xebolax.lector.ui.conEspera
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -36,8 +43,9 @@ object RssSincronizacion {
 		fun fuentes(): List<FuenteRemota>
 		/** Artículos sin leer y favoritos (los recientes). */
 		fun articulos(): List<ArticuloRemoto>
-		fun idsSinLeer(): Set<String>
-		fun idsFavoritos(): Set<String>
+		/** Ids de los sin leer y de los favoritos; null si el servidor no los ha dado todos (entonces no se quita nada por faltar). */
+		fun idsSinLeer(): Set<String>?
+		fun idsFavoritos(): Set<String>?
 		fun marcarLeidos(ids: List<String>, leido: Boolean)
 		fun marcarFavoritos(ids: List<String>, si: Boolean)
 		/** Se suscribe en el servidor; devuelve el id remoto de la fuente. */
@@ -64,12 +72,35 @@ object RssSincronizacion {
 		}
 	}
 
-	/** avisos: los nuevos de las fuentes con «Avisar» (para la notificación). */
-	class Resultado(val fuentes: Int, val nuevos: Int, val avisos: List<Pair<Fuente, RssLector.Elemento>> = emptyList())
+	/**
+	 * avisos: los nuevos de las fuentes con «Avisar» (para la notificación).
+	 * porSubir: fuentes de este móvil que aún no están en la cuenta y no se han
+	 * subido porque no se ha decidido (se pregunta al sincronizar a mano).
+	 */
+	class Resultado(val fuentes: Int, val nuevos: Int, val avisos: List<Pair<Fuente, RssLector.Elemento>> = emptyList(), val porSubir: Int = 0)
 
 	/** Artículos por página al pedirlos al servidor, y cuántos como mucho de cada lista. */
 	private const val PAGINA = 300
 	private const val TOPE = 1000
+
+	/** ¿Subir a la cuenta las fuentes de este móvil? "si", "no" o vacío (sin decidir: no se sube nada). */
+	private const val SUBIR = "rss_sinc_subir"
+	/** Fuentes que no se suben nunca (el servidor las borró o no las reconoce). */
+	private const val NO_SUBIR = "rss_sinc_no_subir"
+
+	private fun noSubir(c: Context): Set<Long> =
+		Rss.prefs(c).getStringSet(NO_SUBIR, emptySet()).orEmpty().mapNotNull { it.toLongOrNull() }.toSet()
+
+	private fun anadirNoSubir(c: Context, ids: Collection<Long>) {
+		if (ids.isEmpty()) return
+		Rss.prefs(c).edit().putStringSet(NO_SUBIR, (noSubir(c) + ids).map { it.toString() }.toSet()).apply()
+	}
+
+	/** Otra cuenta (o ninguna): se olvidan los enlaces con la anterior y lo decidido sobre subir fuentes. */
+	fun olvidarCuenta(c: Context) {
+		RssBaseDatos.obtener(c).olvidarRemotos()
+		Rss.prefs(c).edit().remove(SUBIR).remove(NO_SUBIR).apply()
+	}
 
 	/**
 	 * La dirección de una fuente sin lo que no la cambia: http o https, «www.»,
@@ -94,7 +125,7 @@ object RssSincronizacion {
 			s.marcarFavoritos(cambios.filter { it.third }.map { it.first }, true)
 			s.marcarFavoritos(cambios.filter { !it.third }.map { it.first }, false)
 			db.cambiosEnviados(cambios)
-			// 2. Fuentes: las del servidor se añaden aquí; las de aquí que no están, se suben
+			// 2. Fuentes: las del servidor se añaden aquí
 			val remotas = s.fuentes()
 			val locales = db.fuentes()
 			val enlazadas = db.remotosDeFuentes()
@@ -113,24 +144,58 @@ object RssSincronizacion {
 				idLocal[r.id] = id
 				emparejadas += id
 			}
-			// Se suben las que nunca se enlazaron; las que estaban enlazadas y ya no vienen se borraron en el servidor
-			val subidas = ArrayList<Fuente>()
-			for (f in db.fuentes().filter { f -> f.id !in emparejadas && enlazadas[f.id].isNullOrBlank() }) {
-				runCatching { s.suscribir(f.url, f.titulo, f.categoria) }.getOrNull()?.let {
-					db.ponerRemotoFuente(f.id, it)
-					idLocal[it] = f.id
-					subidas += f
+			// Las que estaban enlazadas y ya no vienen se borraron en el servidor: aquí también. Las que tienen
+			// favoritos o artículos para más tarde se quedan, pausadas y sin enlazar, y no se vuelven a subir.
+			// (Con la lista vacía no se borra nada: puede ser un fallo del servidor.)
+			if (remotas.isNotEmpty()) {
+				val conservadas = ArrayList<Long>()
+				for (f in locales.filter { it.id !in emparejadas && !enlazadas[it.id].isNullOrBlank() }) {
+					if (db.tieneGuardados(f.id)) {
+						db.desenlazarFuente(f.id, pausada = true)
+						conservadas += f.id
+					} else db.borrarFuente(f.id)
 				}
+				anadirNoSubir(c, conservadas)
 			}
-			// Algunos servidores (FreshRSS) dan a la fuente subida otro id del que devuelven al suscribirse:
-			// se vuelve a pedir la lista para que sus artículos lleguen ya en esta sincronización
-			if (subidas.isNotEmpty()) runCatching { s.fuentes() }.getOrNull()?.forEach { r ->
-				if (idLocal.containsKey(r.id)) return@forEach
-				val f = subidas.firstOrNull { direccionNormal(it.url) == direccionNormal(r.url) } ?: return@forEach
-				db.ponerRemotoFuente(f.id, r.id)
-				idLocal[r.id] = f.id
+			// Las de este móvil que no están en la cuenta: solo se suben si el usuario lo ha decidido (se le pregunta
+			// al sincronizar a mano). Nunca las de ejemplo que no ha tocado ni las que el servidor borró o no reconoce.
+			val vetadas = noSubir(c)
+			val candidatas = db.fuentes().filter { f ->
+				f.id !in emparejadas && enlazadas[f.id].isNullOrBlank() && f.id !in vetadas && !Rss.esEjemploSinTocar(c, f)
 			}
-			// 3. Artículos y estados, con las opciones de cada fuente (silenciar, solo con, sin duplicados)
+			val decision = Rss.prefs(c).getString(SUBIR, "").orEmpty()
+			val subidas = ArrayList<Pair<Fuente, String>>()
+			if (decision == "si") for (f in candidatas) {
+				runCatching { s.suscribir(f.url, f.titulo, f.categoria) }.getOrNull()?.let { subidas += f to it }
+			}
+			// Se enlazan solo cuando el servidor las da en su lista (con su id de verdad; FreshRSS devuelve otro al suscribirse)
+			if (subidas.isNotEmpty()) runCatching { s.fuentes() }.getOrNull()?.let { segunda ->
+				val primeras = remotas.map { it.id }.toSet()
+				val sinCasar = ArrayList<Fuente>()
+				for ((f, devuelto) in subidas) {
+					val r = segunda.firstOrNull { it.id == devuelto && !idLocal.containsKey(it.id) }
+						?: segunda.firstOrNull { !idLocal.containsKey(it.id) && direccionNormal(it.url) == direccionNormal(f.url) }
+					if (r == null) sinCasar += f
+					else {
+						db.ponerRemotoFuente(f.id, r.id)
+						idLocal[r.id] = f.id
+						emparejadas += f.id
+					}
+				}
+				// Una sola sin casar y una sola nueva en el servidor: son la misma (el servidor cambió la dirección)
+				val nuevasEnServidor = segunda.filter { it.id !in primeras && !idLocal.containsKey(it.id) }
+				if (sinCasar.size == 1 && nuevasEnServidor.size == 1) {
+					val f = sinCasar.removeAt(0)
+					val r = nuevasEnServidor[0]
+					db.ponerRemotoFuente(f.id, r.id)
+					idLocal[r.id] = f.id
+					emparejadas += f.id
+				}
+				// Las demás siguen siendo de este móvil (se actualizan aquí) y no se vuelven a subir a ciegas
+				anadirNoSubir(c, sinCasar.map { it.id })
+			}
+			// 3. Artículos y estados, con las opciones de cada fuente (silenciar, solo con, sin duplicados);
+			// las pausadas no reciben artículos
 			val articulos = s.articulos()
 			val porId = db.fuentes().associateBy { it.id }
 			var nuevos = 0
@@ -138,22 +203,58 @@ object RssSincronizacion {
 			for ((fuenteRemota, lista) in articulos.groupBy { it.fuente }) {
 				val id = idLocal[fuenteRemota] ?: continue
 				val f = porId[id]
+				if (f != null && f.pausada) continue
 				val admitir: (RssLector.Elemento) -> Boolean = if (f != null) Rss.filtro(db, f) else { _ -> true }
 				val llegados = db.anadirRemotos(id, lista.map { it.elemento to Triple(it.id, it.leido, it.favorito) }, admitir)
 				nuevos += llegados.size
 				if (f != null && f.avisar) llegados.forEach { avisos += f to it }
 			}
-			// Lo que acaba de llegar sin leer o como favorito lo es seguro, aunque el servidor dé los ids en otro formato
-			val sinLeer = s.idsSinLeer() + articulos.filter { !it.leido }.map { it.id }
-			val favoritos = s.idsFavoritos() + articulos.filter { it.favorito }.map { it.id }
-			db.estadoRemoto(db.remotosSinLeer() - sinLeer, leido = true)
+			// Las enlazadas quedan al día y sin error (Estado de las fuentes, Información de la fuente)
+			for (id in emparejadas) if (porId[id]?.pausada == false) db.guardarActualizacion(id, null, null, null, null, "")
+			// Lo que acaba de llegar sin leer o como favorito lo es seguro, aunque el servidor dé los ids en otro formato.
+			// Si el servidor no ha dado todos sus ids, no se marca nada como leído (ni se quita de favoritos) por faltar.
+			val sinLeerServidor = s.idsSinLeer()
+			val favoritosServidor = s.idsFavoritos()
+			val sinLeer = sinLeerServidor.orEmpty() + articulos.filter { !it.leido }.map { it.id }
+			val favoritos = favoritosServidor.orEmpty() + articulos.filter { it.favorito }.map { it.id }
+			if (sinLeerServidor != null) db.estadoRemoto(db.remotosSinLeer() - sinLeer, leido = true)
 			db.estadoRemoto(sinLeer, leido = false)
-			db.estadoRemoto(db.remotosFavoritos() - favoritos, favorito = false)
+			if (favoritosServidor != null) db.estadoRemoto(db.remotosFavoritos() - favoritos, favorito = false)
 			db.estadoRemoto(favoritos, favorito = true)
 			db.avisar()
 			Rss.prefs(c).edit().putLong("rss_sinc_ultima", System.currentTimeMillis()).apply()
-			Resultado(remotas.size, nuevos, avisos)
+			Resultado(remotas.size, nuevos, avisos, porSubir = if (decision.isEmpty()) candidatas.size else 0)
 		}
+	}
+
+	/**
+	 * Tras sincronizar a mano: si hay fuentes de este móvil que aún no están en la
+	 * cuenta y no se ha decidido, se pregunta si subirlas. Con «Subir», se suben
+	 * ya (con la ventana de espera); con «No subir», no se vuelve a preguntar
+	 * hasta que se cambie de cuenta.
+	 */
+	fun preguntarSubir(a: AppCompatActivity, r: Resultado) {
+		if (r.porSubir <= 0) return
+		MaterialAlertDialogBuilder(a)
+			.setTitle(R.string.noticias_subir_titulo)
+			.setMessage(a.resources.getQuantityString(R.plurals.noticias_subir_pregunta, r.porSubir, r.porSubir))
+			.setPositiveButton(R.string.noticias_subir_si) { _, _ ->
+				Rss.prefs(a).edit().putString(SUBIR, "si").apply()
+				a.lifecycleScope.launch {
+					val texto = try {
+						val hecho = a.conEspera(a.getString(R.string.noticias_subir_titulo), a.getString(R.string.sinc_sincronizando)) { sincronizar(a) }
+						Rss.prefs(a).edit().putString("rss_sinc_error", "").apply()
+						a.getString(R.string.sinc_rss_hecho, hecho.fuentes, hecho.nuevos)
+					} catch (e: kotlinx.coroutines.CancellationException) {
+						throw e
+					} catch (e: Exception) {
+						a.getString(R.string.sinc_error, e.message ?: e.javaClass.simpleName)
+					}
+					a.avisar(texto)
+				}
+			}
+			.setNegativeButton(R.string.noticias_subir_no) { _, _ -> Rss.prefs(a).edit().putString(SUBIR, "no").apply() }
+			.show()
 	}
 
 	/** Miniflux descarga él mismo el artículo completo de la web (fetch-content). */
@@ -229,13 +330,15 @@ object RssSincronizacion {
 			val xt = if (excluirLeidos) "&xt=user/-/state/com.google/read" else ""
 			val r = ArrayList<ArticuloRemoto>()
 			var continuacion = ""
+			val vistas = HashSet<String>()
 			do {
 				val c = if (continuacion.isNotEmpty()) "&c=${e(continuacion)}" else ""
 				val o = JSONObject(peticion("$base/reader/api/0/stream/contents/$stream?n=$PAGINA$xt$c&output=json", cabeceras = cab))
 				val items = o.optJSONArray("items") ?: JSONArray()
 				r += pagina(items)
 				continuacion = o.optString("continuation")
-			} while (continuacion.isNotEmpty() && items.length() > 0 && r.size < TOPE)
+				// Una continuación repetida daría vueltas sin fin
+			} while (continuacion.isNotEmpty() && vistas.add(continuacion) && items.length() > 0 && r.size < TOPE)
 			return r
 		}
 
@@ -260,18 +363,23 @@ object RssSincronizacion {
 
 		override fun articulos() = elementos("user/-/state/com.google/reading-list", true) + elementos("user/-/state/com.google/starred", false)
 
-		/** Los ids de una lista, página a página (con «continuation»), en el formato largo que usan los artículos. */
-		private fun ids(consulta: String): Set<String> {
+		/**
+		 * Los ids de una lista, página a página (con «continuation»), en el formato largo
+		 * que usan los artículos. null si no se han podido traer todos (tope o continuación repetida).
+		 */
+		private fun ids(consulta: String): Set<String>? {
 			val r = HashSet<String>()
 			var continuacion = ""
-			do {
+			val vistas = HashSet<String>()
+			while (true) {
 				val c = if (continuacion.isNotEmpty()) "&c=${e(continuacion)}" else ""
 				val o = JSONObject(peticion("$base/reader/api/0/stream/items/ids?$consulta&n=10000$c&output=json", cabeceras = cab))
 				val a = o.optJSONArray("itemRefs") ?: JSONArray()
 				for (i in 0 until a.length()) r += formasDelId(a.optJSONObject(i)?.optString("id").orEmpty())
 				continuacion = o.optString("continuation")
-			} while (continuacion.isNotEmpty() && a.length() > 0 && r.size < 200_000)
-			return r
+				if (continuacion.isEmpty() || a.length() == 0) return r
+				if (!vistas.add(continuacion) || r.size >= 200_000) return null
+			}
 		}
 
 		/**
@@ -365,8 +473,11 @@ object RssSincronizacion {
 
 		override fun articulos() = entradas("status=unread") + entradas("starred=true")
 
-		private fun ids(consulta: String): Set<String> {
-			val a = JSONObject(peticion("$api/entries?$consulta&limit=10000", cabeceras = cab)).optJSONArray("entries") ?: JSONArray()
+		/** null si hay más de los que caben en una petición (total mayor que los recibidos). */
+		private fun ids(consulta: String): Set<String>? {
+			val o = JSONObject(peticion("$api/entries?$consulta&limit=10000", cabeceras = cab))
+			val a = o.optJSONArray("entries") ?: JSONArray()
+			if (o.optInt("total", a.length()) > a.length()) return null
 			return (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optLong("id")?.toString() }.toSet()
 		}
 
@@ -381,9 +492,12 @@ object RssSincronizacion {
 		}
 
 		override fun marcarFavoritos(ids: List<String>, si: Boolean) {
-			// Miniflux solo tiene "cambiar": se cambian los que no están como se pide
-			val actuales = idsFavoritos()
-			for (id in ids) if ((id in actuales) != si) peticion("$api/entries/$id/bookmark", "PUT", "", cabeceras = cab)
+			// Miniflux solo tiene "cambiar": se mira cada uno y se cambian los que no están como se pide
+			// (la lista de todos los favoritos puede venir cortada y se cambiarían los que no toca)
+			for (id in ids) {
+				val ahora = runCatching { JSONObject(peticion("$api/entries/$id", cabeceras = cab)).optBoolean("starred") }.getOrNull() ?: continue
+				if (ahora != si) peticion("$api/entries/$id/bookmark", "PUT", "", cabeceras = cab)
+			}
 		}
 
 		override fun suscribir(url: String, titulo: String, categoria: String): String? {

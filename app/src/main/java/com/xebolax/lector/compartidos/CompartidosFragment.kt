@@ -23,6 +23,7 @@ import com.xebolax.lector.ui.AdaptadorLibros
 import com.xebolax.lector.ui.Fila
 import com.xebolax.lector.ui.campoTexto
 import com.xebolax.lector.ui.dp
+import com.xebolax.lector.ui.lectorActivo
 import com.xebolax.lector.ui.sinAnimarCambios
 import com.xebolax.lector.ui.sinFocoPropio
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,8 @@ class CompartidosFragment : Fragment() {
 	private val db by lazy { BaseDatos.obtener(requireContext()) }
 	private var busqueda = ""
 	private var carga: Job? = null
+	/** La fila sobre la que se usó la última acción (su id). */
+	private var ultimaUsada: Long? = null
 
 	private val recargaDiferida = Runnable { recargar() }
 	private val oyente = BaseDatos.Oyente {
@@ -68,7 +71,8 @@ class CompartidosFragment : Fragment() {
 		modo = runCatching { Modo.valueOf(requireArguments().getString("modo", Modo.PENDIENTES.name)) }.getOrDefault(Modo.PENDIENTES)
 		val a = requireActivity() as AppCompatActivity
 		adaptador = AdaptadorLibros(a, { f -> (f as? Fila.DeCompartido)?.let { Abiertos.abrirPantalla(a, it.libro) } }) { f ->
-			(f as? Fila.DeCompartido)?.let { AccionesCompartido.acciones(a, it.libro) }.orEmpty()
+			// Se apunta sobre cuál se hizo la acción: si desaparece (borrar, pasar a la biblioteca, marcar leído), el foco va a su vecina
+			(f as? Fila.DeCompartido)?.let { fila -> AccionesCompartido.acciones(a, fila.libro).map { (texto, hacer) -> texto to { ultimaUsada = fila.id; hacer() } } }.orEmpty()
 		}
 		b.recycler.layoutManager = LinearLayoutManager(requireContext())
 		b.recycler.sinFocoPropio()
@@ -109,6 +113,19 @@ class CompartidosFragment : Fragment() {
 		super.onDestroyView()
 	}
 
+	/** Pone el foco de TalkBack en la fila de esa posición (o en la última que haya). */
+	private fun enfocarVecina(posicion: Int) {
+		val r = _b?.recycler ?: return
+		if (adaptador.itemCount == 0) return
+		val p = posicion.coerceIn(0, adaptador.itemCount - 1)
+		r.scrollToPosition(p)
+		// Después de que MemoriaFoco intente devolver el foco a la fila que ya no está
+		r.postDelayed({
+			val v = _b?.recycler?.findViewHolderForAdapterPosition(p)?.itemView ?: return@postDelayed
+			if (context?.lectorActivo() == true) v.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+		}, 300)
+	}
+
 	fun recargar() {
 		if (_b == null) return
 		val texto = busqueda
@@ -132,7 +149,14 @@ class CompartidosFragment : Fragment() {
 				lista.map { Fila.DeCompartido(it) } to estado
 			}
 			if (_b == null) return@launch
-			adaptador.reemplazar(filas)
+			// La fila de la última acción ya no está aquí: el foco de TalkBack iría a ninguna parte (MemoriaFoco
+			// la busca y no la encuentra), así que se pone en la que ocupa su lugar, o en la anterior si era la última
+			val usada = ultimaUsada
+			val antes = adaptador.filas
+			val posicion = usada?.let { u -> antes.indexOfFirst { it.id == u } } ?: -1
+			val desaparece = posicion >= 0 && filas.none { it.id == usada }
+			if (desaparece) ultimaUsada = null
+			adaptador.reemplazar(filas) { if (desaparece) enfocarVecina(posicion) }
 			if (b.estado.text.toString() != estado) b.estado.text = estado
 		}
 	}

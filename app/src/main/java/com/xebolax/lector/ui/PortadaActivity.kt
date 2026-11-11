@@ -1,7 +1,6 @@
 package com.xebolax.lector.ui
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -10,7 +9,6 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
@@ -61,7 +59,6 @@ class PortadaActivity : AppCompatActivity() {
 
 	private lateinit var b: ActivityPortadaBinding
 	val actualizaciones = GestorActualizaciones(this)
-	private val permisoNotificaciones = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 	private var filas: List<Fila> = emptyList()
 	private var carga: Job? = null
 
@@ -87,6 +84,8 @@ class PortadaActivity : AppCompatActivity() {
 			val etiqueta: String,
 			val acciones: () -> List<Accion>,
 			val zona: ZonaAcciones?,
+			/** El estado (sin leer, pendiente de descarga…): TalkBack lo dice antes del título. */
+			val estado: String = "",
 		) : Fila(clave.hashCode().toLong())
 	}
 
@@ -102,6 +101,8 @@ class PortadaActivity : AppCompatActivity() {
 		seguirMiniReproductor(b.miniReproductor)
 		b.recycler.layoutManager = LinearLayoutManager(this)
 		b.recycler.sinFocoPropio()
+		// Al recargar (cada vuelta y cada cambio) las filas se repintan en su sitio, sin animación: TalkBack no pierde el foco
+		b.recycler.sinAnimarCambios()
 		b.recycler.adapter = Adaptador().also { it.setHasStableIds(true) }
 
 		if (savedInstanceState == null) {
@@ -109,7 +110,6 @@ class PortadaActivity : AppCompatActivity() {
 			TareasInicio.alAbrir(this)
 			// ¿Se cerró la app por un fallo la última vez? Ofrecer enviarlo (lo envías tú)
 			com.xebolax.lector.datos.RegistroFallos.ofrecerSiHay(this)
-			if (Build.VERSION.SDK_INT >= 33) permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)
 			// Abrir el último libro al iniciar (Ajustes)
 			if (Preferencias(this).abrirUltimo && intent?.action == Intent.ACTION_MAIN) {
 				BaseDatos.obtener(this).ultimoAbierto()?.let { Abiertos.abrirPantalla(this, it) }
@@ -152,9 +152,24 @@ class PortadaActivity : AppCompatActivity() {
 			val n = OrdenSecciones.elementos(this@PortadaActivity)
 			val secciones = OrdenSecciones.orden(this@PortadaActivity).filter { OrdenSecciones.enPortada(this@PortadaActivity, it) }
 			val datos = withContext(Dispatchers.IO) { leer(secciones.toSet(), n) }
-			filas = construir(secciones, datos)
+			val nuevas = construir(secciones, datos)
+			// Si no ha cambiado nada de lo que se ve o se lee, no se repinta (TalkBack se queda donde estaba)
+			val firma = nuevas.joinToString("\n") { firmaDe(it) }
+			filas = nuevas
+			if (firma == firmaFilas) return@launch
+			firmaFilas = firma
 			b.recycler.adapter?.notifyDataSetChanged()
 		}
+	}
+
+	/** Lo que se ve y se lee de las filas de la última vez. */
+	private var firmaFilas: String? = null
+
+	private fun firmaDe(f: Fila): String = when (f) {
+		is Fila.Encabezado -> "${f.id}|${f.resumen}"
+		is Fila.Vacia -> "${f.id}|${f.texto}"
+		// Con los nombres de sus acciones: cambian con el estado (Quitar de favoritos, Marcar como leído…)
+		is Fila.Elemento -> "${f.id}|${f.titulo}|${f.detalle}|${f.estado}|${f.progreso}|${f.icono}|${f.etiqueta}|" + f.acciones().joinToString("/") { it.first }
 	}
 
 	private fun leer(secciones: Set<Seccion>, n: Int): Datos {
@@ -252,9 +267,16 @@ class PortadaActivity : AppCompatActivity() {
 	private fun filaCompartido(l: Libro): Fila {
 		val tipo = com.xebolax.lector.datos.Tipos.de(this, l.claveTipo)?.nombreSingular.orEmpty()
 		val sitio = l.origen.takeIf { it.startsWith("http") }?.let { runCatching { android.net.Uri.parse(it).host?.removePrefix("www.") }.getOrNull() }
-		val partes = listOfNotNull(tipo.takeIf { it.isNotBlank() }, sitio, if (l.progreso > 0) getString(R.string.porcentaje_n, l.progreso.toInt()) else null)
+		// Su estado primero, como en Compartidos: pendiente de descarga, sin leer, leído o por dónde va
+		val estado = when {
+			com.xebolax.lector.compartidos.DescargasPendientes.pendiente(l.ajustes) -> getString(R.string.comp_pendiente_descarga)
+			l.estado == com.xebolax.lector.datos.Estado.TERMINADO -> getString(R.string.estado_leido)
+			l.progreso > 0 -> getString(R.string.porcentaje_n, l.progreso.toInt())
+			else -> getString(R.string.estado_sin_leer)
+		}
+		val partes = listOfNotNull(tipo.takeIf { it.isNotBlank() }, sitio)
 		return Fila.Elemento("compartido${l.id}", R.drawable.ic_compartido, l.tituloVisible, partes.joinToString(" · "),
-			l.progreso.toInt(), { Abiertos.abrirPantalla(this, l) }, getString(R.string.abrir), { AccionesCompartido.acciones(this, l) }, ZonaAcciones.COMPARTIDO)
+			l.progreso.toInt(), { Abiertos.abrirPantalla(this, l) }, getString(R.string.abrir), { AccionesCompartido.acciones(this, l) }, ZonaAcciones.COMPARTIDO, estado)
 	}
 
 	private fun filaEpisodio(e: Episodio, lista: List<Episodio>): Fila {
@@ -337,11 +359,13 @@ class PortadaActivity : AppCompatActivity() {
 				is Fila.Elemento -> (v as VistaElemento).b.let { e ->
 					e.icono.setImageResource(f.icono)
 					e.titulo.text = f.titulo
-					e.detalle.text = f.detalle
-					e.detalle.isVisible = f.detalle.isNotBlank()
+					val detalle = listOf(f.estado, f.detalle).filter { it.isNotBlank() }.joinToString(" · ")
+					e.detalle.text = detalle
+					e.detalle.isVisible = detalle.isNotBlank()
 					e.progreso.isVisible = f.progreso != null && f.progreso > 0
 					e.progreso.progress = f.progreso ?: 0
-					e.root.contentDescription = listOf(f.titulo, f.detalle).filter { it.isNotBlank() }.joinToString(", ")
+					// El estado, antes del título (una sola parada que lo dice todo)
+					e.root.contentDescription = listOf(f.estado, f.titulo, f.detalle).filter { it.isNotBlank() }.joinToString(", ")
 					e.root.setOnClickListener { f.alPulsar() }
 					e.root.etiquetaPulsar(f.etiqueta)
 					val acciones = f.acciones()

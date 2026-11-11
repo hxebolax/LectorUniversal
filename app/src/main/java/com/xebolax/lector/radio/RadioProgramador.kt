@@ -25,6 +25,11 @@ object RadioProgramador {
 	private const val ACCION_PROGRAMADA = "com.xebolax.lector.radio.PROGRAMADA"
 	const val ACCION_APAGAR = "com.xebolax.lector.radio.APAGAR"
 	const val ACCION_POSPONER = "com.xebolax.lector.radio.POSPONER"
+	/** Cancelar el despertador pospuesto (botón de su aviso). */
+	const val ACCION_CANCELAR_POSPUESTO = "com.xebolax.lector.radio.CANCELAR_POSPUESTO"
+	/** Aviso «Pospuesto hasta las…» (canal propio, sin sonido). */
+	private const val CANAL_POSPUESTO = "radio_pospuesto"
+	private const val NOTIFICACION_POSPUESTO = 7305
 	private const val EXTRA_ID = "id"
 	private const val CANAL = "radio_despertador"
 	const val NOTIFICACION = 7302
@@ -81,8 +86,43 @@ object RadioProgramador {
 			else poner(c, cuando, pendiente(c, p.id.toInt(), p.id, crear = true)!!)
 		}
 		// El despertador pospuesto también (al reiniciar el móvil se pierden todas las alarmas)
-		val pospuesto = Radio.prefs(c).getLong("radio_pospuesta_cuando", 0)
-		if (pospuesto > System.currentTimeMillis()) poner(c, pospuesto, pendientePospuesto(c))
+		val pospuesto = pospuestoHasta(c)
+		if (pospuesto > 0) {
+			poner(c, pospuesto, pendientePospuesto(c))
+			avisoPospuesto(c, pospuesto)
+		}
+	}
+
+	/** Cuándo sonará el despertador pospuesto (ms), o 0 si no hay ninguno. */
+	fun pospuestoHasta(c: Context): Long = Radio.prefs(c).getLong("radio_pospuesta_cuando", 0).takeIf { it > System.currentTimeMillis() } ?: 0L
+
+	/** Aviso «Pospuesto hasta las 7:40» con Cancelar (si no, no había forma de quitarlo). */
+	private fun avisoPospuesto(c: Context, cuando: Long) {
+		if (Build.VERSION.SDK_INT >= 26) {
+			c.getSystemService(NotificationManager::class.java).createNotificationChannel(
+				NotificationChannel(CANAL_POSPUESTO, c.getString(R.string.audio_canal_pospuesto), NotificationManager.IMPORTANCE_LOW))
+		}
+		val cancelar = PendingIntent.getBroadcast(c, 9, Intent(c, RadioReceptorAlarma::class.java).setAction(ACCION_CANCELAR_POSPUESTO),
+			PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+		val abrir = PendingIntent.getActivity(c, 4, Intent(c, RadioActivity::class.java).setAction(RadioActivity.ACCION_PROGRAMAR), PendingIntent.FLAG_IMMUTABLE)
+		val n = NotificationCompat.Builder(c, CANAL_POSPUESTO)
+			.setSmallIcon(R.drawable.ic_alarma)
+			.setContentTitle(c.getString(R.string.radio_despertador))
+			.setContentText(c.getString(R.string.audio_pospuesto_hasta, DateFormat.getTimeInstance(DateFormat.SHORT).format(cuando)))
+			.setContentIntent(abrir)
+			.setOnlyAlertOnce(true)
+			.addAction(R.drawable.ic_detener, c.getString(R.string.cancelar), cancelar)
+			.build()
+		runCatching { NotificationManagerCompat.from(c).notify(NOTIFICACION_POSPUESTO, n) }
+	}
+
+	/** Cancela el despertador pospuesto: quita la alarma, sus datos y el aviso. */
+	fun cancelarPospuesto(c: Context) {
+		alarmas(c).cancel(pendientePospuesto(c))
+		Radio.prefs(c).edit().remove("radio_pospuesta").remove("radio_pospuesta_cuando").apply()
+		NotificationManagerCompat.from(c).cancel(NOTIFICACION_POSPUESTO)
+		// La pestaña Programar lo dice en su línea de estado: se pone al día
+		RadioBaseDatos.obtener(c).avisar()
 	}
 
 	private fun pendientePospuesto(c: Context): PendingIntent =
@@ -209,6 +249,8 @@ object RadioProgramador {
 		val cuando = System.currentTimeMillis() + posponerMinutos(c) * 60_000L
 		Radio.prefs(c).edit().putString("radio_pospuesta", e.json().toString()).putLong("radio_pospuesta_cuando", cuando).apply()
 		poner(c, cuando, pendientePospuesto(c))
+		avisoPospuesto(c, cuando)
+		RadioBaseDatos.obtener(c).avisar()
 	}
 
 	/** Ha llegado la hora de una programación. */
@@ -217,6 +259,7 @@ object RadioProgramador {
 			// Despertador pospuesto (con los minutos del despertador original)
 			val pr = Radio.prefs(c)
 			pr.edit().remove("radio_pospuesta_cuando").apply()
+			NotificationManagerCompat.from(c).cancel(NOTIFICACION_POSPUESTO)
 			val e = Emisora.deJson(pr.getString("radio_pospuesta", "").orEmpty()) ?: return
 			despertar(c, Programacion(0, Programacion.DESPERTADOR, e, 0, 0, 0, pr.getInt("radio_despertador_duracion", 30), true))
 			return
@@ -239,6 +282,7 @@ class RadioReceptorAlarma : BroadcastReceiver() {
 		when (i.action) {
 			RadioProgramador.ACCION_APAGAR -> RadioProgramador.apagar(app)
 			RadioProgramador.ACCION_POSPONER -> RadioProgramador.posponer(app)
+			RadioProgramador.ACCION_CANCELAR_POSPUESTO -> RadioProgramador.cancelarPospuesto(app)
 			else -> {
 				// Se espera un poco a que conecte con el reproductor antes de soltar el aviso
 				val pendiente = goAsync()

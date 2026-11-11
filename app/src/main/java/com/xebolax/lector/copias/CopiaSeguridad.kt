@@ -8,6 +8,7 @@ import com.xebolax.lector.BuildConfig
 import com.xebolax.lector.R
 import com.xebolax.lector.datos.Actividad
 import com.xebolax.lector.datos.BaseDatos
+import com.xebolax.lector.datos.FalloIo
 import com.xebolax.lector.datos.Secretos
 import org.json.JSONArray
 import org.json.JSONObject
@@ -82,8 +83,8 @@ object CopiaSeguridad {
 		val tamanos: Map<Parte, Long>,
 	)
 
-	class NecesitaContrasena : IOException("La copia está protegida con contraseña")
-	class NoEsUnaCopia : IOException("El archivo no es una copia de seguridad de Lector Universal")
+	class NecesitaContrasena : FalloIo(R.string.cj_copia_con_contrasena)
+	class NoEsUnaCopia : FalloIo(R.string.cj_copia_no_es_copia)
 
 	// --- Tamaños -------------------------------------------------------------------------------
 
@@ -249,7 +250,7 @@ object CopiaSeguridad {
 		val magia = ByteArray(MAGIA.size)
 		if (datos.readNBytesCompat(magia) != MAGIA.size || !magia.contentEquals(MAGIA)) throw NoEsUnaCopia()
 		val formato = datos.read()
-		if (formato != FORMATO) throw IOException("La copia es de una versión más nueva de la app. Actualiza Lector Universal y vuelve a intentarlo.")
+		if (formato != FORMATO) throw FalloIo(R.string.cj_copia_mas_nueva)
 		val cifrada = datos.read() == 1
 		cabecera.write(magia)
 		cabecera.write(formato)
@@ -258,7 +259,7 @@ object CopiaSeguridad {
 			if (contrasena == null) throw NecesitaContrasena()
 			val sal = ByteArray(16).also { datos.readFully(it) }
 			val vueltas = datos.readInt()
-			if (vueltas !in 1..10_000_000) throw IOException("La copia está dañada.")
+			if (vueltas !in 1..10_000_000) throw FalloIo(R.string.cj_copia_danada)
 			val prefijo = ByteArray(7).also { datos.readFully(it) }
 			cabecera.write(sal)
 			cabecera.write(java.nio.ByteBuffer.allocate(4).putInt(vueltas).array())
@@ -314,7 +315,7 @@ object CopiaSeguridad {
 				if (parte !in elegidas) continue
 				val destino = File(temporal, e.name)
 				// Nada puede salir de la carpeta temporal (nombres con «..»)
-				if (!destino.canonicalPath.startsWith(raiz)) throw IOException("La copia está dañada.")
+				if (!destino.canonicalPath.startsWith(raiz)) throw FalloIo(R.string.cj_copia_danada)
 				destino.parentFile?.mkdirs()
 				destino.outputStream().use { zip.copyTo(it) }
 			}
@@ -346,7 +347,7 @@ object CopiaSeguridad {
 			origen.copyTo(nuevo, overwrite = true)
 			if (!nuevo.renameTo(destino)) {
 				destino.delete()
-				if (!nuevo.renameTo(destino)) throw IOException("No se pudo restaurar $nombre.")
+				if (!nuevo.renameTo(destino)) throw FalloIo(R.string.cj_copia_no_restaurado, nombre)
 			}
 			File(temporal, "${p.id}/$nombre-wal").takeIf { it.exists() }?.copyTo(File(destino.path + "-wal"), overwrite = true)
 		}

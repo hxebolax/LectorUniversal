@@ -55,14 +55,16 @@ class AccionesTalkBackActivity : AppCompatActivity() {
 		b.estado.text = zona?.let { getString(R.string.acciones_explicacion_zona, getString(it.titulo).lowercase()) } ?: getString(R.string.acciones_explicacion)
 		b.recycler.layoutManager = LinearLayoutManager(this)
 		b.recycler.sinFocoPropio()
-		b.recycler.adapter = if (zona == null) AdaptadorZonas() else AdaptadorAcciones().also { it.setHasStableIds(true) }
+		// Ids estables y sin animación al refrescar: las filas se repintan en su sitio y TalkBack no pierde el foco
+		b.recycler.sinAnimarCambios()
+		b.recycler.adapter = if (zona == null) AdaptadorZonas().also { it.setHasStableIds(true) } else AdaptadorAcciones().also { it.setHasStableIds(true) }
 		cargar()
 	}
 
 	override fun onResume() {
 		super.onResume()
-		// Al volver de una zona, su resumen (cuántas salen) puede haber cambiado
-		if (zona == null) b.recycler.adapter?.notifyDataSetChanged()
+		// Al volver de una zona, su resumen (cuántas salen) puede haber cambiado: se repintan en su sitio
+		if (zona == null) b.recycler.adapter?.let { it.notifyItemRangeChanged(0, it.itemCount) }
 	}
 
 	override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -181,6 +183,7 @@ class AccionesTalkBackActivity : AppCompatActivity() {
 
 	private inner class AdaptadorZonas : RecyclerView.Adapter<Fila>() {
 		override fun getItemCount() = ZonaAcciones.entries.size
+		override fun getItemId(posicion: Int) = ZonaAcciones.entries[posicion].ordinal.toLong()
 		override fun onCreateViewHolder(padre: ViewGroup, tipo: Int) = nuevaFila(padre, false)
 		override fun onBindViewHolder(v: Fila, posicion: Int) {
 			val z = ZonaAcciones.entries[posicion]

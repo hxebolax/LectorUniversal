@@ -80,12 +80,15 @@ class ServicioExportar : Service() {
 				val contenido = withContext(Dispatchers.IO) { Abiertos.abrir(this@ServicioExportar, libro, Abiertos.opciones(this@ServicioExportar)) }
 				val doc = (contenido as? Contenido.Texto)?.documento ?: error(getString(R.string.error_abrir, ""))
 				val titulo = doc.titulo.ifBlank { libro.tituloVisible }
-				val n = ExportadorAudio(this@ServicioExportar).exportar(doc, libro.id, titulo, carpeta) { cap, total, porcentaje ->
-					avisar(getString(R.string.exportar_audio_progreso, cap, total), porcentaje)
+				val exportador = ExportadorAudio(this@ServicioExportar)
+				val n = exportador.exportar(doc, libro.id, titulo, carpeta) { cap, total, porcentaje ->
+					// Con la voz del libro en ElevenLabs se exporta con la del móvil: se dice
+					val nota = exportador.nota?.let { " $it" }.orEmpty()
+					avisar(getString(R.string.exportar_audio_progreso, cap, total) + nota, porcentaje)
 				}
-				final = resources.getQuantityString(R.plurals.exportar_audio_hecho, n, n, titulo)
+				final = resources.getQuantityString(R.plurals.exportar_audio_hecho, n, n, titulo) + exportador.nota?.let { " $it" }.orEmpty()
 			} catch (e: CancellationException) {
-				final = getString(R.string.exportar_audio_cancelado)
+				final = getString(if (sinTiempo) R.string.cj_exportar_sin_tiempo else R.string.exportar_audio_cancelado)
 			} catch (e: Exception) {
 				final = getString(R.string.exportar_audio_error, e.message.orEmpty())
 			}
@@ -103,6 +106,22 @@ class ServicioExportar : Service() {
 	private fun detener() {
 		ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
 		stopSelf()
+	}
+
+	/** Se paró porque Android agotó su tiempo (se dice en el aviso final, no «cancelado»). */
+	@Volatile
+	private var sinTiempo = false
+
+	/**
+	 * Android 15: un servicio así tiene 6 horas al día. Al acabarse, se para ya
+	 * (si no, Android cierra la app) y se avisa; los capítulos ya exportados se quedan.
+	 */
+	override fun onTimeout(startId: Int, tipo: Int) {
+		sinTiempo = true
+		trabajo?.cancel()
+		exportando = false
+		getSystemService(NotificationManager::class.java)?.notify(AVISO + 1, aviso(getString(R.string.cj_exportar_sin_tiempo), -1, false))
+		detener()
 	}
 
 	private fun avisar(texto: String, porcentaje: Int) {

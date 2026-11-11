@@ -69,5 +69,14 @@ class LectorApp : Application() {
 				com.xebolax.lector.widget.WidgetLectura.actualizar(this)
 			}
 		}
+		// También el audiolibro que suena (empieza, se pausa o cambia de libro)
+		var ultimoAudio: Pair<Long, Boolean>? = null
+		ControlAudio.registrar {
+			val ahora = ControlAudio.idLibro to ControlAudio.reproduciendo
+			if (ahora != ultimoAudio) {
+				ultimoAudio = ahora
+				com.xebolax.lector.widget.WidgetLectura.actualizar(this)
+			}
+		}
 	}
 }

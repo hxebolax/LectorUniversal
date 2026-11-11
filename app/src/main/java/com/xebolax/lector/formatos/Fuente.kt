@@ -4,7 +4,10 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import androidx.annotation.StringRes
 import androidx.documentfile.provider.DocumentFile
+import com.xebolax.lector.R
+import com.xebolax.lector.datos.textoUsuario
 import java.io.Closeable
 import java.io.File
 import java.io.FileNotFoundException
@@ -13,14 +16,27 @@ import java.net.URLDecoder
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 
-/** No se puede leer el archivo: el mensaje se muestra tal cual al usuario. */
-open class ExcepcionFormato(mensaje: String, causa: Throwable? = null) : Exception(mensaje, causa)
+/** No se puede leer el archivo: el mensaje se muestra tal cual al usuario (en el idioma de la app). */
+open class ExcepcionFormato(mensaje: String, causa: Throwable? = null) : Exception(mensaje, causa) {
+
+	/** Con un texto de los recursos (R.string), en el idioma de la app. */
+	constructor(@StringRes recurso: Int, causa: Throwable? = null) : this(textoUsuario(recurso, emptyArray<Any>()), causa)
+
+	companion object {
+		/** Un texto de los recursos con sus datos, en el idioma de la app (como LectorApp.texto, también en las pruebas). */
+		fun texto(@StringRes recurso: Int, vararg datos: Any): String = textoUsuario(recurso, datos)
+
+		/** «Este archivo no es válido (formato: …)»: no es de ese formato o está dañado. */
+		fun noValido(formato: Formato, causa: Throwable? = null) =
+			ExcepcionFormato(texto(R.string.fmt_no_valido, texto(formato.textoNombre)), causa)
+	}
+}
 
 /** El documento está protegido con contraseña: hay que pedirla y volver a abrir. */
-class ExcepcionClave(val incorrecta: Boolean) : ExcepcionFormato(if (incorrecta) "Contraseña incorrecta" else "Contraseña necesaria")
+class ExcepcionClave(val incorrecta: Boolean) : ExcepcionFormato(if (incorrecta) R.string.fmt_clave_incorrecta else R.string.fmt_clave_necesaria)
 
 /** Libro con DRM: no se puede leer (y se dice claramente). */
-class ExcepcionDrm(mensaje: String) : ExcepcionFormato(mensaje)
+class ExcepcionDrm : ExcepcionFormato(R.string.fmt_drm)
 
 /** Opciones que cambian el resultado de la conversión (forman parte de la clave de la caché). */
 data class OpcionesLectura(
@@ -86,9 +102,9 @@ class Fuente(val contexto: Context, val uri: Uri, nombre: String? = null) {
 
 	/** Todos los bytes (para formatos pequeños). */
 	fun bytes(maximo: Long = 512L * 1024 * 1024): ByteArray {
-		if (tamano > maximo) throw ExcepcionFormato("El archivo es demasiado grande (${tamano / 1024 / 1024} MB).")
+		if (tamano > maximo) throw ExcepcionFormato(ExcepcionFormato.texto(R.string.fmt_demasiado_grande, tamano / 1024 / 1024))
 		// Con el límite también al leer: hay sitios que no dicen el tamaño (-1)
-		return abrir().use { leerConLimite(it, maximo) ?: throw ExcepcionFormato("El archivo es demasiado grande (más de ${maximo / 1024 / 1024} MB).") }
+		return abrir().use { leerConLimite(it, maximo) ?: throw ExcepcionFormato(ExcepcionFormato.texto(R.string.fmt_demasiado_grande_mas, maximo / 1024 / 1024)) }
 	}
 
 	/** Los primeros bytes (para reconocer el formato). */
@@ -251,7 +267,7 @@ class ContenedorZip(archivo: File) : Contenedor {
 	private val zip = try {
 		ZipFile(archivo)
 	} catch (e: Exception) {
-		throw ExcepcionFormato("El archivo está dañado o no es un ZIP válido.", e)
+		throw ExcepcionFormato.noValido(Formato.ZIP, e)
 	}
 	private val porNombre: Map<String, String> by lazy {
 		zip.entries().asSequence().filter { !it.isDirectory }.associate { it.name.lowercase().replace('\\', '/') to it.name }
@@ -273,17 +289,21 @@ class ContenedorZip(archivo: File) : Contenedor {
 	override fun bytes(ruta: String): ByteArray? {
 		val nombre = buscar(ruta) ?: return null
 		val entrada = zip.getEntry(nombre) ?: return null
-		if (entrada.size > MAXIMO_ENTRADA) throw ExcepcionFormato("Hay un archivo demasiado grande dentro del libro: $nombre.")
+		if (entrada.size > MAXIMO_ENTRADA) throw ExcepcionFormato(ExcepcionFormato.texto(R.string.fmt_parte_grande, nombre))
 		return zip.getInputStream(entrada).use { Fuente.leerConLimite(it, MAXIMO_ENTRADA) }
-			?: throw ExcepcionFormato("Hay un archivo demasiado grande dentro del libro: $nombre.")
+			?: throw ExcepcionFormato(ExcepcionFormato.texto(R.string.fmt_parte_grande, nombre))
 	}
 
 	/** Extrae todo a una carpeta (DAISY en ZIP: el audio tiene que estar en archivos sueltos). */
 	fun extraer(destino: File) {
 		destino.mkdirs()
 		val raiz = destino.canonicalPath
-		// Nunca más de lo que cabe (dejando margen): un ZIP manipulado podría llenar el móvil
-		var queda = destino.usableSpace - 200L * 1024 * 1024
+		// Hace falta el tamaño que declaran las entradas (más un margen pequeño), y no se escribe mucho más de eso:
+		// un ZIP manipulado que dice ocupar poco y descomprime gigas se corta a tiempo
+		val declarado = zip.entries().asSequence().filter { !it.isDirectory }.sumOf { it.size.coerceAtLeast(0L) }
+		val margen = 16L * 1024 * 1024
+		if (declarado + margen > destino.usableSpace) comprobarSitio(-1)
+		var queda = declarado + maxOf(declarado / 10, margen)
 		val bufer = ByteArray(256 * 1024)
 		for (e in zip.entries()) {
 			if (e.isDirectory) continue
@@ -297,12 +317,16 @@ class ContenedorZip(archivo: File) : Contenedor {
 						val n = entrada.read(bufer)
 						if (n < 0) break
 						queda -= n
-						if (queda < 0) throw ExcepcionFormato("No hay espacio para descomprimir el libro (o el ZIP está manipulado).")
+						comprobarSitio(queda)
 						s.write(bufer, 0, n)
 					}
 				}
 			}
 		}
+	}
+
+	private fun comprobarSitio(queda: Long) {
+		if (queda < 0) throw ExcepcionFormato(R.string.fmt_sin_espacio)
 	}
 
 	companion object {
@@ -327,7 +351,7 @@ class ContenedorDirectorio(private val raiz: File) : Contenedor {
 
 /** Carpeta elegida con el selector del sistema (árbol de documentos). */
 class ContenedorCarpeta(private val contexto: Context, arbol: Uri) : Contenedor {
-	private val raiz = DocumentFile.fromTreeUri(contexto, arbol) ?: throw ExcepcionFormato("No se puede abrir la carpeta.")
+	private val raiz = DocumentFile.fromTreeUri(contexto, arbol) ?: throw ExcepcionFormato(R.string.fmt_carpeta_no_abre)
 	private val archivos: Map<String, Pair<String, Uri>> by lazy {
 		val mapa = HashMap<String, Pair<String, Uri>>()
 		fun recorrer(carpeta: DocumentFile, prefijo: String, profundidad: Int) {

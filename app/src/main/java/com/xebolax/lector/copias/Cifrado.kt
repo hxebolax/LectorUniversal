@@ -1,5 +1,7 @@
 package com.xebolax.lector.copias
 
+import com.xebolax.lector.R
+import com.xebolax.lector.datos.FalloIo
 import java.io.DataInputStream
 import java.io.EOFException
 import java.io.FilterOutputStream
@@ -33,7 +35,7 @@ object Cifrado {
 	const val BLOQUE = 256 * 1024
 	private const val ULTIMO = 0x80000000.toInt()
 
-	class ContrasenaIncorrecta : IOException("Contraseña incorrecta o copia dañada")
+	class ContrasenaIncorrecta : FalloIo(R.string.cj_copia_contrasena_incorrecta)
 
 	fun aleatorio(n: Int) = ByteArray(n).also { SecureRandom().nextBytes(it) }
 
@@ -126,16 +128,16 @@ object Cifrado {
 			val marca = try {
 				datos.readInt()
 			} catch (e: EOFException) {
-				throw IOException("La copia está incompleta (le falta el final).")
+				throw FalloIo(R.string.cj_copia_incompleta)
 			}
 			val ultimo = marca and ULTIMO != 0
 			val tamano = marca and ULTIMO.inv()
-			if (tamano < 16 || tamano > BLOQUE + 16) throw IOException("La copia está dañada.")
+			if (tamano < 16 || tamano > BLOQUE + 16) throw FalloIo(R.string.cj_copia_danada)
 			val cifrado = ByteArray(tamano)
 			try {
 				datos.readFully(cifrado)
 			} catch (e: EOFException) {
-				throw IOException("La copia está incompleta.")
+				throw FalloIo(R.string.cj_copia_incompleta)
 			}
 			bloque = try {
 				cifrador(Cipher.DECRYPT_MODE, clave, prefijo, numero, ultimo, cabecera).doFinal(cifrado)
@@ -147,7 +149,7 @@ object Cifrado {
 			if (ultimo) {
 				terminada = true
 				// Nada puede ir detrás del último bloque
-				if (datos.read() != -1) throw IOException("La copia está dañada (hay datos de más).")
+				if (datos.read() != -1) throw FalloIo(R.string.cj_copia_danada)
 			}
 			return true
 		}

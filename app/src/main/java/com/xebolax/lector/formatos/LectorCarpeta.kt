@@ -1,6 +1,8 @@
 package com.xebolax.lector.formatos
 
 import android.net.Uri
+import com.xebolax.lector.LectorApp
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.Contenido
 import com.xebolax.lector.modelo.LibroAudio
 import com.xebolax.lector.modelo.MarcaAudio
@@ -44,9 +46,9 @@ object LectorCarpeta : LectorFormato {
 			f != Formato.DESCONOCIDO && f != Formato.ZIP && !f.audio && ext !in ACOMPANANTES
 		}
 		if (documentos.size == 1) {
-			throw ExcepcionFormato("Esta carpeta no es un libro DAISY ni un audiolibro. Abre el archivo directamente.")
+			throw ExcepcionFormato(R.string.fmt_carpeta_abre_archivo)
 		}
-		throw ExcepcionFormato("Esta carpeta no contiene un libro DAISY ni archivos de audio.")
+		throw ExcepcionFormato(R.string.fmt_carpeta_sin_libro)
 	}
 
 	private fun audiolibro(z: Contenedor, ctx: ContextoLectura, nombre: String, audios: List<String>, listas: List<String>): Contenido {
@@ -74,7 +76,7 @@ object LectorCarpeta : LectorFormato {
 				z.uriReproducible(ruta)?.let { ruta to Pista(it, LectorListaAudio.tituloDeArchivo(ruta), 0L) }
 			}
 		}
-		if (pistas.isEmpty()) throw ExcepcionFormato("No se pueden reproducir los archivos de audio de esta carpeta.")
+		if (pistas.isEmpty()) throw ExcepcionFormato(R.string.fmt_carpeta_audio_no)
 
 		// Duraciones
 		val conDuracion = LectorListaAudio.conDuraciones(pistas.map { it.second }, ctx, 10, 60)
@@ -103,18 +105,20 @@ object LectorCarpeta : LectorFormato {
 
 		// Etiquetas del primer archivo (leer las de todos sería lento)
 		val info = CapitulosAudio.metadatos(ctx.app, Uri.parse(pistas[0].second.uri))
-		val titulo = tituloLista.ifBlank { nombre }.ifBlank { info.album }.ifBlank { "Audiolibro" }
+		val titulo = tituloLista.ifBlank { nombre }.ifBlank { info.album }.ifBlank { LectorApp.texto(R.string.cj_audiolibro) }
 		val autor = autorLista.ifBlank { info.autorLibro }
 		val lista = pistas.map { it.second }
 		val total = if (lista.all { it.duracionMs > 0 }) lista.sumOf { it.duracionMs } else 0L
+		// Las etiquetas, en el idioma de la app (se muestran en Información)
+		fun t(recurso: Int) = LectorApp.texto(recurso)
 		val metadatos = linkedMapOf(
-			"Autor" to autor,
-			"Narrador" to info.narrador,
-			"Álbum" to (if (info.album != titulo) info.album else ""),
-			"Género" to info.genero,
-			"Fecha" to info.fecha,
-			"Pistas" to lista.size.toString(),
-			"Duración total" to (if (total > 0) CapitulosAudio.duracionLegible(total) else ""),
+			t(R.string.cj_meta_autor) to autor,
+			t(R.string.cj_meta_narrador) to info.narrador,
+			t(R.string.cj_meta_album) to (if (info.album != titulo) info.album else ""),
+			t(R.string.cj_meta_genero) to info.genero,
+			t(R.string.cj_meta_fecha) to info.fecha,
+			t(R.string.cj_meta_pistas) to lista.size.toString(),
+			t(R.string.cj_meta_duracion_total) to (if (total > 0) CapitulosAudio.duracionLegible(total) else ""),
 		)
 		ctx.progreso(100)
 		return Contenido.Audio(

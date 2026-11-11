@@ -83,7 +83,7 @@ data class Articulo(
  * Base de datos de la sección de noticias, separada de la biblioteca: los
  * artículos no van a la biblioteca salvo que se pida expresamente.
  */
-class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db", null, 5) {
+class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db", null, 6) {
 
 	companion object {
 		@Volatile
@@ -155,6 +155,12 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 		db.execSQL("CREATE INDEX articulos_fuente ON articulos(fuente, leido)")
 		crearCarpetas(db)
 		columnas5(db)
+		indiceRemoto(db)
+	}
+
+	/** Índice por id remoto: la sincronización busca los artículos por él (si no, recorrería toda la tabla con cada uno). */
+	private fun indiceRemoto(db: SQLiteDatabase) {
+		db.execSQL("CREATE INDEX IF NOT EXISTS articulos_remoto ON articulos(remoto)")
 	}
 
 	private fun tieneColumna(db: SQLiteDatabase, tabla: String, columna: String): Boolean =
@@ -189,6 +195,7 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 		}
 		if (antes < 4) crearCarpetas(db)
 		if (antes < 5) columnas5(db)
+		if (antes < 6) indiceRemoto(db)
 	}
 
 	// --- Sincronización ----------------------------------------------------------------
@@ -252,15 +259,16 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 
 	/** Estado que viene del servidor (sin marcarlo como cambio pendiente). */
 	fun estadoRemoto(remotos: Collection<String>, leido: Boolean? = null, favorito: Boolean? = null) {
-		if (remotos.isEmpty()) return
+		if (remotos.isEmpty() || leido == null && favorito == null) return
+		val v = ContentValues()
+		if (leido != null) v.put("leido", if (leido) 1 else 0)
+		if (favorito != null) v.put("favorito", if (favorito) 1 else 0)
 		val db = writableDatabase
 		db.beginTransaction()
 		try {
-			for (r in remotos) {
-				val v = ContentValues()
-				if (leido != null) v.put("leido", if (leido) 1 else 0)
-				if (favorito != null) v.put("favorito", if (favorito) 1 else 0)
-				db.update("articulos", v, "remoto = ? AND cambiado = 0", arrayOf(r))
+			// Por lotes (con el índice por id remoto), no una consulta por artículo
+			for (trozo in remotos.distinct().chunked(400)) {
+				db.update("articulos", v, "cambiado = 0 AND remoto IN (${trozo.joinToString(",") { "?" }})", trozo.toTypedArray())
 			}
 			db.setTransactionSuccessful()
 		} finally {
@@ -277,34 +285,40 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 		admitir: (RssLector.Elemento) -> Boolean = { true }): List<RssLector.Elemento> {
 		val nuevos = ArrayList<RssLector.Elemento>()
 		val db = writableDatabase
-		// Primer enlace de un artículo que ya estaba aquí (mismo enlace): si se cambió aquí, manda lo de aquí (y se envía después)
-		val enlazar = db.compileStatement(
-			"UPDATE articulos SET remoto = ?, leido = CASE WHEN cambiado = 1 THEN leido ELSE ? END, " +
-				"favorito = CASE WHEN cambiado = 1 THEN favorito ELSE ? END WHERE fuente = ? AND remoto = '' AND enlace = ?",
-		)
+		// ¿Ya está aquí con ese id remoto? (enlazado antes, aunque conserve su guid de la fuente)
+		val yaEsta = db.compileStatement("SELECT COUNT(*) FROM articulos WHERE remoto = ?")
 		db.beginTransaction()
 		try {
+			// Los de esta fuente aún sin enlazar, por su enlace normalizado (el servidor puede añadir utm_… o cambiar http por https)
+			val sinEnlazar = HashMap<String, Long>()
+			db.rawQuery("SELECT id, enlace FROM articulos WHERE fuente = ? AND remoto = '' AND enlace != ''", arrayOf(fuente.toString())).use { c ->
+				while (c.moveToNext()) sinEnlazar.putIfAbsent(enlaceNormal(c.getString(1)), c.getLong(0))
+			}
 			val ahora = System.currentTimeMillis()
 			for ((e, estado) in lista) {
 				val (remoto, leido, favorito) = estado
-				if (e.enlace.isNotBlank()) {
-					enlazar.clearBindings()
-					enlazar.bindString(1, remoto)
-					enlazar.bindLong(2, if (leido) 1L else 0L)
-					enlazar.bindLong(3, if (favorito) 1L else 0L)
-					enlazar.bindLong(4, fuente)
-					enlazar.bindString(5, e.enlace)
-					if (enlazar.executeUpdateDelete() > 0) continue
-				}
 				val soloEstado = ContentValues().apply {
 					put("leido", if (leido) 1 else 0)
 					put("favorito", if (favorito) 1 else 0)
 				}
-				// No pasa las opciones de la fuente: no se guarda (si ya estaba, solo su estado)
-				if (!admitir(e)) {
+				yaEsta.clearBindings()
+				yaEsta.bindString(1, remoto)
+				if (yaEsta.simpleQueryForLong() > 0) {
 					db.update("articulos", soloEstado, "remoto = ? AND cambiado = 0", arrayOf(remoto))
 					continue
 				}
+				// Primer enlace de un artículo que ya estaba aquí: si se cambió aquí, manda lo de aquí (y se envía después)
+				val local = if (e.enlace.isNotBlank()) sinEnlazar.remove(enlaceNormal(e.enlace)) else null
+				if (local != null) {
+					db.execSQL(
+						"UPDATE articulos SET remoto = ?, leido = CASE WHEN cambiado = 1 THEN leido ELSE ? END, " +
+							"favorito = CASE WHEN cambiado = 1 THEN favorito ELSE ? END WHERE id = ?",
+						arrayOf<Any>(remoto, if (leido) 1 else 0, if (favorito) 1 else 0, local),
+					)
+					continue
+				}
+				// No pasa las opciones de la fuente: no se guarda
+				if (!admitir(e)) continue
 				val guid = "r:$remoto"
 				val id = db.insertWithOnConflict("articulos", null, ContentValues().apply {
 					put("fuente", fuente)
@@ -324,15 +338,45 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 					put("palabras", palabrasDe(e.contenido.ifBlank { e.resumen }))
 				}, SQLiteDatabase.CONFLICT_IGNORE)
 				if (id != -1L) nuevos += RssLector.Elemento(guid, e.titulo, e.enlace, e.autor, e.fecha, e.resumen, e.contenido, e.adjunto, e.tipoAdjunto, e.duracion)
-				else db.update("articulos", soloEstado, "remoto = ? AND cambiado = 0", arrayOf(remoto))
 			}
 			db.setTransactionSuccessful()
 		} finally {
 			db.endTransaction()
-			enlazar.close()
+			yaEsta.close()
 		}
 		avisar()
 		return nuevos
+	}
+
+	/**
+	 * Un enlace sin lo que un servidor suele cambiar: http o https, «www.», la
+	 * barra final, el ancla (#…) y los parámetros de seguimiento (utm_…, fbclid…).
+	 */
+	private fun enlaceNormal(url: String): String {
+		val sinAncla = url.trim().substringBefore('#')
+		val parametros = sinAncla.substringAfter('?', "").split('&').filter { p ->
+			val k = p.substringBefore('=').lowercase()
+			p.isNotEmpty() && !k.startsWith("utm_") && k !in SEGUIMIENTO
+		}
+		val sin = sinAncla.substringBefore('?').replaceFirst(Regex("(?i)^https?://"), "")
+		val corte = sin.indexOf('/').takeIf { it >= 0 } ?: sin.length
+		return sin.substring(0, corte).lowercase().removePrefix("www.") + sin.substring(corte).trimEnd('/') +
+			if (parametros.isEmpty()) "" else "?" + parametros.joinToString("&")
+	}
+
+	private val SEGUIMIENTO = setOf("fbclid", "gclid", "mc_cid", "mc_eid")
+
+	/** Una fuente con artículos que el usuario ha querido guardar (favoritos o para más tarde). */
+	fun tieneGuardados(fuente: Long): Boolean =
+		readableDatabase.rawQuery("SELECT 1 FROM articulos WHERE fuente = ? AND (favorito = 1 OR mas_tarde = 1) LIMIT 1", arrayOf(fuente.toString())).use { it.moveToFirst() }
+
+	/** Deja de estar enlazada con el servidor; pausada: además se pausa (no se actualiza desde el móvil). */
+	fun desenlazarFuente(id: Long, pausada: Boolean) {
+		writableDatabase.update("fuentes", ContentValues().apply {
+			put("remoto", "")
+			if (pausada) put("pausada", 1)
+		}, "id = ?", arrayOf(id.toString()))
+		avisar()
 	}
 
 	/** Enlaces de los artículos que llegaron del servidor a esta fuente (para no repetirlos al actualizarla aparte). */
@@ -734,7 +778,7 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 			categoria != null -> "fuente IN (SELECT id FROM fuentes WHERE categoria = ? COLLATE NOCASE)" to listOf(categoria)
 			else -> "1" to emptyList()
 		}
-		val condicion = "leido = 0 AND ($donde)" + if (antesDe > 0) " AND fecha < ?" else ""
+		val condicion = "leido = 0 AND papelera = 0 AND ($donde)" + if (antesDe > 0) " AND fecha < ?" else ""
 		val valores = (if (antesDe > 0) args + antesDe.toString() else args).toTypedArray()
 		val db = writableDatabase
 		var ids: List<Long> = emptyList()

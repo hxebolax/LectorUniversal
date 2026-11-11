@@ -1,6 +1,7 @@
 package com.xebolax.lector.formatos
 
 import android.util.Xml
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.ConstructorDocumento
 import com.xebolax.lector.modelo.Contenido
 import com.xebolax.lector.modelo.Enlace
@@ -251,11 +252,11 @@ object LectorPresentacion : LectorFormato {
 	private fun leerPptx(fuente: Fuente, ctx: ContextoLectura, c: ConstructorDocumento) {
 		val cabecera = runCatching { fuente.cabecera(8) }.getOrDefault(ByteArray(0))
 		if (cabecera.size >= 4 && cabecera[0] == 0xD0.toByte() && cabecera[1] == 0xCF.toByte()) {
-			throw ExcepcionFormato("La presentación está cifrada con contraseña; ábrela en PowerPoint y guárdala sin contraseña.")
+			throw ExcepcionFormato(R.string.fmt_cifrado)
 		}
 		if (!AyudaPresentacion.esZip(cabecera)) {
 			// Puede ser un ODP con otra extensión
-			throw ExcepcionFormato("La presentación está dañada o no es un archivo PowerPoint válido.")
+			throw ExcepcionFormato.noValido(Formato.PPTX)
 		}
 		fuente.contenedor().use { z ->
 			if (z.buscar("content.xml") != null && z.buscar("ppt/presentation.xml") == null) {
@@ -265,7 +266,7 @@ object LectorPresentacion : LectorFormato {
 			val raiz = AyudaPresentacion.relaciones(z, "")
 			val ruta = raiz.values.firstOrNull { it.tipo.endsWith("/officeDocument") }?.let { z.buscar(it.destino) }
 				?: z.buscar("ppt/presentation.xml")
-				?: throw ExcepcionFormato("La presentación está dañada (falta ppt/presentation.xml).")
+				?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 			AyudaPresentacion.metadatosCore(z, c)
 			val rels = AyudaPresentacion.relaciones(z, ruta)
 			val presentacion = AyudaPresentacion.xml(z, ruta)
@@ -278,7 +279,7 @@ object LectorPresentacion : LectorFormato {
 				diapositivas = z.entradas().filter { DIAPOSITIVA.matches(it.lowercase()) }
 					.sortedBy { DIAPOSITIVA.find(it.lowercase())?.groupValues?.get(1)?.toIntOrNull() ?: 0 }
 			}
-			if (diapositivas.isEmpty()) throw ExcepcionFormato("La presentación no tiene diapositivas.")
+			if (diapositivas.isEmpty()) throw ExcepcionFormato(R.string.fmt_vacio)
 			for ((i, rutaDiapositiva) in diapositivas.withIndex()) {
 				ctx.comprobar()
 				ctx.progreso(i * 100 / diapositivas.size)
@@ -463,18 +464,18 @@ object LectorPresentacion : LectorFormato {
 
 	private fun leerOdpZip(z: Contenedor, ctx: ContextoLectura, c: ConstructorDocumento) {
 		if (z.texto("META-INF/manifest.xml").orEmpty().contains("encryption-data")) {
-			throw ExcepcionFormato("La presentación está cifrada con contraseña; ábrela y guárdala sin contraseña.")
+			throw ExcepcionFormato(R.string.fmt_cifrado)
 		}
 		z.texto("meta.xml")?.let { AyudaPresentacion.metadatosOdf(it, c) }
-		val contenido = z.texto("content.xml") ?: throw ExcepcionFormato("La presentación está dañada (falta content.xml).")
+		val contenido = z.texto("content.xml") ?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 		paginasOdp(Jsoup.parse(contenido, "", Parser.xmlParser()), ctx, c)
 	}
 
 	private fun paginasOdp(doc: Element, ctx: ContextoLectura, c: ConstructorDocumento) {
 		val presentacion = doc.getElementsByTag("office:presentation").firstOrNull()
-			?: throw ExcepcionFormato("No es una presentación OpenDocument válida.")
+			?: throw ExcepcionFormato.noValido(Formato.PPTX)
 		val paginas = presentacion.children().filter { it.normalName() == "draw:page" }
-		if (paginas.isEmpty()) throw ExcepcionFormato("La presentación no tiene diapositivas.")
+		if (paginas.isEmpty()) throw ExcepcionFormato(R.string.fmt_vacio)
 		for ((i, pagina) in paginas.withIndex()) {
 			ctx.comprobar()
 			ctx.progreso(i * 100 / paginas.size)
@@ -607,7 +608,7 @@ object LectorHoja : LectorFormato {
 		val c = ctx.nuevoConstructor()
 		val cabecera = runCatching { fuente.cabecera(8) }.getOrDefault(ByteArray(0))
 		if (cabecera.size >= 4 && cabecera[0] == 0xD0.toByte() && cabecera[1] == 0xCF.toByte()) {
-			throw ExcepcionFormato("La hoja de cálculo está cifrada con contraseña o es un .xls antiguo; ábrela y guárdala como .xlsx sin contraseña.")
+			throw ExcepcionFormato(R.string.fmt_hoja_cifrada_o_antigua)
 		}
 		val plana = fuente.extension == "fods" || !AyudaPresentacion.esZip(cabecera)
 		if (plana) {
@@ -618,10 +619,10 @@ object LectorHoja : LectorFormato {
 			fuente.contenedor().use { z ->
 				if (z.buscar("content.xml") != null && z.buscar("xl/workbook.xml") == null) {
 					if (z.texto("META-INF/manifest.xml").orEmpty().contains("encryption-data")) {
-						throw ExcepcionFormato("La hoja de cálculo está cifrada con contraseña; ábrela y guárdala sin contraseña.")
+						throw ExcepcionFormato(R.string.fmt_cifrado)
 					}
 					z.texto("meta.xml")?.let { AyudaPresentacion.metadatosOdf(it, c) }
-					val entrada = z.abrir("content.xml") ?: throw ExcepcionFormato("La hoja de cálculo está dañada (falta content.xml).")
+					val entrada = z.abrir("content.xml") ?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 					entrada.use { leerOds(it, c, ctx) }
 				} else {
 					leerXlsx(z, c, ctx)
@@ -665,7 +666,7 @@ object LectorHoja : LectorFormato {
 		val raiz = AyudaPresentacion.relaciones(z, "")
 		val libro = raiz.values.firstOrNull { it.tipo.endsWith("/officeDocument") }?.let { z.buscar(it.destino) }
 			?: z.buscar("xl/workbook.xml")
-			?: throw ExcepcionFormato("La hoja de cálculo está dañada (falta xl/workbook.xml).")
+			?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 		AyudaPresentacion.metadatosCore(z, c)
 		val rels = AyudaPresentacion.relaciones(z, libro)
 		fun rutaDe(tipo: String, defecto: String): String? =

@@ -4,4 +4,6 @@
 	<string name="lectura_el_voces_cargando">Loading the voices of your ElevenLabs account…</string>
 	<string name="lectura_el_voces_error">The ElevenLabs voices could not be loaded. %1$s</string>
 	<string name="lectura_detectar_idioma_desc">Even if the book does not say so, reads paragraphs in another language with a voice for that language (offline). It works when «Switch voice by language» is on here or in the voice of a book or a section. It may be wrong with short paragraphs or many names.</string>
+	<string name="lectura_traductor_no_instalado">Google Translate is not installed. You can translate with AI or with another app.</string>
+	<string name="lectura_exportar_sin_elevenlabs">This book\'s voice is from ElevenLabs, but the audio is exported with the phone\'s voice.</string>
 </resources>

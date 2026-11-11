@@ -10,4 +10,18 @@
 	<string name="disp_ya_compartidos_abrir">Already in Shared: open it</string>
 	<string name="zona_dispositivo">Books on the device</string>
 	<string name="widget_escuchar_x">Listen to %1$s</string>
+	<plurals name="comp_no_guardados_n">
+		<item quantity="one">%1$d could not be saved</item>
+		<item quantity="other">%1$d could not be saved</item>
+	</plurals>
+	<string name="comp_pendiente_no_guardado">The link could not be saved to download later. %1$s</string>
+	<plurals name="tipo_salen_de_carpeta_n">
+		<item quantity="one">%1$d was in a folder of another type and has moved to the top of the library.</item>
+		<item quantity="other">%1$d were in folders of another type and have moved to the top of the library.</item>
+	</plurals>
+	<string name="coleccion_renombrada">Collection renamed: %1$s</string>
+	<string name="zona_grupo">Authors, series and collections in the library</string>
+	<string name="cat_direccion_no_valida">Type the full address of the catalog, for example https://my.server.com/opds</string>
+	<string name="bib_guardado_x">Saved in your library: %1$s</string>
+	<string name="widget_pausar_audio">Pause %1$s</string>
 </resources>

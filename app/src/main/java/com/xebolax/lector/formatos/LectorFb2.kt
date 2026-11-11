@@ -36,12 +36,12 @@ object LectorFb2 : LectorFormato {
 		}
 		ctx.progreso(30)
 		val raiz = doc.getAllElements().firstOrNull { local(it) == "fictionbook" }
-			?: throw ExcepcionFormato("El archivo no es un libro FictionBook válido.")
+			?: throw ExcepcionFormato.noValido(Formato.FB2)
 		val c = ctx.nuevoConstructor()
 		hijo(raiz, "description")?.let { metadatos(it, c) }
 
 		val cuerpos = raiz.children().filter { local(it) == "body" }
-		if (cuerpos.isEmpty()) throw ExcepcionFormato("El libro FictionBook no tiene texto (falta <body>).")
+		if (cuerpos.isEmpty()) throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_vacio)
 		val principales = cuerpos.filter { it.attr("name").lowercase() !in NOTAS }.ifEmpty { listOf(cuerpos.first()) }
 		val notas = cuerpos.filter { it !in principales }
 
@@ -78,8 +78,8 @@ object LectorFb2 : LectorFormato {
 		if (!esZip) return fuente.bytes(128L * 1024 * 1024)
 		return fuente.contenedor().use { z ->
 			val entrada = z.entradas().filter { it.lowercase().endsWith(".fb2") }.minByOrNull { it.count { ch -> ch == '/' } }
-				?: throw ExcepcionFormato("El ZIP no contiene ningún libro FB2.")
-			z.bytes(entrada) ?: throw ExcepcionFormato("No se puede leer el libro FB2 del ZIP.")
+				?: throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_zip_sin_documento)
+			z.bytes(entrada) ?: throw ExcepcionFormato(ExcepcionFormato.texto(com.xebolax.lector.R.string.fmt_parte_no_legible, entrada.substringAfterLast('/')))
 		}
 	}
 

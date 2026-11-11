@@ -241,8 +241,9 @@ class RadioListaFragment : Fragment() {
 
 	private fun construirCabecera() {
 		val c = _b?.cabecera ?: return
-		// Se rehace mientras hay un diálogo encima (se eligió algo en él): el foco volverá al botón equivalente
-		val volverA = clavePulsada?.takeIf { activity?.hasWindowFocus() == false }
+		// El foco volverá al botón equivalente: si lo tenía uno de la cabecera, o si se rehace con un diálogo encima
+		val conDialogo = activity?.hasWindowFocus() == false
+		val volverA = claveConFoco(c) ?: clavePulsada?.takeIf { conDialogo }
 		clavePulsada = null
 		c.removeAllViews()
 		cabeceraGrabando = ServicioGrabacion.grabando?.uuid
@@ -336,11 +337,31 @@ class RadioListaFragment : Fragment() {
 			))
 		}
 		// Pauta 34: los botones son nuevos y MemoriaFoco no encuentra el que se pulsó; se lleva el foco al que lo sustituye
-		if (volverA != null) c.findViewWithTag<View>(volverA)?.let { v ->
-			v.postDelayed({
-				if (v.isAttachedToWindow && v.isShown) v.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
-			}, 700)
-		}
+		if (volverA != null) devolverFoco(c, volverA, conDialogo)
+	}
+
+	/** La clave (tag) del botón de la cabecera que tiene el foco de TalkBack, si lo tiene alguno. */
+	private fun claveConFoco(v: View): String? {
+		if (!v.isShown) return null
+		if (v is ViewGroup) for (i in 0 until v.childCount) claveConFoco(v.getChildAt(i))?.let { return it }
+		return (v.tag as? String)?.takeIf { runCatching { v.createAccessibilityNodeInfo().isAccessibilityFocused }.getOrDefault(false) }
+	}
+
+	/**
+	 * Pauta 34: la cabecera se ha rehecho (sus botones son nuevos). El foco va al botón equivalente
+	 * o, si ya no está, al primero; tras un diálogo, después de que MemoriaFoco lo intente.
+	 */
+	private fun devolverFoco(c: ViewGroup, clave: String, conDialogo: Boolean) {
+		val destino = c.findViewWithTag<View>(clave) ?: primerBoton(c) ?: return
+		destino.postDelayed({
+			if (destino.isAttachedToWindow && destino.isShown) destino.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+		}, if (conDialogo) 700L else 100L)
+	}
+
+	private fun primerBoton(v: View): View? {
+		if (v.tag is String && v.isShown) return v
+		if (v is ViewGroup) for (i in 0 until v.childCount) primerBoton(v.getChildAt(i))?.let { return it }
+		return null
 	}
 
 	private fun campoFiltro(pista: String, inicial: String, alCambiar: (String) -> Unit): View {
@@ -801,7 +822,10 @@ class RadioListaFragment : Fragment() {
 			}
 			Modo.PROGRAMAR -> {
 				val proximas = proximaProgramacion
-				when {
+				// El despertador pospuesto también se dice (se cancela desde su aviso)
+				val pospuesto = RadioProgramador.pospuestoHasta(requireContext()).takeIf { it > 0 }
+					?.let { getString(R.string.audio_despertador_pospuesto, RadioProgramador.cuandoLegible(requireContext(), it)) + " " }.orEmpty()
+				pospuesto + when {
 					filas.isEmpty() -> getString(R.string.radio_sin_programaciones)
 					proximas == null -> getString(R.string.radio_ninguna_activa)
 					else -> getString(if (proximas.second.esDespertador) R.string.radio_proximo_despertador else R.string.radio_proxima_grabacion,

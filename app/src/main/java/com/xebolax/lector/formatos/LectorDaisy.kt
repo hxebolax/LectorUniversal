@@ -1,5 +1,6 @@
 package com.xebolax.lector.formatos
 
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.ConstructorDocumento
 import com.xebolax.lector.modelo.Contenido
 import com.xebolax.lector.modelo.FraseAudio
@@ -44,10 +45,10 @@ object LectorDaisy : LectorFormato {
 		}
 		if (fuente.uri.scheme == "file") {
 			val padre = File(fuente.uri.path!!).parentFile
-				?: throw ExcepcionFormato("Para abrir un libro DAISY, elige su carpeta completa o el archivo ZIP.")
+				?: throw ExcepcionFormato(R.string.fmt_daisy_carpeta)
 			return ContenedorDirectorio(padre).use { leerContenedor(it, ctx, padre.name) }
 		}
-		throw ExcepcionFormato("Para abrir un libro DAISY, elige su carpeta completa o el archivo ZIP.")
+		throw ExcepcionFormato(R.string.fmt_daisy_carpeta)
 	}
 
 	/**
@@ -80,7 +81,12 @@ object LectorDaisy : LectorFormato {
 	 * (que hay que leer igualmente para abrirlo).
 	 */
 	private fun limpiarExtracciones(base: File?, actual: File) {
-		val carpetas = base?.listFiles()?.filter { it.isDirectory && it != actual } ?: return
+		// Nunca la del audiolibro cargado en el reproductor (se puede estar escuchando sin volver a abrirlo)
+		val cargado = com.xebolax.lector.audio.ControlAudio.libro?.pistas?.firstOrNull()?.uri
+			?.takeIf { it.startsWith("file:") }?.let { android.net.Uri.parse(it).path }
+		val carpetas = base?.listFiles()?.filter { c ->
+			c.isDirectory && c != actual && (cargado == null || !cargado.startsWith(c.path + File.separator))
+		} ?: return
 		fun usada(f: File) = File(f, ".completo").takeIf { it.exists() }?.lastModified() ?: f.lastModified()
 		val tamanos = carpetas.associateWith { c -> c.walkTopDown().filter { it.isFile }.sumOf { it.length() } }
 		var total = tamanos.values.sum() + actual.walkTopDown().filter { it.isFile }.sumOf { it.length() }
@@ -119,7 +125,7 @@ object LectorDaisy : LectorFormato {
 			}.getOrNull().orEmpty().contains("<dtbook", ignoreCase = true)
 		}
 		if (dtbooks.isNotEmpty()) return Montaje(contenedor, ctx, nombre, entradas).soloTexto(dtbooks)
-		throw ExcepcionFormato("No se ha encontrado un libro DAISY: falta el archivo ncc.html o el paquete .opf.")
+		throw ExcepcionFormato(R.string.fmt_daisy_no_encontrado)
 	}
 
 	/**
@@ -272,7 +278,7 @@ object LectorDaisy : LectorFormato {
 		val libro = doc.getAllElements().firstOrNull { local(it) == "book" } ?: doc
 		dtbookAHtml(libro)
 		ConversorHtml(c, "", ctx.opciones).convertir(libro)
-		if (c.estaVacio()) throw ExcepcionFormato("El libro DAISY no contiene nada que se pueda leer.")
+		if (c.estaVacio()) throw ExcepcionFormato(R.string.fmt_vacio)
 		c.metadatos["Tipo DAISY"] = "DAISY 3, solo texto"
 		return Contenido.Texto(c.construir())
 	}
@@ -342,7 +348,7 @@ object LectorDaisy : LectorFormato {
 			version = "2.02"
 			ncc = rutaNcc
 			ctx.progreso(2)
-			val doc = html(z, rutaNcc) ?: throw ExcepcionFormato("El archivo ncc.html del libro DAISY no se puede leer.")
+			val doc = html(z, rutaNcc) ?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 			for (m in doc.select("meta")) {
 				val valor = m.attr("content").trim()
 				if (valor.isEmpty()) continue
@@ -395,7 +401,7 @@ object LectorDaisy : LectorFormato {
 		fun daisy3(rutaOpf: String): Contenido {
 			version = "3"
 			ctx.progreso(2)
-			val opf = xml(z, rutaOpf) ?: throw ExcepcionFormato("El paquete .opf del libro DAISY no se puede leer.")
+			val opf = xml(z, rutaOpf) ?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 			val todos = opf.getAllElements()
 			for (e in todos) {
 				when (local(e)) {
@@ -444,7 +450,7 @@ object LectorDaisy : LectorFormato {
 		fun epub3(rutaOpf: String): Contenido {
 			version = "EPUB 3"
 			ctx.progreso(2)
-			val opf = xml(z, rutaOpf) ?: throw ExcepcionFormato("El paquete .opf del EPUB no se puede leer.")
+			val opf = xml(z, rutaOpf) ?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 			val todos = opf.getAllElements()
 			for (e in todos) {
 				when (local(e)) {
@@ -660,7 +666,7 @@ object LectorDaisy : LectorFormato {
 			// Sin audio ni texto: al menos el NCC (sus encabezados)
 			if (!hayAudio && c.estaVacio()) {
 				ncc?.let { n -> html(z, n)?.let { ConversorHtml(c, n, ctx.opciones).convertir(it.body()) } }
-				if (c.estaVacio()) throw ExcepcionFormato("El libro DAISY no contiene nada que se pueda leer.")
+				if (c.estaVacio()) throw ExcepcionFormato(R.string.fmt_vacio)
 			}
 			val hayTexto = !c.estaVacio()
 			if (hayTexto && archivosTexto.isNotEmpty()) {

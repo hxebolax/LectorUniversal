@@ -347,7 +347,9 @@ object RssLector {
 
 	/** Fecha en cualquiera de los formatos habituales de RSS y Atom (0 si no se entiende). */
 	fun fecha(s: String): Long {
+		// Las fracciones de segundo, siempre con 3 cifras (Miniflux da microsegundos: «12:34:56.123456Z»)
 		val t = s.trim().replace(Regex("\\s+"), " ")
+			.replace(Regex("""(:\d{2})\.(\d+)""")) { m -> m.groupValues[1] + "." + m.groupValues[2].take(3).padEnd(3, '0') }
 		if (t.isEmpty()) return 0
 		for (f in FORMATOS) {
 			val formato = SimpleDateFormat(f, Locale.US).apply {

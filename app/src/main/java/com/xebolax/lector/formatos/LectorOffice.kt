@@ -1,6 +1,7 @@
 package com.xebolax.lector.formatos
 
 import android.util.Xml
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.ConstructorDocumento
 import com.xebolax.lector.modelo.Contenido
 import com.xebolax.lector.modelo.Enlace
@@ -35,7 +36,7 @@ internal class SinEntidadesXml(entrada: InputStream) : java.io.FilterInputStream
 		val c = b.toChar()
 		ventana.append(c)
 		if (ventana.length > 16) ventana.deleteCharAt(0)
-		if (ventana.endsWith("<!ENTITY", ignoreCase = true)) throw ExcepcionFormato("El documento está dañado o manipulado: declara entidades XML.")
+		if (ventana.endsWith("<!ENTITY", ignoreCase = true)) throw ExcepcionFormato(R.string.fmt_manipulado)
 		// Empieza el elemento raíz («<w:document…»): ya no puede haber declaraciones
 		if (ventana.length >= 2 && ventana[ventana.length - 2] == '<' && c.isLetter()) comprobando = false
 	}
@@ -296,7 +297,7 @@ object LectorDocx : LectorFormato {
 			val raiz = AyudaOffice.relaciones(z, "")
 			val principal = raiz.values.firstOrNull { it.tipo.endsWith("/officeDocument") }?.let { z.buscar(it.destino) }
 				?: z.buscar("word/document.xml")
-				?: throw ExcepcionFormato("El documento de Word está dañado (falta word/document.xml).")
+				?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 			val rels = AyudaOffice.relaciones(z, principal)
 			fun rutaDe(tipo: String, defecto: String): String? =
 				rels.values.firstOrNull { it.tipo.endsWith("/$tipo") }?.let { z.buscar(it.destino) } ?: z.buscar(defecto)
@@ -315,9 +316,9 @@ object LectorDocx : LectorFormato {
 			val cuerpo = Cuerpo(c, ctx, estilos, numeracion, externos, notasPie.isNotEmpty(), imagenes)
 			try {
 				z.abrir(principal)?.use { cuerpo.leer(it) }
-					?: throw ExcepcionFormato("El documento de Word está dañado (falta word/document.xml).")
+					?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 			} catch (e: XmlPullParserException) {
-				if (c.estaVacio()) throw ExcepcionFormato("El documento de Word está dañado y no se puede leer.", e)
+				if (c.estaVacio()) throw ExcepcionFormato(R.string.fmt_danado, e)
 				c.avisos += "El documento está dañado: puede faltar texto al final."
 			}
 			ctx.progreso(90)
@@ -890,9 +891,9 @@ object LectorOdt : LectorFormato {
 			fuente.contenedor().use { z ->
 				val manifiesto = z.texto("META-INF/manifest.xml").orEmpty()
 				if (manifiesto.contains("encryption-data")) {
-					throw ExcepcionFormato("El documento está cifrado con contraseña; ábrelo y guárdalo sin contraseña.")
+					throw ExcepcionFormato(R.string.fmt_cifrado)
 				}
-				val contenido = z.texto("content.xml") ?: throw ExcepcionFormato("El documento OpenDocument está dañado (falta content.xml).")
+				val contenido = z.texto("content.xml") ?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 				z.texto("meta.xml")?.let { metadatos(Jsoup.parse(it, "", Parser.xmlParser()), c) }
 				z.texto("styles.xml")?.let { leerEstilosLista(Jsoup.parse(it, "", Parser.xmlParser()), estilosLista) }
 				ctx.comprobar()
@@ -903,7 +904,7 @@ object LectorOdt : LectorFormato {
 		}
 		ctx.progreso(30)
 		val cuerpo = doc.getElementsByTag("office:text").firstOrNull()
-			?: throw ExcepcionFormato("No es un documento de texto OpenDocument válido.")
+			?: throw ExcepcionFormato.noValido(Formato.ODT)
 		val conversor = ConversorOdt(c, ctx, estilosLista)
 		conversor.bloques(cuerpo)
 		conversor.notasFinales()

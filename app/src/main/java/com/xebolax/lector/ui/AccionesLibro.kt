@@ -11,6 +11,7 @@ import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.datos.Carpeta
 import com.xebolax.lector.datos.Estado
 import com.xebolax.lector.datos.Libro
+import com.xebolax.lector.datos.claveTipo
 import com.xebolax.lector.formatos.Formato
 import com.xebolax.lector.lectura.Abiertos
 import com.xebolax.lector.lectura.LectorActivity
@@ -152,7 +153,9 @@ object AccionesLibro {
 			a.enSegundoPlano({ db.cambiarEstado(l.id, Estado.TERMINADO) }) { a.avisar(a.getString(R.string.hecho)) }
 		}
 		if (l.estado != Estado.NUEVO) lista += a.getString(R.string.marcar_no_leido) to {
-			a.confirmar(a.getString(R.string.confirmar_no_leido), a.getString(R.string.marcar_no_leido)) { a.enSegundoPlano({ db.cambiarEstado(l.id, Estado.NUEVO) }) }
+			a.confirmar(a.getString(R.string.confirmar_no_leido), a.getString(R.string.marcar_no_leido)) {
+				a.enSegundoPlano({ db.cambiarEstado(l.id, Estado.NUEVO) }) { a.avisar(a.getString(R.string.hecho)) }
+			}
 		}
 		lista += a.getString(R.string.estado_de_lectura) to { elegirEstado(a, listOf(l.id), l.estado) }
 		lista += a.getString(R.string.colecciones_puntos) to { elegirColecciones(a, l) }
@@ -160,9 +163,7 @@ object AccionesLibro {
 		lista += a.getString(R.string.cambiar_tipo) to {
 			elegirTipo(a, l.tipo) { tipo ->
 				a.enSegundoPlano({
-					// En una carpeta de otro tipo no se vería en la pestaña nueva: sale a la raíz
-					val deCarpeta = l.carpeta?.let { db.carpeta(it) }?.tipo.orEmpty()
-					val sale = deCarpeta.isNotEmpty() && tipo.isNotEmpty() && deCarpeta != tipo
+					val sale = saleDeCarpeta(db, l, tipo)
 					if (sale) db.moverLibro(l.id, null)
 					db.cambiarTipo(l.id, tipo)
 					sale
@@ -179,10 +180,27 @@ object AccionesLibro {
 		lista += a.getString(R.string.compartir_archivo) to { compartir(a, l) }
 		lista += a.getString(R.string.quitar_de_biblioteca) to {
 			a.confirmar(a.getString(R.string.confirmar_quitar, l.tituloVisible), a.getString(R.string.quitar)) {
+				pararSiSeUsa(listOf(l.id))
 				a.enSegundoPlano({ quitar(a, l.id, l.uri) }) { a.avisar(a.getString(R.string.quitado_de_biblioteca)) }
 			}
 		}
 		return lista
+	}
+
+	/**
+	 * Al cambiar el tipo: ¿queda en una carpeta de otro tipo? Entonces no se
+	 * vería en la pestaña de su tipo y sale a la raíz. Se compara con el tipo
+	 * que tendrá de verdad («Automático» es el que le toca por su formato).
+	 */
+	fun saleDeCarpeta(db: BaseDatos, l: Libro, tipo: String): Boolean {
+		val deCarpeta = l.carpeta?.let { db.carpeta(it) }?.tipo.orEmpty()
+		return deCarpeta.isNotEmpty() && deCarpeta != l.copy(tipo = tipo).claveTipo
+	}
+
+	/** Antes de quitar o borrar: si eso se está leyendo en voz alta o está sonando, se para (en el hilo principal). */
+	fun pararSiSeUsa(ids: Collection<Long>) {
+		if (ids.any { LectorVoz.esActual(it) }) LectorVoz.detener()
+		if (ids.any { com.xebolax.lector.audio.ControlAudio.esActual(it) }) com.xebolax.lector.audio.ControlAudio.detener()
 	}
 
 	/** Quita un libro de la biblioteca: las copias guardadas dentro de la app se borran; los archivos del dispositivo no se tocan. */
@@ -206,7 +224,7 @@ object AccionesLibro {
 	fun informacion(a: AppCompatActivity, l: Libro) {
 		val db = BaseDatos.obtener(a)
 		val fecha = { t: Long -> if (t > 0) DateFormat.getMediumDateFormat(a).format(Date(t)) + " " + DateFormat.getTimeFormat(a).format(Date(t)) else "—" }
-		val formato = runCatching { Formato.valueOf(l.formato).nombre }.getOrDefault(l.formato)
+		val formato = Formato.nombreDe(a, l.formato)
 		// La carpeta y los marcadores, de la base de datos fuera del hilo principal
 		a.enSegundoPlano({ db.rutaCarpeta(l.carpeta) to db.marcadores(l.id).size }) { (ruta, marcas) ->
 			val texto = buildString {

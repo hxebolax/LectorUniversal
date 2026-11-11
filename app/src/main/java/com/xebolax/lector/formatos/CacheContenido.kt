@@ -63,15 +63,28 @@ object CacheContenido {
 		} else {
 			val uri = fuente.uri
 			val id = if (DocumentsContract.isDocumentUri(fuente.contexto, uri)) DocumentsContract.getDocumentId(uri) else DocumentsContract.getTreeDocumentId(uri)
-			val hijos = DocumentsContract.buildChildDocumentsUriUsingTree(uri, id)
-			val columnas = arrayOf(DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-			fuente.contexto.contentResolver.query(hijos, columnas, null, null, null)?.use { c ->
-				while (c.moveToNext()) {
-					n++
-					if (!c.isNull(0)) bytes += c.getLong(0)
-					if (!c.isNull(1)) fecha = maxOf(fecha, c.getLong(1))
+			val columnas = arrayOf(
+				DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE,
+				DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+			)
+			// Hasta 3 niveles, como con los archivos (los DAISY suelen tener subcarpetas)
+			fun recorrer(carpeta: String, nivel: Int) {
+				val hijos = DocumentsContract.buildChildDocumentsUriUsingTree(uri, carpeta)
+				val subcarpetas = ArrayList<String>()
+				fuente.contexto.contentResolver.query(hijos, columnas, null, null, null)?.use { c ->
+					while (c.moveToNext()) {
+						if (c.getString(1) == DocumentsContract.Document.MIME_TYPE_DIR) {
+							c.getString(0)?.let { subcarpetas += it }
+							continue
+						}
+						n++
+						if (!c.isNull(2)) bytes += c.getLong(2)
+						if (!c.isNull(3)) fecha = maxOf(fecha, c.getLong(3))
+					}
 				}
+				if (nivel < 3) for (s in subcarpetas) recorrer(s, nivel + 1)
 			}
+			recorrer(id, 1)
 		}
 		"$n:$bytes:$fecha"
 	}.getOrDefault("")

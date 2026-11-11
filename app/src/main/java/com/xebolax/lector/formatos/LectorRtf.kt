@@ -31,7 +31,7 @@ object LectorRtf : LectorFormato {
 		when {
 			esRtf -> InterpreteRtf(bytes, inicio, c, ctx).ejecutar()
 			esWrite(bytes) || (fuente.extension == "wri" && bytes.size > 128) -> leerWrite(bytes, c, ctx)
-			else -> throw ExcepcionFormato("El archivo no es un documento RTF válido.")
+			else -> throw ExcepcionFormato.noValido(Formato.RTF)
 		}
 		if (c.titulo.isBlank()) c.titulo = fuente.nombre.substringBeforeLast('.')
 		return Contenido.Texto(c.construir())

@@ -1,5 +1,6 @@
 package com.xebolax.lector.formatos
 
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.ConstructorDocumento
 import com.xebolax.lector.modelo.Contenido
 import com.xebolax.lector.modelo.Marca
@@ -29,7 +30,6 @@ object LectorMobi : LectorFormato {
 
 	private const val NULO = -1
 	private const val HUFF = 17480
-	private const val DRM = "Este libro tiene DRM (protección anticopia) y no se puede abrir."
 
 	private val FILEPOS = Regex("""(?i)\bfilepos\s*=\s*["']?0*(\d+)["']?""")
 	private val KINDLE_POS = Regex("""(?i)kindle:pos:fid:([0-9a-v]+):off:([0-9a-v]+)(\?[^"'\s>]*)?""")
@@ -64,7 +64,7 @@ object LectorMobi : LectorFormato {
 
 	private fun leerBase(pdb: BaseDatosPalm, fuente: Fuente, ctx: ContextoLectura): Contenido {
 		val cab = CabeceraMobi(pdb.registro(0))
-		if (cab.cifrado != 0) throw ExcepcionDrm(DRM)
+		if (cab.cifrado != 0) throw ExcepcionDrm()
 		if (!cab.esMobi) return Contenido.Texto(textoPalm(pdb, cab, fuente, ctx).construir())
 
 		// KF8: AZW3 independiente o libro combinado (MOBI 6 + KF8 tras el registro BOUNDARY)
@@ -78,7 +78,7 @@ object LectorMobi : LectorFormato {
 		if (base8 >= 0) {
 			try {
 				val cab8 = if (base8 == 0) cab else CabeceraMobi(pdb.registro(base8))
-				if (cab8.cifrado != 0) throw ExcepcionDrm(DRM)
+				if (cab8.cifrado != 0) throw ExcepcionDrm()
 				val c = constructorMobi(ctx, listOf(cab8, cab), pdb, fuente)
 				leerKf8(pdb, base8, cab8, c, ctx)
 				if (!c.estaVacio()) return Contenido.Texto(c.construir())
@@ -93,7 +93,7 @@ object LectorMobi : LectorFormato {
 		}
 		val c = constructorMobi(ctx, listOf(cab), pdb, fuente)
 		leerMobi6(pdb, cab, c, ctx)
-		if (c.estaVacio()) throw ExcepcionFormato("El libro no contiene texto.")
+		if (c.estaVacio()) throw ExcepcionFormato(R.string.fmt_vacio)
 		return Contenido.Texto(c.construir())
 	}
 
@@ -126,7 +126,7 @@ object LectorMobi : LectorFormato {
 	private fun textoCrudo(pdb: BaseDatosPalm, base: Int, cab: CabeceraMobi, ctx: ContextoLectura): ByteArray {
 		val total = cab.registrosTexto
 		if (cab.compresion != 1 && cab.compresion != 2 && cab.compresion != HUFF) {
-			throw ExcepcionFormato("El libro usa una compresión desconocida (${cab.compresion}).")
+			throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		}
 		val huff = if (cab.compresion == HUFF) HuffmanCdic.cargar(pdb, base + cab.huffRegistro, cab.huffCuenta) else null
 		val salida = BuferMobi(if (cab.longitudTexto in 1..(256 shl 20)) cab.longitudTexto + 8192 else 1 shl 20)
@@ -222,7 +222,7 @@ object LectorMobi : LectorFormato {
 		val conBlancos = texto.contains("\n\n")
 		val parrafos = if (conBlancos) texto.split(Regex("\n\\s*\n")).map { it.replace('\n', ' ') } else texto.split('\n')
 		for (p in parrafos) c.parrafo(Textos.unirEspacios(p))
-		if (c.estaVacio()) throw ExcepcionFormato("El libro no contiene texto.")
+		if (c.estaVacio()) throw ExcepcionFormato(R.string.fmt_vacio)
 		AyudaBinarios.promoverCapitulos(c)
 		return c
 	}
@@ -635,7 +635,7 @@ private class BaseDatosPalm private constructor(
 	val cuantos: Int get() = inicios.size
 
 	fun registro(i: Int): ByteArray {
-		if (i !in 0 until cuantos) throw ExcepcionFormato("El libro está dañado: falta un registro.")
+		if (i !in 0 until cuantos) throw ExcepcionFormato(R.string.fmt_danado)
 		val inicio = inicios[i]
 		val fin = if (i + 1 < cuantos) inicios[i + 1] else tamano
 		if (inicio >= tamano || fin <= inicio) return ByteArray(0)
@@ -655,21 +655,21 @@ private class BaseDatosPalm private constructor(
 			val raf = RandomAccessFile(archivo, "r")
 			try {
 				val tamano = raf.length()
-				if (tamano < 86) throw ExcepcionFormato("El archivo no es un libro MOBI válido.")
+				if (tamano < 86) throw ExcepcionFormato.noValido(Formato.MOBI)
 				val cab = ByteArray(78)
 				raf.readFully(cab)
 				var finNombre = 0
 				while (finNombre < 32 && cab[finNombre].toInt() != 0) finNombre++
 				val nombre = String(cab, 0, finNombre, Charset.forName("windows-1252"))
 				val n = be16(cab, 76)
-				if (n == 0 || 78L + n * 8L > tamano) throw ExcepcionFormato("El archivo no es un libro MOBI válido.")
+				if (n == 0 || 78L + n * 8L > tamano) throw ExcepcionFormato.noValido(Formato.MOBI)
 				val lista = ByteArray(n * 8)
 				raf.readFully(lista)
 				val inicios = LongArray(n) { be32u(lista, it * 8) }
 				return BaseDatosPalm(raf, nombre, inicios)
 			} catch (e: Exception) {
 				raf.close()
-				throw if (e is ExcepcionFormato) e else ExcepcionFormato("El archivo no es un libro MOBI válido.", e)
+				throw if (e is ExcepcionFormato) e else ExcepcionFormato.noValido(Formato.MOBI, e)
 			}
 		}
 	}
@@ -770,11 +770,11 @@ private class HuffmanCdic(huff: ByteArray, cdics: List<ByteArray>) {
 	private val claras = ArrayList<Boolean>()
 
 	init {
-		if (huff.size < 24 || !firma(huff, 0, "HUFF")) throw ExcepcionFormato("La tabla de compresión del libro está dañada.")
+		if (huff.size < 24 || !firma(huff, 0, "HUFF")) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		val off1 = be32(huff, 8)
 		val off2 = be32(huff, 12)
 		if (off1 < 0 || off1 + 1024 > huff.size || off2 < 0 || off2 + 256 > huff.size) {
-			throw ExcepcionFormato("La tabla de compresión del libro está dañada.")
+			throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 		}
 		for (i in 0 until 256) {
 			val v = be32u(huff, off1 + i * 4)
@@ -790,7 +790,7 @@ private class HuffmanCdic(huff: ByteArray, cdics: List<ByteArray>) {
 			maxCodigo[l] = ((mx + 1) shl (32 - l)) - 1
 		}
 		for (cdic in cdics) cargarDiccionario(cdic)
-		if (frases.isEmpty()) throw ExcepcionFormato("El diccionario de compresión del libro está vacío.")
+		if (frases.isEmpty()) throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 	}
 
 	private fun cargarDiccionario(cdic: ByteArray) {
@@ -826,13 +826,15 @@ private class HuffmanCdic(huff: ByteArray, cdics: List<ByteArray>) {
 
 	fun descomprimir(d: ByteArray, n: Int, s: BuferMobi, profundidad: Int) {
 		if (profundidad > 32) return
+		// Lo que añade este registro (el búfer es el de todo el libro)
+		val inicio = s.tamano
 		var quedan = n.toLong() * 8
 		var pos = 0
 		var x = leer64(d, n, 0)
 		var bits = 32
 		while (true) {
 			// Un registro de texto ocupa unos pocos KB: frases anidadas que se expanden sin fin son un archivo dañado
-			if (s.tamano > 1 shl 20) break
+			if (s.tamano - inicio > 1 shl 20) break
 			if (bits <= 0) {
 				pos += 4
 				x = leer64(d, n, pos)
@@ -872,7 +874,7 @@ private class HuffmanCdic(huff: ByteArray, cdics: List<ByteArray>) {
 	companion object {
 		fun cargar(pdb: BaseDatosPalm, inicio: Int, cuenta: Int): HuffmanCdic {
 			if (inicio <= 0 || cuenta <= 0 || inicio + cuenta > pdb.cuantos) {
-				throw ExcepcionFormato("La tabla de compresión del libro falta o está dañada.")
+				throw ExcepcionFormato(R.string.fmt_no_descomprimir)
 			}
 			return HuffmanCdic(pdb.registro(inicio), (1 until cuenta).map { pdb.registro(inicio + it) })
 		}

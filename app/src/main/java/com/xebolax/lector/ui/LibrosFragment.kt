@@ -90,6 +90,18 @@ class LibrosFragment : Fragment() {
 	private var nombreGrupoActual = ""
 	/** Al terminar de cargar, decir en qué carpeta se está (tras abrir una o subir). */
 	private var anunciarAlCargar = false
+	/**
+	 * Al entrar o salir de una carpeta, un autor, una serie o una colección la
+	 * lista cambia entera y TalkBack perdería el foco: tras cargar se pone en
+	 * esta fila (su id) o, si es null, en la primera.
+	 */
+	private var enfocarAlCargar = false
+	private var filaAEnfocar: Long? = null
+
+	private fun pedirFoco(fila: Long? = null) {
+		enfocarAlCargar = true
+		filaAEnfocar = fila
+	}
 
 	/** Carpeta abierta (null = raíz de la biblioteca). Los libros que se añaden van a ella. */
 	var carpetaActual: Long? = null
@@ -296,12 +308,16 @@ class LibrosFragment : Fragment() {
 	fun subir(): Boolean {
 		// En un autor, serie o colección: vuelve a la lista de grupos
 		if (porGrupos && grupo != null) {
+			// Se vuelve a la lista de grupos, con el foco en el que se acaba de dejar
+			pedirFoco(Fila.Grupo(grupo!!, "", 0).id)
 			grupo = null
 			recargar()
 			return true
 		}
 		if (!porCarpetas || carpetaActual == null) return false
 		// El padre se sabe de la última carga; si aún no ha llegado la de esta carpeta, se mira (es una consulta pequeña)
+		// El foco, en la carpeta de la que se sale
+		pedirFoco(Fila.DeCarpeta(com.xebolax.lector.datos.Carpeta(carpetaActual!!, "", null, 0), 0, 0).id)
 		carpetaActual = if (cargada == carpetaActual) padreActual else carpetaActual?.let { db.carpeta(it) }?.padre
 		anunciarAlCargar = true
 		recargar()
@@ -489,16 +505,41 @@ class LibrosFragment : Fragment() {
 				seleccionados.removeAll(quitados.toSet())
 			}
 			adaptador.seleccionados = seleccionados.toSet()
-			adaptador.reemplazar(vista.filas)
+			// Tras abrir una carpeta o subir: dónde se está (se dice después de poner el foco)
+			val aviso = if (anunciarAlCargar) getString(R.string.carpeta_x, vista.nombreCarpeta.ifBlank { nombreVista() }) else null
+			anunciarAlCargar = false
+			val enfocar = enfocarAlCargar
+			val fila = filaAEnfocar
+			enfocarAlCargar = false
+			filaAEnfocar = null
+			adaptador.reemplazar(vista.filas) { if (enfocar) enfocarFila(fila, aviso) else aviso?.let { decir(it) } }
 			actualizarCabecera()
 			// Solo si cambia: la línea de estado es una región viva y TalkBack la leería en cada recarga
 			if (b.estado.text.toString() != vista.estado) b.estado.text = vista.estado
-			// Tras abrir una carpeta o subir: dónde se está
-			if (anunciarAlCargar) {
-				anunciarAlCargar = false
-				(activity as? AppCompatActivity)?.avisar(getString(R.string.carpeta_x, vista.nombreCarpeta.ifBlank { nombreVista() }), mostrar = false)
-			}
 		}
+	}
+
+	private fun decir(texto: String) = (activity as? AppCompatActivity)?.avisar(texto, mostrar = false)
+
+	/**
+	 * Pone el foco de TalkBack en esa fila (o en la primera, sin contar «Subir»)
+	 * y después dice el aviso, como CatalogoFragment.refrescar.
+	 */
+	private fun enfocarFila(id: Long?, aviso: String?) {
+		val r = _b?.recycler ?: return
+		val filas = adaptador.filas
+		if (filas.isEmpty()) {
+			aviso?.let { decir(it) }
+			return
+		}
+		val posicion = id?.let { i -> filas.indexOfFirst { it.id == i } }?.takeIf { it >= 0 }
+			?: filas.indexOfFirst { it !is Fila.Subir }.takeIf { it >= 0 } ?: 0
+		(r.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(posicion, 0)
+		r.postDelayed({
+			val v = _b?.recycler?.findViewHolderForAdapterPosition(posicion)?.itemView
+			if (v != null && context?.lectorActivo() == true) v.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+			aviso?.let { decir(it) }
+		}, 150)
 	}
 
 	/** «3 libros», «1 documento», «5 elementos» (todo y tipos propios). */
@@ -525,12 +566,14 @@ class LibrosFragment : Fragment() {
 					campoBusqueda?.setText("")
 				}
 				anunciarAlCargar = true
+				pedirFoco()
 				recargar()
 			}
 			is Fila.Subir -> subir()
 			is Fila.Grupo -> {
 				grupo = fila.clave
 				nombreGrupoActual = fila.nombre
+				pedirFoco()
 				recargar()
 				a.avisar(fila.nombre, mostrar = false)
 			}
@@ -572,7 +615,16 @@ class LibrosFragment : Fragment() {
 			},
 			getString(R.string.cambiar_tipo) to {
 				AccionesLibro.elegirTipo(a, null) { tipo ->
-					hacer({ db.cambiarTipo(ids, tipo) }) { a.getString(R.string.tipo_cambiado, AccionesLibro.nombreTipo(a, tipo)) }
+					a.enSegundoPlano({
+						// Los que quedan en una carpeta de otro tipo no se verían en su pestaña: salen a la raíz
+						val salen = ids.mapNotNull { db.libro(it) }.filter { AccionesLibro.saleDeCarpeta(db, it, tipo) }.map { it.id }
+						salen.forEach { db.moverLibro(it, null) }
+						db.cambiarTipo(ids, tipo)
+						salen.size
+					}) { salen ->
+						hecho(a.getString(R.string.tipo_cambiado, AccionesLibro.nombreTipo(a, tipo)) +
+							if (salen > 0) " " + a.resources.getQuantityString(R.plurals.tipo_salen_de_carpeta_n, salen, salen) else "")
+					}
 				}
 			},
 			getString(R.string.anadir_favoritos) to { hacer({ ids.forEach { db.cambiarFavorito(it, true) } }) { a.getString(R.string.anadido_favoritos) } },
@@ -592,6 +644,7 @@ class LibrosFragment : Fragment() {
 			},
 			getString(R.string.quitar_de_biblioteca) to {
 				a.confirmar(resources.getQuantityString(R.plurals.confirmar_quitar_varios, n, n), getString(R.string.quitar)) {
+					AccionesLibro.pararSiSeUsa(ids)
 					hacer({ ids.forEach { id -> db.libro(id)?.let { AccionesLibro.quitar(a, id, it.uri) } } }) { a.getString(R.string.quitado_de_biblioteca) }
 				}
 			},
@@ -623,7 +676,7 @@ class LibrosFragment : Fragment() {
 					getString(R.string.renombrar) to {
 						a.pedirTexto(getString(R.string.renombrar), getString(R.string.nombre), fila.nombre) { n ->
 							if (n.isNotBlank()) a.enSegundoPlano({ db.renombrarColeccion(id, n) }) { hecho ->
-								if (!hecho) a.avisar(a.getString(R.string.coleccion_ya_existe, n.trim()))
+								a.avisar(a.getString(if (hecho) R.string.coleccion_renombrada else R.string.coleccion_ya_existe, n.trim()))
 							}
 						}
 					},

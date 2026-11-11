@@ -79,9 +79,9 @@
 		android:summary="@string/aj_al_encender_audio_desc" />
 	<PreferenceCategory android:title="@string/aj_temporizador_auto_cat">
 		<SwitchPreferenceCompat android:key="temporizador_auto" android:title="@string/aj_temporizador_auto" android:summary="@string/aj_temporizador_auto_desc" android:defaultValue="false" />
-		<EditTextPreference android:key="temporizador_auto_desde" android:title="@string/aj_temporizador_desde" android:defaultValue="23:00" app:useSimpleSummaryProvider="true" />
-		<EditTextPreference android:key="temporizador_auto_hasta" android:title="@string/aj_temporizador_hasta" android:defaultValue="07:00" app:useSimpleSummaryProvider="true" />
-		<ListPreference android:key="temporizador_auto_minutos" android:title="@string/aj_temporizador_minutos" android:entries="@array/temporizador_auto_nombres" android:entryValues="@array/temporizador_auto_valores" android:defaultValue="30" app:useSimpleSummaryProvider="true" />
+		<EditTextPreference android:key="temporizador_auto_desde" android:dependency="temporizador_auto" android:title="@string/aj_temporizador_desde" android:defaultValue="23:00" app:useSimpleSummaryProvider="true" />
+		<EditTextPreference android:key="temporizador_auto_hasta" android:dependency="temporizador_auto" android:title="@string/aj_temporizador_hasta" android:defaultValue="07:00" app:useSimpleSummaryProvider="true" />
+		<ListPreference android:key="temporizador_auto_minutos" android:dependency="temporizador_auto" android:title="@string/aj_temporizador_minutos" android:entries="@array/temporizador_auto_nombres" android:entryValues="@array/temporizador_auto_valores" android:defaultValue="30" app:useSimpleSummaryProvider="true" />
 	</PreferenceCategory>
 	<SwitchPreferenceCompat android:key="reanudar_al_conectar" android:title="@string/aj_reanudar_conectar" android:summary="@string/aj_reanudar_conectar_desc" android:defaultValue="true" />
 </PreferenceScreen>

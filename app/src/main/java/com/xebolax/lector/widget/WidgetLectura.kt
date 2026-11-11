@@ -9,6 +9,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import com.xebolax.lector.R
 import com.xebolax.lector.datos.BaseDatos
+import com.xebolax.lector.audio.ControlAudio
 import com.xebolax.lector.audio.ReproductorActivity
 import com.xebolax.lector.lectura.Abiertos
 import com.xebolax.lector.lectura.LectorActivity
@@ -38,15 +39,28 @@ class WidgetLectura : AppWidgetProvider() {
 			val ids = runCatching { gestor.getAppWidgetIds(ComponentName(contexto, WidgetLectura::class.java)) }.getOrNull() ?: return
 			if (ids.isEmpty()) return
 			ambito.launch {
-				val vistas = withContext(Dispatchers.IO) { vistas(contexto) }
+				// El audiolibro que suena se mira aquí, en el hilo principal (el reproductor solo se usa desde él)
+				val audio = audioActual()
+				val vistas = withContext(Dispatchers.IO) { vistas(contexto, audio) }
 				gestor.updateAppWidget(ids, vistas)
 			}
 		}
 
-		private fun vistas(contexto: Context): RemoteViews {
+		/** El audiolibro cargado en el reproductor (id y si suena), o null. Los podcasts y la radio no son libros. */
+		private fun audioActual(): Pair<Long, Boolean>? =
+			ControlAudio.idLibro.takeIf { it > 0 && ControlAudio.libro != null }?.let { it to ControlAudio.reproduciendo }
+
+		private fun vistas(contexto: Context, audio: Pair<Long, Boolean>?): RemoteViews {
 			val v = RemoteViews(contexto.packageName, R.layout.widget_lectura)
 			val estado = LectorVoz.estado()
-			val libro = if (estado.activo) BaseDatos.obtener(contexto).libro(estado.libro) else BaseDatos.obtener(contexto).ultimoAbierto()
+			val db = BaseDatos.obtener(contexto)
+			// Lo que se lee en voz alta, si no el audiolibro del reproductor, y si no el último abierto
+			val libro = when {
+				estado.activo -> db.libro(estado.libro)
+				audio != null -> db.libro(audio.first)
+				else -> db.ultimoAbierto()
+			}
+			val conAudio = !estado.activo && audio != null && libro?.audio == true
 			val titulo = libro?.tituloVisible ?: estado.titulo.ifBlank { contexto.getString(R.string.widget_sin_libro) }
 			v.setTextViewText(R.id.widget_titulo, titulo)
 			val detalle = libro?.let { contexto.getString(R.string.porcentaje_n, it.progreso.toInt()) }.orEmpty()
@@ -59,15 +73,18 @@ class WidgetLectura : AppWidgetProvider() {
 			val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 			v.setOnClickPendingIntent(R.id.widget_abrir, PendingIntent.getActivity(contexto, 1, abrir, flags))
 			v.setContentDescription(R.id.widget_abrir, contexto.getString(R.string.widget_seguir_leyendo_x, titulo))
-			val leyendo = estado.leyendo
+			val leyendo = if (conAudio) audio!!.second else estado.leyendo
 			v.setImageViewResource(R.id.widget_voz, if (leyendo) R.drawable.ic_pausa else R.drawable.ic_reproducir)
 			v.setContentDescription(R.id.widget_voz, contexto.getString(if (leyendo) R.string.pausar_lectura else R.string.leer_en_voz_alta))
 			// Un audiolibro sin nada cargado se abre en su pantalla directamente: desde un aviso en segundo plano
 			// (el BroadcastReceiver) Android 14 o superior puede impedir abrir una pantalla
-			val voz = if (!estado.activo && libro?.audio == true) PendingIntent.getActivity(contexto, 3, abrir, flags)
+			// Con el audiolibro ya cargado, el botón lo pausa o lo sigue (sin abrir nada)
+			val abrirAudio = !estado.activo && !conAudio && libro?.audio == true
+			val voz = if (abrirAudio) PendingIntent.getActivity(contexto, 3, abrir, flags)
 			else PendingIntent.getBroadcast(contexto, 2, Intent(contexto, WidgetLectura::class.java).setAction(ALTERNAR), flags)
 			v.setOnClickPendingIntent(R.id.widget_voz, voz)
-			if (!estado.activo && libro?.audio == true) v.setContentDescription(R.id.widget_voz, contexto.getString(R.string.widget_escuchar_x, titulo))
+			if (abrirAudio) v.setContentDescription(R.id.widget_voz, contexto.getString(R.string.widget_escuchar_x, titulo))
+			else if (conAudio) v.setContentDescription(R.id.widget_voz, contexto.getString(if (leyendo) R.string.widget_pausar_audio else R.string.widget_escuchar_x, titulo))
 			return v
 		}
 	}
@@ -80,6 +97,11 @@ class WidgetLectura : AppWidgetProvider() {
 		super.onReceive(contexto, intent)
 		if (intent.action != ALTERNAR) return
 		LectorVoz.iniciar(contexto)
+		// Un audiolibro cargado en el reproductor (y nada leyéndose en voz alta): se pausa o se sigue
+		if (LectorVoz.documento == null && audioActual() != null) {
+			ControlAudio.alternar()
+			return
+		}
 		if (LectorVoz.documento != null) {
 			LectorVoz.alternar()
 			return

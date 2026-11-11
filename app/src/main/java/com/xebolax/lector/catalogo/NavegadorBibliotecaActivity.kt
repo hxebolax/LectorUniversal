@@ -169,7 +169,7 @@ class NavegadorBibliotecaActivity : AppCompatActivity() {
 				val id = r.anadidos.firstOrNull() ?: BaseDatos.obtener(this@NavegadorBibliotecaActivity).libroPorUri(Uri.fromFile(f).toString())?.id
 					?: return@launch mensaje(nombre, getString(R.string.web_no_anadido))
 				// Título, autor y tipo reales (audiolibro, DAISY) por detrás
-				com.xebolax.lector.LectorApp.ambito.launch { Importador.completarDatos(applicationContext, listOf(id)) }
+				if (id in r.nuevos) com.xebolax.lector.LectorApp.ambito.launch { Importador.completarDatos(applicationContext, listOf(id)) }
 				MaterialAlertDialogBuilder(this@NavegadorBibliotecaActivity)
 					.setTitle(R.string.web_descargado)
 					.setMessage(getString(R.string.web_descargado_texto, f.name))

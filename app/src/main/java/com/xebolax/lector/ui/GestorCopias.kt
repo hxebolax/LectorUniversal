@@ -61,6 +61,13 @@ class GestorCopias(private val fragmento: Fragment) {
 	private val actividad get() = fragmento.activity as? AppCompatActivity
 	private fun texto(id: Int, vararg args: Any) = fragmento.getString(id, *args)
 
+	/** Por qué falló, en lenguaje claro (en el idioma de la app); nunca el texto técnico de la excepción. */
+	private fun motivo(e: Exception): String = when {
+		e is com.xebolax.lector.datos.ConTextoUsuario -> e.message.orEmpty()
+		e is java.io.IOException && e.message?.contains("ENOSPC") == true -> texto(R.string.cj_sin_espacio)
+		else -> ""
+	}
+
 	private val guardarEn = fragmento.registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
 		uri?.let { guardar(it) }
 	}
@@ -117,7 +124,7 @@ class GestorCopias(private val fragmento: Fragment) {
 				throw e
 			} catch (e: Exception) {
 				borrarDocumento(uri)
-				a.mensaje(texto(R.string.copia_crear), texto(R.string.copia_error_guardar, e.message.orEmpty()))
+				a.mensaje(texto(R.string.copia_crear), texto(R.string.copia_error_guardar, motivo(e)))
 			}
 		}
 	}
@@ -280,7 +287,7 @@ class GestorCopias(private val fragmento: Fragment) {
 			} catch (e: Cifrado.ContrasenaIncorrecta) {
 				return@launch a.mensaje(texto(R.string.copia_restaurar), texto(R.string.copia_contrasena_incorrecta)) { pedirContrasena { abrir(uri, it) } }
 			} catch (e: Exception) {
-				return@launch a.mensaje(texto(R.string.copia_restaurar), texto(R.string.copia_error_abrir, e.message.orEmpty()))
+				return@launch a.mensaje(texto(R.string.copia_restaurar), texto(R.string.copia_error_abrir, motivo(e)))
 			}
 			mostrarInfo(uri, info, contrasena)
 		}
@@ -346,7 +353,7 @@ class GestorCopias(private val fragmento: Fragment) {
 			} catch (e: Cifrado.ContrasenaIncorrecta) {
 				return@launch a.mensaje(texto(R.string.copia_restaurar), texto(R.string.copia_contrasena_incorrecta))
 			} catch (e: Exception) {
-				return@launch a.mensaje(texto(R.string.copia_restaurar), texto(R.string.copia_error_restaurar, e.message.orEmpty()))
+				return@launch a.mensaje(texto(R.string.copia_restaurar), texto(R.string.copia_error_restaurar, motivo(e)))
 			}
 			Sonidos.sonar(a, Sonidos.Tipo.LISTO)
 			a.mensaje(texto(if (deshacer) R.string.copia_deshacer else R.string.copia_restaurar), texto(R.string.copia_restaurada)) { reiniciar(a, Parte.AJUSTES in partes) }

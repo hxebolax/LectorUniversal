@@ -236,7 +236,11 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		}
 	}
 
-	private fun mostrar(d: Documento) {
+	private fun mostrar(nuevo: Documento) {
+		// Es el libro que se lee en voz alta (se vuelve a él desde la notificación tras abrir otro): el mismo
+		// documento de la voz; si no, el panel de voz no se vería y Reproducir empezaría la lectura de nuevo
+		val d = libro?.takeIf { it.id > 0 && LectorVoz.esActual(it.id) }?.let { LectorVoz.documento }
+			?.takeIf { it.bloques.size == nuevo.bloques.size } ?: nuevo
 		doc = d
 		val l = libro ?: return
 		if (d.titulo.isNotBlank()) {
@@ -416,7 +420,11 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		}
 		ajustesAlSalir = ""
 		ultimoLatido = System.currentTimeMillis()
+		// Los errores de la voz se dicen aquí con TalkBack (y en pantalla), no solo en un Toast
+		LectorVoz.alError = alErrorVoz
 	}
+
+	private val alErrorVoz: (String) -> Unit = { texto -> avisar(texto) }
 
 	override fun onStop() {
 		super.onStop()
@@ -424,6 +432,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 	}
 
 	override fun onPause() {
+		if (LectorVoz.alError === alErrorVoz) LectorVoz.alError = null
 		marcarSeguidosLeidos()
 		guardarPosicion()
 		volcarEstadisticas()
@@ -1261,6 +1270,8 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		LectorVoz.leerDesde(d, l.id, d.titulo.ifBlank { l.tituloVisible }, bloque, noticia = esNoticia)
 		// El mini reproductor y la notificación vuelven aquí (una noticia no tiene id de libro)
 		LectorVoz.volver = Intent(this, LectorActivity::class.java).putExtras(intent).apply { removeExtra(EXTRA_LEER_AL_ABRIR) }
+		// La primera vez que se lee en voz alta (sigue con la pantalla apagada): permiso de avisos, explicado
+		com.xebolax.lector.ui.PermisoAvisos.pedir(this, R.string.cj_avisos_por_lectura)
 	}
 
 	private fun alternarVoz() {
@@ -1371,10 +1382,11 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 	private fun describirImagen(bloque: Int) {
 		val recurso = doc?.imagenes?.get(bloque) ?: return
 		val l = libro ?: return
-		avisar(getString(R.string.preparando_imagen))
 		lifecycleScope.launch {
-			val archivo = withContext(Dispatchers.IO) { ImagenLibro.preparar(this@LectorActivity, Uri.parse(l.uri), l.nombre, recurso) }
-				?: return@launch avisar(getString(R.string.imagen_no_disponible))
+			// Con la ventana de espera (y Cancelar): sacar la imagen de un libro grande o de la web tarda
+			val archivo = conEspera(getString(R.string.describir_imagen), getString(R.string.preparando_imagen)) {
+				withContext(Dispatchers.IO) { ImagenLibro.preparar(this@LectorActivity, Uri.parse(l.uri), l.nombre, recurso) }
+			} ?: return@launch avisar(getString(R.string.imagen_no_disponible))
 			val texto = doc?.bloques?.getOrNull(bloque)?.texto.orEmpty()
 			opcionesImagen(getString(R.string.describir_imagen), archivo, getString(R.string.ia_pedir_descripcion, texto.take(300)), texto)
 		}
@@ -1430,15 +1442,16 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		val l = libro ?: return
 		val pagina = d.paginaDe(bloque) ?: return
 		val indice = d.paginas.indexOf(pagina)
-		avisar(getString(R.string.preparando_imagen))
+		val titulo = getString(R.string.describir_pagina_n, pagina.etiqueta)
 		lifecycleScope.launch {
-			val archivo = withContext(Dispatchers.IO) {
-				runCatching {
-					val pdf = com.xebolax.lector.formatos.Fuente(this@LectorActivity, Uri.parse(l.uri), l.nombre).archivoLocal()
-					com.xebolax.lector.ocr.Ocr.paginaComoImagen(this@LectorActivity, pdf, indice)
-				}.getOrNull()
+			val archivo = conEspera(titulo, getString(R.string.preparando_imagen)) {
+				withContext(Dispatchers.IO) {
+					runCatching {
+						val pdf = com.xebolax.lector.formatos.Fuente(this@LectorActivity, Uri.parse(l.uri), l.nombre).archivoLocal()
+						com.xebolax.lector.ocr.Ocr.paginaComoImagen(this@LectorActivity, pdf, indice)
+					}.getOrNull()
+				}
 			} ?: return@launch avisar(getString(R.string.imagen_no_disponible))
-			val titulo = getString(R.string.describir_pagina_n, pagina.etiqueta)
 			opcionesImagen(titulo, archivo, getString(R.string.ia_pedir_pagina), "")
 		}
 	}
@@ -1571,7 +1584,14 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		val traductor = Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain")
 			.putExtra(Intent.EXTRA_PROCESS_TEXT, texto).putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
 			.setPackage("com.google.android.apps.translate")
-		if (traductor.resolveActivity(packageManager) != null) opciones += getString(R.string.traducir_con_google) to { startActivity(traductor) }
+		// Siempre se ofrece (desde Android 11 no se puede saber si está sin declararlo); si no está instalado, se dice
+		opciones += getString(R.string.traducir_con_google) to {
+			try {
+				startActivity(traductor)
+			} catch (_: ActivityNotFoundException) {
+				avisar(getString(R.string.lectura_traductor_no_instalado))
+			}
+		}
 		opciones += getString(R.string.traducir_con_ia) to {
 			val idioma = java.util.Locale.getDefault().getDisplayLanguage(java.util.Locale.getDefault())
 			conversarConIA(getString(R.string.traducir_parrafo), getString(R.string.ia_pedir_traduccion, idioma, texto))

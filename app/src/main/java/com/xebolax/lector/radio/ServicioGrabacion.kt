@@ -47,6 +47,7 @@ class ServicioGrabacion : Service() {
 		private const val CANAL = "radio_grabacion"
 		private const val NOTIFICACION = 7301
 		private const val NOTIFICACION_FALLO = 7304
+		private const val CANAL_AVISOS = "radio_grabacion_avisos"
 
 		/** Lo que se está grabando (null si nada). */
 		@Volatile
@@ -302,7 +303,9 @@ class ServicioGrabacion : Service() {
 
 	/** Aviso de que la grabación no se pudo hacer (o se cortó), con el motivo en palabras. */
 	private fun avisarFallo(e: Emisora, motivo: String, conAlgo: Boolean) {
-		canal()
+		// Canal propio de importancia normal (el de la grabación en marcha es silencioso y este aviso se perdía)
+		if (Build.VERSION.SDK_INT >= 26) getSystemService(NotificationManager::class.java)
+			.createNotificationChannel(NotificationChannel(CANAL_AVISOS, getString(R.string.audio_canal_grabacion_avisos), NotificationManager.IMPORTANCE_DEFAULT))
 		val explicacion = when {
 			motivo.startsWith("http:") -> {
 				val codigo = motivo.removePrefix("http:").toIntOrNull() ?: 0
@@ -315,7 +318,7 @@ class ServicioGrabacion : Service() {
 		}.replaceFirstChar { it.titlecase() }
 		val abrir = PendingIntent.getActivity(this, 3, Intent(this, RadioActivity::class.java).setAction(RadioActivity.ACCION_GRABACIONES), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 		val titulo = getString(if (conAlgo) R.string.audio_grabacion_cortada else R.string.audio_grabacion_fallida, e.nombre)
-		val n = NotificationCompat.Builder(this, CANAL)
+		val n = NotificationCompat.Builder(this, CANAL_AVISOS)
 			.setSmallIcon(R.drawable.ic_grabar)
 			.setContentTitle(titulo)
 			.setContentText(explicacion)

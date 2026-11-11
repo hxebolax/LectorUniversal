@@ -1,6 +1,8 @@
 package com.xebolax.lector.formatos
 
 import android.net.Uri
+import com.xebolax.lector.LectorApp
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.Contenido
 import com.xebolax.lector.modelo.LibroAudio
 import com.xebolax.lector.modelo.MarcaAudio
@@ -31,16 +33,18 @@ object LectorAudio : LectorFormato {
 		val autor = info.autorLibro
 		val narrador = info.narrador
 		val pista = Pista(fuente.uri.toString(), info.titulo.ifBlank { titulo }, info.duracionMs)
+		// Las etiquetas, en el idioma de la app (se muestran en Información)
+		fun t(recurso: Int) = LectorApp.texto(recurso)
 		val metadatos = LinkedHashMap<String, String>()
-		metadatos["Autor"] = autor
-		metadatos["Narrador"] = narrador
-		if (info.album.isNotBlank() && info.album != titulo) metadatos["Álbum"] = info.album
-		if (info.titulo.isNotBlank() && info.titulo != titulo) metadatos["Título de la pista"] = info.titulo
-		metadatos["Género"] = info.genero
-		metadatos["Fecha"] = info.fecha
-		if (info.duracionMs > 0) metadatos["Duración"] = CapitulosAudio.duracionLegible(info.duracionMs)
-		if (capitulos.isNotEmpty()) metadatos["Capítulos"] = capitulos.size.toString()
-		metadatos["Archivo"] = fuente.nombre
+		metadatos[t(R.string.cj_meta_autor)] = autor
+		metadatos[t(R.string.cj_meta_narrador)] = narrador
+		if (info.album.isNotBlank() && info.album != titulo) metadatos[t(R.string.cj_meta_album)] = info.album
+		if (info.titulo.isNotBlank() && info.titulo != titulo) metadatos[t(R.string.cj_meta_titulo_pista)] = info.titulo
+		metadatos[t(R.string.cj_meta_genero)] = info.genero
+		metadatos[t(R.string.cj_meta_fecha)] = info.fecha
+		if (info.duracionMs > 0) metadatos[t(R.string.cj_meta_duracion)] = CapitulosAudio.duracionLegible(info.duracionMs)
+		if (capitulos.isNotEmpty()) metadatos[t(R.string.cj_meta_capitulos)] = capitulos.size.toString()
+		metadatos[t(R.string.cj_meta_archivo)] = fuente.nombre
 		return Contenido.Audio(
 			LibroAudio(
 				titulo = titulo,
@@ -83,8 +87,8 @@ object LectorListaAudio : LectorFormato {
 			}
 		}
 		if (lista.pistas.isEmpty()) {
-			if (relativas > 0) throw ExcepcionFormato("Para abrir una lista de reproducción, añade la carpeta que la contiene.")
-			throw ExcepcionFormato("La lista de reproducción está vacía o sus archivos no existen.")
+			if (relativas > 0) throw ExcepcionFormato(R.string.fmt_lista_carpeta)
+			throw ExcepcionFormato(R.string.fmt_lista_vacia)
 		}
 		ctx.progreso(20)
 		val pistas = conDuraciones(lista.pistas, ctx)

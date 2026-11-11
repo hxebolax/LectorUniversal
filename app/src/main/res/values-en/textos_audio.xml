@@ -15,4 +15,11 @@
 	<string name="audio_grabacion_cortada">The recording of %1$s was cut off</string>
 	<!-- Radio: confirm before deleting a song from the history -->
 	<string name="audio_confirmar_borrar_cancion">Delete «%1$s» from the songs? This cannot be undone.</string>
+	<!-- Radio: channel and notice of the snoozed alarm (with the Cancel button) -->
+	<string name="audio_canal_pospuesto">Snoozed alarm</string>
+	<string name="audio_pospuesto_hasta">Snoozed until %1$s</string>
+	<!-- Radio, Schedule: status line with a snoozed alarm («tomorrow at 7:40») -->
+	<string name="audio_despertador_pospuesto">Snoozed alarm: rings %1$s.</string>
+	<!-- Radio: channel for notices of recordings that fail -->
+	<string name="audio_canal_grabacion_avisos">Recording notices</string>
 </resources>

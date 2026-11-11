@@ -2372,7 +2372,7 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 		<item>Compartidos (recomendado)</item>
 		<item>La biblioteca, como antes</item>
 	</string-array>
-	<string-array name="comp_destino_valores">
+	<string-array name="comp_destino_valores" translatable="false">
 		<item>compartidos</item>
 		<item>biblioteca</item>
 	</string-array>
@@ -2381,7 +2381,7 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 		<item>Abrirlo y leerlo en voz alta</item>
 		<item>Solo guardarlo</item>
 	</string-array>
-	<string-array name="comp_al_recibir_valores">
+	<string-array name="comp_al_recibir_valores" translatable="false">
 		<item>abrir</item>
 		<item>leer</item>
 		<item>guardar</item>
@@ -2392,7 +2392,7 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 		<item>A la semana</item>
 		<item>Al mes</item>
 	</string-array>
-	<string-array name="comp_borrar_valores">
+	<string-array name="comp_borrar_valores" translatable="false">
 		<item>0</item>
 		<item>1</item>
 		<item>7</item>
@@ -2402,7 +2402,7 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 		<item>Libros</item>
 		<item>Documentos</item>
 	</string-array>
-	<string-array name="tipo_ambiguos_valores">
+	<string-array name="tipo_ambiguos_valores" translatable="false">
 		<item>LIBRO</item>
 		<item>DOCUMENTO</item>
 	</string-array>

@@ -40,6 +40,7 @@ import com.xebolax.lector.ui.elegirUno
 import com.xebolax.lector.ui.pedirTexto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -78,6 +79,8 @@ class RssListaFragment : Fragment() {
 	private val db by lazy { RssBaseDatos.obtener(requireContext()) }
 	private var filas: List<Fila> = emptyList()
 	private var carga: Job? = null
+	/** La búsqueda espera a que se deje de escribir. */
+	private var escribiendo: Job? = null
 
 	// Fuentes: dónde se está
 	private var categoria: String? = null
@@ -173,7 +176,12 @@ class RssListaFragment : Fragment() {
 					override fun onTextChanged(s: CharSequence?, a: Int, b: Int, d: Int) {}
 					override fun afterTextChanged(s: Editable?) {
 						busqueda = s?.toString().orEmpty()
-						recargar()
+						// Se busca al dejar de escribir (no con cada letra: la línea de estado lo diría tras cada una)
+						escribiendo?.cancel()
+						escribiendo = viewLifecycleOwner.lifecycleScope.launch {
+							delay(600)
+							recargar()
+						}
 					}
 				})
 				c.addView(contenedor)
@@ -439,7 +447,11 @@ class RssListaFragment : Fragment() {
 		a.lifecycleScope.launch {
 			val lista = withContext(Dispatchers.IO) { db.categorias() }
 			a.elegirCarpeta(getString(R.string.mover_a_carpeta), lista, f.categoria) { destino ->
-				RssAcciones.enFondo(a, { db.ponerCategoria(f.id, destino) }) {
+				RssAcciones.enFondo(a, {
+					db.ponerCategoria(f.id, destino)
+					// Movida por el usuario: si era de ejemplo, ya es suya (se sube a la cuenta)
+					Rss.tocarFuente(a, f.id)
+				}) {
 					a.avisar(if (destino.isBlank()) a.getString(R.string.sin_carpeta) else a.getString(R.string.movida_a_carpeta, destino))
 				}
 			}
@@ -450,6 +462,7 @@ class RssListaFragment : Fragment() {
 	private fun marcarTodo(a: RssActivity, fuente: Long? = null, categoria: String? = null) {
 		a.lifecycleScope.launch {
 			val ids = withContext(Dispatchers.IO) { db.marcarTodoLeido(fuente = fuente, categoria = categoria) }
+			if (ids.isEmpty()) return@launch a.avisar(a.getString(R.string.noticias_nada_sin_leer))
 			a.conDeshacer(a.resources.getQuantityString(R.plurals.rss_marcados_leidos, ids.size, ids.size)) {
 				RssAcciones.enFondo(a, { db.marcarLeidos(ids, false) })
 			}

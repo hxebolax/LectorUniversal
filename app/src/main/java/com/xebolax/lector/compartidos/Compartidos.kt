@@ -90,13 +90,19 @@ object Compartidos {
 	const val ATAJO_PENDIENTE = "com.xebolax.lector.ATAJO_LEER_PENDIENTE"
 	const val ATAJO_WEB = "com.xebolax.lector.ATAJO_GUARDAR_WEB"
 
+	/** Alias no exportado de Compartidos para los accesos directos: otra app no puede mandar estas acciones. */
+	const val ALIAS_ATAJOS = "com.xebolax.lector.compartidos.AtajosCompartidos"
+
+	/** ¿Llega por el alias de los accesos directos (y no de otra app)? */
+	fun esAtajo(i: Intent) = i.component?.className == ALIAS_ATAJOS
+
 	/** Los accesos directos: Leer lo copiado, Leer lo pendiente y Guardar una página web. */
 	fun ponerAtajos(c: Context) = runCatching {
 		fun atajo(id: String, accion: String, texto: Int, icono: Int) = androidx.core.content.pm.ShortcutInfoCompat.Builder(c, id)
 			.setShortLabel(c.getString(texto))
 			.setLongLabel(c.getString(texto))
 			.setIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(c, icono))
-			.setIntent(Intent(c, CompartidosActivity::class.java).setAction(accion))
+			.setIntent(Intent(accion).setComponent(android.content.ComponentName(c.packageName, ALIAS_ATAJOS)))
 			.build()
 		androidx.core.content.pm.ShortcutManagerCompat.setDynamicShortcuts(c, listOf(
 			atajo("copiado", ATAJO_COPIADO, com.xebolax.lector.R.string.atajo_leer_copiado, com.xebolax.lector.R.drawable.ic_compartido),
@@ -110,11 +116,11 @@ object Compartidos {
 	 * Compartidos), se usa ese. Devuelve su id y si es nuevo.
 	 */
 	suspend fun guardarArchivo(c: Context, uri: Uri): Pair<Long, Boolean> = withContext(Dispatchers.IO) {
+		// Un archivo de dentro de la app (file:// o nuestro FileProvider) no se acepta desde otra app
+		if (com.xebolax.lector.biblioteca.Importador.esInterno(c, uri)) throw SecurityException(c.getString(com.xebolax.lector.R.string.error_archivo_interno))
 		val db = BaseDatos.obtener(c)
 		db.libroPorUri(uri.toString())?.let { return@withContext it.id to false }
-		val antes = db.todosConCompartidos().map { it.id }.toSet()
-		val id = com.xebolax.lector.biblioteca.Importador.anadirExterno(c, uri)
-		val nuevo = id !in antes
+		val (id, nuevo) = com.xebolax.lector.biblioteca.Importador.anadirExternoNuevo(c, uri)
 		if (nuevo) db.moverACompartidos(id)
 		id to nuevo
 	}

@@ -148,6 +148,9 @@ object ControlAudio {
 	fun cargarExterno(e: Externo) {
 		val j = jugador ?: return
 		if (esActual(e.id) && !alarmaDeReserva) {
+			// El mismo audio, pero puede venir ahora como despertador (o dejar de serlo)
+			usarAlarma(e.despertador)
+			permitirHttp = e.directo
 			externo = e
 			return
 		}
@@ -206,6 +209,9 @@ object ControlAudio {
 		if (escuchandoA === j) return
 		escuchandoA = j
 		j.addListener(object : Player.Listener {
+			// Empieza o deja de sonar de verdad (tras cargar, al reconectar): las estadísticas y quien escuche lo necesitan
+			override fun onIsPlayingChanged(sonando: Boolean) = avisar().let { }
+
 			override fun onPlaybackStateChanged(estado: Int) {
 				if (estado == Player.STATE_ENDED) principal.post { if (externo?.directo == true) alCortarse(null) else terminarExterno() }
 				if (estado == Player.STATE_READY && externo?.directo == true && problema.isNotEmpty()) {
@@ -389,6 +395,13 @@ object ControlAudio {
 		e.alGuardar(0, duracionPista())
 		// El temporizador «al final del episodio» cuenta cualquier audio que termina (también una noticia o un episodio sin suscribirse)
 		paradoTrasEpisodio = contarEpisodioTerminado()
+		// «Al final del capítulo» en el último capítulo (o sin capítulos): para aquí, como al final del episodio
+		if (alFinalDelCapitulo) {
+			alFinalDelCapitulo = false
+			paradoTrasEpisodio = true
+			marcarParadaPorTemporizador()
+			avisar()
+		}
 		e.alTerminar()
 	}
 
@@ -405,17 +418,22 @@ object ControlAudio {
 	fun manejaFoco(contexto: Context) = Preferencias(contexto).talkbackAlHablar != "seguir"
 
 	fun aplicarAtributos() {
+		// Mientras suena el despertador sigue con el volumen de alarma (cambiar Ajustes no lo pasa a multimedia)
+		if (comoAlarma && atributosDe === jugador) return
 		if (::app.isInitialized) jugador?.setAudioAttributes(atributos(app), manejaFoco(app))
 	}
 
 	/** ¿Suena ahora como alarma (despertador)? */
 	private var comoAlarma = false
+	/** El reproductor al que se le pusieron esos atributos (si el servicio se recrea, el nuevo empieza como multimedia). */
+	private var atributosDe: ExoPlayer? = null
 
 	/** El despertador, con el volumen de alarma (suena aunque el multimedia esté a 0); lo demás, como multimedia. */
 	private fun usarAlarma(si: Boolean) {
-		if (si == comoAlarma) return
-		comoAlarma = si
 		val j = jugador ?: return
+		if (si == comoAlarma && atributosDe === j) return
+		comoAlarma = si
+		atributosDe = j
 		if (si) j.setAudioAttributes(androidx.media3.common.AudioAttributes.Builder().setUsage(C.USAGE_ALARM).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
 		else aplicarAtributos()
 	}
@@ -433,7 +451,14 @@ object ControlAudio {
 			controlador = MediaController.Builder(app, SessionToken(app, ComponentName(app, ServicioAudio::class.java))).buildAsync()
 		}
 		val futuro = controlador!!
-		futuro.addListener({ if (jugador != null) alListo() else principal.postDelayed({ if (jugador != null) alListo() }, 300) }, { principal.post(it) })
+		futuro.addListener({
+			// Si no se pudo conectar, se olvida: la próxima vez se vuelve a intentar
+			if (runCatching { futuro.get() }.isFailure) {
+				if (controlador === futuro) controlador = null
+				return@addListener
+			}
+			if (jugador != null) alListo() else principal.postDelayed({ if (jugador != null) alListo() }, 300)
+		}, { principal.post(it) })
 	}
 
 	/** Carga un libro en el reproductor y lo coloca en su posición guardada. */
@@ -520,9 +545,11 @@ object ControlAudio {
 			finTemporizador = SystemClock.elapsedRealtime() + restanteTemporizador
 			restanteTemporizador = 0
 		}
-		// Temporizador automático por la noche (Ajustes, Audiolibros): si no hay ya uno puesto
+		// Con temporizador puesto, agitar vuelve a funcionar (la pausa lo apagó)
+		if (minutosTemporizador() != 0) agitar.empezar { alAgitar() }
+		// Temporizador automático por la noche (Ajustes, Audiolibros): si no hay ya uno puesto (y nunca al despertador)
 		Preferencias(app).let { pr ->
-			if (pr.temporizadorAuto && minutosTemporizador() == 0 && dentroDeFranja(pr.temporizadorAutoDesde, pr.temporizadorAutoHasta)) {
+			if (pr.temporizadorAuto && externo?.despertador != true && minutosTemporizador() == 0 && dentroDeFranja(pr.temporizadorAutoDesde, pr.temporizadorAutoHasta)) {
 				temporizador(pr.temporizadorAutoMinutos)
 				temporizadorAutomatico = true
 			}
@@ -560,7 +587,8 @@ object ControlAudio {
 		cancion = ""
 		problema = ""
 		alarmaDeReserva = false
-		quitarTemporizador()
+		// Después de pausar (que guarda lo que quedaba): se borra todo
+		borrarTemporizador()
 		controlador?.let { MediaController.releaseFuture(it) }
 		controlador = null
 		avisar()
@@ -733,7 +761,11 @@ object ControlAudio {
 			if (alFinalDelCapitulo) {
 				val (_, siguiente) = limitesCapitulo()
 				val (pista, ms) = posicion()
-				if (siguiente != null && siguiente.pista == pista && siguiente.ms - ms in 0..1200) {
+				// Sin más capítulos en esta pista (último capítulo, o sin capítulos): para al final de la pista.
+				// Un audio externo termina solo y lo para terminarExterno (así cuenta como terminado)
+				val finPista = (siguiente == null || siguiente.pista != pista) && externo == null &&
+					duracionPista().let { d -> d > 0 && d - ms in 0..1200 }
+				if (finPista || (siguiente != null && siguiente.pista == pista && siguiente.ms - ms in 0..1200)) {
 					alFinalDelCapitulo = false
 					pausar()
 					marcarParadaPorTemporizador()
@@ -763,8 +795,16 @@ object ControlAudio {
 		when {
 			reproduciendo && minutos != 0 -> temporizador(minutos)
 			!reproduciendo && paradoPorTemporizador > 0 && SystemClock.elapsedRealtime() - paradoPorTemporizador < 3 * 60_000L -> {
-				reproducir()
-				temporizador(minutos)
+				val e = externo
+				if (e != null && !e.directo && terminadoId == e.id) {
+					// Paró al terminar el episodio: se sigue con la cola (no se vuelve a empezar el mismo)
+					paradoTrasEpisodio = false
+					temporizador(minutos)
+					e.alTerminar()
+				} else {
+					reproducir()
+					temporizador(minutos)
+				}
 			}
 		}
 		avisar()
@@ -778,6 +818,20 @@ object ControlAudio {
 	 * lo consulta para no seguir con la cola; el contador ya lo ha gastado terminarExterno.)
 	 */
 	fun pararTrasEpisodio(): Boolean = paradoTrasEpisodio
+
+	/**
+	 * «Dar por escuchado y pasar al siguiente»: también cuenta para el temporizador por
+	 * episodios. Devuelve true si toca parar (queda en pausa; agitar sigue con la cola).
+	 */
+	fun pasarEpisodio(): Boolean {
+		val e = externo
+		if (episodiosTemporizador == 1) {
+			pausar()
+			if (e != null) terminadoId = e.id
+		}
+		paradoTrasEpisodio = contarEpisodioTerminado()
+		return paradoTrasEpisodio
+	}
 
 	/**
 	 * Ha terminado un audio externo: si el temporizador es por episodios, cuenta uno y, si era el
@@ -835,7 +889,8 @@ object ControlAudio {
 
 	/** ¿La hora de ahora está entre «desde» y «hasta» (HH:MM; puede pasar de medianoche)? */
 	private fun dentroDeFranja(desde: String, hasta: String): Boolean {
-		fun minutos(t: String) = t.split(':').let { (it.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (it.getOrNull(1)?.toIntOrNull() ?: 0) }
+		// Escrita a mano en versiones anteriores podía ser «23.00» o «2300»: se lee igual que «23:00»
+		fun minutos(t: String) = (com.xebolax.lector.ui.normalizarHora(t) ?: t).split(':').let { (it.getOrNull(0)?.toIntOrNull() ?: 0) * 60 + (it.getOrNull(1)?.toIntOrNull() ?: 0) }
 		val ahora = java.util.Calendar.getInstance().let { it.get(java.util.Calendar.HOUR_OF_DAY) * 60 + it.get(java.util.Calendar.MINUTE) }
 		val a = minutos(desde)
 		val b = minutos(hasta)
@@ -846,6 +901,20 @@ object ControlAudio {
 		finTemporizador = 0
 		alFinalDelCapitulo = false
 		volumenNormal()
+	}
+
+	/** Al detener: no queda nada del temporizador (lo siguiente que suene no hereda los minutos que quedaban, ni agitar). */
+	private fun borrarTemporizador() {
+		quitarTemporizador()
+		restanteTemporizador = 0
+		episodiosTemporizador = 0
+		paradoTrasEpisodio = false
+		minutosElegidos = 0
+		paradoPorTemporizador = 0
+		temporizadorAutomatico = false
+		principal.removeCallbacks(latido)
+		principal.removeCallbacks(dejarDeAgitar)
+		if (::app.isInitialized) agitar.parar()
 	}
 
 	/** Minutos que quedan (0 = sin temporizador, -1 = al final del capítulo, -2 = al final del episodio, -10N = tras N episodios). */

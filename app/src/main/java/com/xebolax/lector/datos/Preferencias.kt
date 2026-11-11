@@ -24,7 +24,6 @@ class Preferencias(private val contexto: Context) {
 	val temaApp get() = texto("tema_app", "sistema")
 	val abrirUltimo get() = p.getBoolean("abrir_ultimo", false)
 	val sonidos get() = p.getBoolean("sonidos", true)
-	val vibracion get() = p.getBoolean("vibracion", false)
 	val buscarActualizaciones get() = p.getBoolean("buscar_actualizaciones", true)
 	val urlActualizaciones get() = texto("url_actualizaciones", BuildConfig.URL_ACTUALIZACIONES).trim().trimEnd('/')
 		.ifBlank { BuildConfig.URL_ACTUALIZACIONES }
@@ -61,7 +60,6 @@ class Preferencias(private val contexto: Context) {
 	val navegacionCircular get() = p.getBoolean("navegacion_circular", false)
 	val sonidoMarcadores get() = p.getBoolean("sonido_marcadores", true)
 	val anunciarNivel get() = p.getBoolean("anunciar_nivel", true)
-	val acciones: Set<String> get() = p.getStringSet("acciones_parrafo", null) ?: ACCIONES_POR_DEFECTO
 	/** Sonidos al llegar a un elemento (encabezado, enlace, tabla...); vacío = ninguno. */
 	val sonidosElementos: Set<String> get() = p.getStringSet("sonidos_elementos", null) ?: emptySet()
 	/** Qué se anuncia de cada párrafo además del texto (tipo, página, marcador, búsqueda). */
@@ -161,10 +159,4 @@ class Preferencias(private val contexto: Context) {
 	var historialBusquedas: List<String>
 		get() = runCatching { JSONArray(texto("historial_busquedas", "[]")).let { a -> List(a.length()) { a.getString(it) } } }.getOrDefault(emptyList())
 		set(valor) = p.edit().putString("historial_busquedas", JSONArray(valor.distinct().take(30)).toString()).apply()
-
-	companion object {
-		val ACCIONES_POR_DEFECTO = setOf(
-			"leer_aqui", "marcador", "nota", "copiar", "siguiente_encabezado", "anterior_encabezado", "indice", "buscar", "ir_a",
-		)
-	}
 }

@@ -152,7 +152,8 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 	/** Añade a la biblioteca (a una carpeta) y devuelve su id; si ya estaba, el que tenía. */
 	private suspend fun anadir(lista: List<BuscadorDispositivo.Encontrado>, carpeta: Long?): List<Long> {
 		val r = Importador.anadirArchivos(this, lista.map { Uri.fromFile(it.archivo) }, carpeta)
-		TareasInicio.completar(this, r.anadidos)
+		// Título y autor reales solo de los nuevos: los que ya estaban pueden tener los suyos editados
+		TareasInicio.completar(this, r.nuevos)
 		actualizarBiblioteca()
 		filtrar()
 		return r.anadidos
@@ -178,7 +179,7 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 		if (id == null || enCompartidos(e)) {
 			r += getString(R.string.disp_anadir) to { lifecycleScope.launch { anadir(listOf(e), null); avisar(getString(R.string.disp_anadido, e.nombre)) } }
 			r += getString(R.string.disp_anadir_carpeta) to {
-				AccionesLibro.elegirCarpeta(this, getString(R.string.mover_a_carpeta), null) { carpeta ->
+				AccionesLibro.elegirCarpeta(this, getString(R.string.disp_anadir_carpeta), null) { carpeta ->
 					lifecycleScope.launch { anadir(listOf(e), carpeta); avisar(getString(R.string.disp_anadido, e.nombre)) }
 				}
 			}
@@ -187,7 +188,7 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 			mensaje(getString(R.string.informacion), listOf(
 				getString(R.string.info_archivo, e.nombre),
 				getString(R.string.disp_ruta, e.archivo.parent.orEmpty()),
-				getString(R.string.info_formato, e.formato.nombre),
+				getString(R.string.info_formato, e.formato.nombre(this@LibrosDispositivoActivity)),
 				getString(R.string.info_tamano, tamanoLegible(e.tamano)),
 			).joinToString("\n"))
 		}
@@ -247,7 +248,7 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 			val carpeta = e.archivo.parentFile?.name.orEmpty()
 			val partes = listOfNotNull(
 				(if (enCompartidos(e)) getString(R.string.disp_en_compartidos) else getString(R.string.disp_en_biblioteca)).takeIf { ya(e) != null },
-				e.formato.nombre,
+				e.formato.nombre(this@LibrosDispositivoActivity),
 				carpeta.takeIf { it.isNotBlank() }?.let { getString(R.string.en_carpeta, it) },
 				tamanoLegible(e.tamano),
 			)

@@ -7,6 +7,7 @@ import android.provider.DocumentsContract
 import android.util.Log
 import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.datos.Preferencias
+import com.xebolax.lector.datos.claveTipo
 import com.xebolax.lector.formatos.ContextoLectura
 import com.xebolax.lector.formatos.Formato
 import com.xebolax.lector.formatos.Fuente
@@ -31,7 +32,8 @@ object Importador {
 
 	private const val ETIQUETA = "Importador"
 
-	class Resultado(val anadidos: List<Long>, val yaEstaban: Int)
+	/** anadidos: los que ahora están en la biblioteca (también los que pasan desde Compartidos); nuevos: solo los que no estaban. */
+	class Resultado(val anadidos: List<Long>, val yaEstaban: Int, val nuevos: List<Long> = anadidos)
 
 	/** Guarda el permiso de lectura para siempre (solo con direcciones del selector de documentos). */
 	fun guardarPermiso(contexto: Context, uri: Uri): Boolean = runCatching {
@@ -51,6 +53,7 @@ object Importador {
 	suspend fun anadirArchivos(contexto: Context, uris: List<Uri>, carpeta: Long?): Resultado = withContext(Dispatchers.IO) {
 		val db = BaseDatos.obtener(contexto)
 		val anadidos = ArrayList<Long>()
+		val nuevos = ArrayList<Long>()
 		var yaEstaban = 0
 		for (uri in uris) {
 			guardarPermiso(contexto, uri)
@@ -63,9 +66,24 @@ object Importador {
 				} else yaEstaban++
 				continue
 			}
-			anadidos += anadir(contexto, uri, null, carpeta)
+			val id = anadir(contexto, uri, null, carpeta)
+			anadidos += id
+			nuevos += id
 		}
-		Resultado(anadidos, yaEstaban)
+		aplicarTipoCarpeta(db, anadidos, carpeta)
+		Resultado(anadidos, yaEstaban, nuevos)
+	}
+
+	/**
+	 * Lo que se pone en una carpeta de un tipo (Documentos, Apuntes…) pasa a
+	 * ser de ese tipo; si no, no se vería en su pestaña. El audio sigue siendo audio.
+	 */
+	fun aplicarTipoCarpeta(db: BaseDatos, ids: List<Long>, carpeta: Long?) {
+		if (ids.isEmpty() || carpeta == null) return
+		val tipo = db.carpeta(carpeta)?.tipo?.takeIf { it.isNotEmpty() } ?: return
+		if (tipo == com.xebolax.lector.datos.TipoContenido.AUDIOLIBRO.name) return
+		val cambiar = ids.filter { id -> db.libro(id)?.let { !it.audio && it.claveTipo != tipo } == true }
+		db.cambiarTipo(cambiar, tipo)
 	}
 
 	private fun anadir(contexto: Context, uri: Uri, nombre: String?, carpeta: Long?, formatoForzado: Formato? = null): Long {
@@ -87,11 +105,14 @@ object Importador {
 	 * Archivo que llega de otra app. Devuelve el id del libro (nuevo o el que
 	 * ya existía con esa dirección).
 	 */
-	suspend fun anadirExterno(contexto: Context, uri: Uri): Long = withContext(Dispatchers.IO) {
+	suspend fun anadirExterno(contexto: Context, uri: Uri): Long = anadirExternoNuevo(contexto, uri).first
+
+	/** Como anadirExterno, y además dice si es nuevo (para leer sus datos reales solo entonces). */
+	suspend fun anadirExternoNuevo(contexto: Context, uri: Uri): Pair<Long, Boolean> = withContext(Dispatchers.IO) {
 		if (esInterno(contexto, uri)) throw SecurityException(contexto.getString(com.xebolax.lector.R.string.error_archivo_interno))
 		val db = BaseDatos.obtener(contexto)
-		db.libroPorUri(uri.toString())?.let { return@withContext it.id }
-		if (guardarPermiso(contexto, uri)) return@withContext anadir(contexto, uri, null, null)
+		db.libroPorUri(uri.toString())?.let { return@withContext it.id to false }
+		if (guardarPermiso(contexto, uri)) return@withContext anadir(contexto, uri, null, null) to true
 		// Sin permiso permanente: copia en la memoria de la app
 		val nombre = Fuente.nombreDe(contexto, uri).ifBlank { "documento" }
 		val carpeta = File(contexto.filesDir, "biblioteca").apply { mkdirs() }
@@ -118,8 +139,8 @@ object Importador {
 			temporal.delete()
 		}
 		val local = Uri.fromFile(destino)
-		db.libroPorUri(local.toString())?.let { return@withContext it.id }
-		anadir(contexto, local, nombre, null)
+		db.libroPorUri(local.toString())?.let { return@withContext it.id to false }
+		anadir(contexto, local, nombre, null) to true
 	}
 
 	/** ¿Tienen los dos archivos exactamente lo mismo? */
@@ -153,6 +174,8 @@ object Importador {
 
 	/** ¿Es un archivo de dentro de la app (file:// en su carpeta de datos)? No se acepta desde otras apps. */
 	fun esInterno(contexto: Context, uri: Uri): Boolean {
+		// Nuestro propio FileProvider (content://<paquete>.archivos/…): daría a otra app lo que hay dentro de la app
+		if (uri.scheme == "content") return uri.authority.orEmpty().let { it == "${contexto.packageName}.archivos" || it.startsWith(contexto.packageName + ".") }
 		if (uri.scheme != "file") return false
 		val ruta = runCatching { File(uri.path ?: return false).canonicalPath }.getOrNull() ?: return true
 		val datos = runCatching { contexto.dataDir.canonicalPath }.getOrDefault(contexto.filesDir.parent ?: "")

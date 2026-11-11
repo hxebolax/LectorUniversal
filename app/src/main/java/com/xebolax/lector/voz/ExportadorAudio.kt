@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.documentfile.provider.DocumentFile
+import com.xebolax.lector.R
 import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.datos.Preferencias
 import com.xebolax.lector.modelo.Documento
@@ -19,6 +20,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -37,6 +39,10 @@ import kotlin.coroutines.coroutineContext
 class ExportadorAudio(private val c: Context) {
 
 	class Capitulo(val titulo: String, val bloques: IntRange)
+
+	/** Algo que decir junto al progreso (por ejemplo, que no se usa ElevenLabs). */
+	@Volatile var nota: String? = null
+		private set
 
 	/** progreso(capítulo actual, total de capítulos, porcentaje del libro). */
 	suspend fun exportar(doc: Documento, idLibro: Long, titulo: String, carpeta: Uri, progreso: (Int, Int, Int) -> Unit): Int {
@@ -57,7 +63,7 @@ class ExportadorAudio(private val c: Context) {
 				coroutineContext.ensureActive()
 				progreso(i + 1, capitulos.size, (doc.inicioBloque[cap.bloques.first] * 100 / total).toInt())
 				// Trozos de unos 2500 caracteres en frases completas (el motor tiene un máximo por petición)
-				val trozos = trozos(doc, cap.bloques, p.saltarNotas).map { t -> pronunciador?.takeIf { !it.vacio }?.aplicar(t) ?: t }
+				val trozos = trozos(doc, cap.bloques, p, pronunciador)
 				if (trozos.isEmpty()) continue
 				// Cada trozo se codifica en cuanto se genera y su WAV se borra: la caché no crece con capítulos largos
 				val m4a = File(temporal, "capitulo.m4a")
@@ -108,14 +114,16 @@ class ExportadorAudio(private val c: Context) {
 		return lista
 	}
 
-	private fun trozos(doc: Documento, bloques: IntRange, saltarNotas: Boolean): List<String> {
+	private fun trozos(doc: Documento, bloques: IntRange, p: Preferencias, pronunciador: Pronunciador?): List<String> {
 		val trozos = ArrayList<String>()
 		val actual = StringBuilder()
 		for (b in bloques) {
 			val bl = doc.bloques.getOrNull(b) ?: continue
-			if (bl.tipo == TipoBloque.SEPARADOR || (saltarNotas && bl.tipo == TipoBloque.NOTA)) continue
-			for (r in Segmentador.frases(bl.texto)) {
-				val frase = bl.texto.substring(r.first, r.last + 1)
+			if (bl.tipo == TipoBloque.SEPARADOR || (p.saltarNotas && bl.tipo == TipoBloque.NOTA)) continue
+			for ((k, r) in Segmentador.frases(bl.texto).withIndex()) {
+				// Lo mismo que se dice al leer en voz alta (notas, direcciones, paréntesis, pronunciación, páginas)
+				val frase = LectorVoz.textoParaDecir(c, p, doc, b, bl.texto.substring(r.first, r.last + 1), k == 0, pronunciador)
+				if (frase.isBlank()) continue
 				if (actual.length + frase.length > 2500 && actual.isNotEmpty()) {
 					trozos += actual.toString()
 					actual.setLength(0)
@@ -141,6 +149,8 @@ class ExportadorAudio(private val c: Context) {
 			tts.shutdown()
 			error("El motor de voz no está disponible")
 		}
+		// ElevenLabs no se usa para exportar (gastaría muchos créditos): se exporta con la voz del móvil y se dice
+		if (ElevenLabs.esMotor(perfil.motorEfectivo(p))) nota = c.getString(R.string.lectura_exportar_sin_elevenlabs)
 		val velocidad = perfil.velocidadEfectiva(p)
 		val nombreVoz = perfil.vozEfectiva(p).takeUnless { ElevenLabs.esVozSuya(it) }.orEmpty()
 		tts.setSpeechRate(velocidad / 100f)
@@ -152,7 +162,19 @@ class ExportadorAudio(private val c: Context) {
 		return tts
 	}
 
+	/** Genera el WAV de un trozo; si el motor falla, se para o no contesta en un minuto, lo intenta otra vez. */
 	private suspend fun sintetizar(tts: TextToSpeech, texto: String, destino: File): Boolean {
+		repeat(2) {
+			coroutineContext.ensureActive()
+			if (withTimeoutOrNull(60_000) { sintetizarUnaVez(tts, texto, destino) } == true) return true
+			destino.delete()
+			// Lo que quedara pendiente en el motor se descarta antes de volver a pedirlo
+			runCatching { tts.stop() }
+		}
+		return false
+	}
+
+	private suspend fun sintetizarUnaVez(tts: TextToSpeech, texto: String, destino: File): Boolean {
 		val hecho = CompletableDeferred<Boolean>()
 		val id = destino.name + System.nanoTime()
 		tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -165,6 +187,9 @@ class ExportadorAudio(private val c: Context) {
 				if (utteranceId == id) hecho.complete(false)
 			}
 			override fun onError(utteranceId: String?, errorCode: Int) {
+				if (utteranceId == id) hecho.complete(false)
+			}
+			override fun onStop(utteranceId: String?, interrupted: Boolean) {
 				if (utteranceId == id) hecho.complete(false)
 			}
 		})
@@ -247,10 +272,12 @@ class ExportadorAudio(private val c: Context) {
 		}
 
 		private fun vaciar(final: Boolean) {
+			// Al final, como mucho unos 5 s esperando al codificador (si no da el fin del flujo, se deja como esté)
+			var esperas = 0
 			while (true) {
 				val i = codec.dequeueOutputBuffer(info, if (final) 10_000 else 0)
 				when {
-					i == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!final) return
+					i == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!final || ++esperas > 500) return
 					i == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
 						pista = muxer.addTrack(codec.outputFormat)
 						muxer.start()
@@ -306,10 +333,18 @@ class ExportadorAudio(private val c: Context) {
 		}
 
 		/** Cierra el audio del capítulo (el archivo queda completo). */
-		fun terminar() {
-			val i = codec.dequeueInputBuffer(10_000)
-			if (i >= 0) codec.queueInputBuffer(i, 0, 0, muestras * 1_000_000L / frecuencia, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-			vaciar(true)
+		suspend fun terminar() {
+			// El fin del flujo necesita un búfer de entrada libre: se vacía la salida hasta que lo haya (con tope)
+			for (intento in 0 until 500) {
+				coroutineContext.ensureActive()
+				val i = codec.dequeueInputBuffer(10_000)
+				if (i >= 0) {
+					codec.queueInputBuffer(i, 0, 0, muestras * 1_000_000L / frecuencia, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+					vaciar(true)
+					return
+				}
+				vaciar(false)
+			}
 		}
 
 		/** Suelta el codificador y el archivo (también si se canceló a medias). */

@@ -1,5 +1,6 @@
 package com.xebolax.lector.formatos
 
+import com.xebolax.lector.R
 import com.xebolax.lector.modelo.Contenido
 import com.xebolax.lector.modelo.TipoBloque
 import java.nio.ByteBuffer
@@ -17,11 +18,11 @@ object LectorDocAntiguo : LectorFormato {
 	override fun leer(fuente: Fuente, ctx: ContextoLectura): Contenido {
 		val ole = Ole(fuente.bytes())
 		when {
-			ole.tiene("EncryptedPackage") || ole.tiene("EncryptionInfo") -> throw ExcepcionFormato("El documento está cifrado con contraseña; ábrelo en Word y guárdalo sin contraseña.")
-			ole.tiene("PowerPoint Document") -> throw ExcepcionFormato("Las presentaciones de PowerPoint antiguas (.ppt) no se pueden abrir: guárdala como .pptx.")
-			ole.tiene("Workbook") || ole.tiene("Book") -> throw ExcepcionFormato("Las hojas de Excel antiguas (.xls) no se pueden abrir: guárdala como .xlsx.")
+			ole.tiene("EncryptedPackage") || ole.tiene("EncryptionInfo") -> throw ExcepcionFormato(R.string.fmt_cifrado)
+			ole.tiene("PowerPoint Document") -> throw ExcepcionFormato(R.string.fmt_ppt_antiguo)
+			ole.tiene("Workbook") || ole.tiene("Book") -> throw ExcepcionFormato(R.string.fmt_xls_antiguo)
 		}
-		val word = ole.flujo("WordDocument") ?: throw ExcepcionFormato("No es un documento de Word.")
+		val word = ole.flujo("WordDocument") ?: throw ExcepcionFormato.noValido(Formato.DOC)
 		val texto = textoDe(word, ole)
 		val c = ctx.nuevoConstructor()
 		c.titulo = fuente.nombre.substringBeforeLast('.')
@@ -32,19 +33,19 @@ object LectorDocAntiguo : LectorFormato {
 	/** El texto del documento principal, desde la tabla de piezas. */
 	internal fun textoDe(word: ByteArray, ole: Ole): String {
 		val fib = ByteBuffer.wrap(word).order(ByteOrder.LITTLE_ENDIAN)
-		if (word.size < 0x01AA || fib.getShort(0).toInt() and 0xFFFF != 0xA5EC) throw ExcepcionFormato("Este documento de Word es demasiado antiguo o está dañado.")
+		if (word.size < 0x01AA || fib.getShort(0).toInt() and 0xFFFF != 0xA5EC) throw ExcepcionFormato(R.string.fmt_doc_muy_antiguo)
 		val banderas = fib.getShort(0x0A).toInt() and 0xFFFF
-		if (banderas and 0x0100 != 0) throw ExcepcionFormato("El documento está cifrado con contraseña; ábrelo en Word y guárdalo sin contraseña.")
-		val tabla = ole.flujo(if (banderas and 0x0200 != 0) "1Table" else "0Table") ?: throw ExcepcionFormato("Al documento le falta una parte.")
+		if (banderas and 0x0100 != 0) throw ExcepcionFormato(R.string.fmt_cifrado)
+		val tabla = ole.flujo(if (banderas and 0x0200 != 0) "1Table" else "0Table") ?: throw ExcepcionFormato(R.string.fmt_falta_parte)
 		val ccpTexto = fib.getInt(0x004C)
 		val fcClx = fib.getInt(0x01A2)
 		val lcbClx = fib.getInt(0x01A6)
-		if (fcClx < 0 || lcbClx <= 0 || fcClx + lcbClx > tabla.size) throw ExcepcionFormato("El documento de Word está dañado.")
+		if (fcClx < 0 || lcbClx <= 0 || fcClx + lcbClx > tabla.size) throw ExcepcionFormato(R.string.fmt_danado)
 		val t = ByteBuffer.wrap(tabla).order(ByteOrder.LITTLE_ENDIAN)
 		// CLX: varios Prc (0x01) y luego el Pcdt (0x02) con la tabla de piezas
 		var i = fcClx
 		while (i < fcClx + lcbClx && tabla[i].toInt() == 0x01) i += 3 + (t.getShort(i + 1).toInt() and 0xFFFF)
-		if (i >= fcClx + lcbClx || tabla[i].toInt() != 0x02) throw ExcepcionFormato("El documento de Word está dañado.")
+		if (i >= fcClx + lcbClx || tabla[i].toInt() != 0x02) throw ExcepcionFormato(R.string.fmt_danado)
 		val lcb = t.getInt(i + 1)
 		val inicio = i + 5
 		val piezas = (lcb - 4) / 12
@@ -149,7 +150,7 @@ class Ole(private val datos: ByteArray) {
 	private val miniFlujo: ByteArray
 
 	init {
-		if (datos.size < 512 || b.getInt(0) != 0xE011CFD0.toInt()) throw ExcepcionFormato("No es un documento de Office antiguo.")
+		if (datos.size < 512 || b.getInt(0) != 0xE011CFD0.toInt()) throw ExcepcionFormato.noValido(Formato.DOC)
 		// DIFAT: los primeros 109 sectores de la FAT en la cabecera y el resto en una cadena de sectores
 		val sectoresFat = ArrayList<Int>()
 		for (k in 0 until 109) b.getInt(0x4C + k * 4).takeIf { it >= 0 }?.let { sectoresFat += it }

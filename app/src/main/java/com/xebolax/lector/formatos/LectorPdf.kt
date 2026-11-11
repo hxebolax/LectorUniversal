@@ -69,7 +69,7 @@ object LectorPdf : LectorFormato {
 		} catch (e: InvalidPasswordException) {
 			throw ExcepcionClave(incorrecta = ctx.opciones.clave != null)
 		} catch (e: IOException) {
-			throw ExcepcionFormato("El PDF está dañado o no se puede leer.", e)
+			throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_danado, e)
 		}
 		try {
 			return Contenido.Texto(convertir(doc, fuente, ctx))
@@ -80,7 +80,7 @@ object LectorPdf : LectorFormato {
 
 	private fun convertir(doc: PDDocument, fuente: Fuente, ctx: ContextoLectura): Documento {
 		val total = doc.numberOfPages
-		if (total <= 0) throw ExcepcionFormato("El PDF no tiene páginas.")
+		if (total <= 0) throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_vacio)
 		val c = ctx.nuevoConstructor()
 		metadatos(doc, c)
 		if (c.titulo.isBlank()) c.titulo = fuente.nombre.substringBeforeLast('.')

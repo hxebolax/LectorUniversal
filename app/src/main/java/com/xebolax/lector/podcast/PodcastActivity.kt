@@ -409,6 +409,7 @@ class PodcastActivity : AppCompatActivity() {
 					pausado = pausado.isChecked,
 				))
 				avisar(getString(R.string.guardado))
+				if (avisos.isChecked && !p.avisar) com.xebolax.lector.ui.PermisoAvisos.pedir(this, R.string.cj_avisos_por_podcasts)
 			}
 			.setNegativeButton(R.string.cancelar, null)
 			.show()

@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import com.xebolax.lector.BuildConfig
+import com.xebolax.lector.R
+import com.xebolax.lector.datos.FalloEstado
+import com.xebolax.lector.datos.FalloIo
 import com.xebolax.lector.datos.Preferencias
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -101,7 +104,7 @@ object Actualizador {
 			"github" -> conReintento { leerGitHub(BuildConfig.REPO_GITHUB) }
 			"personalizada" -> {
 				val url = p.urlPersonalizada
-				require(url.startsWith("http")) { "No hay dirección personalizada para las actualizaciones. Escríbela en Ajustes, General." }
+				if (!url.startsWith("http")) throw FalloEstado(R.string.cj_act_sin_direccion)
 				val repo = repoDeGitHub(url)
 				conReintento { if (repo != null) leerGitHub(repo) else leerVersion(url) }
 			}
@@ -149,9 +152,9 @@ object Actualizador {
 		val o = try {
 			when (val codigo = c.responseCode) {
 				200 -> JSONObject(c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() })
-				404 -> throw IllegalStateException("GitHub no tiene versiones publicadas en $repo.")
-				403, 429 -> throw IOException("GitHub no deja consultar más por ahora (límite de peticiones). Inténtalo dentro de un rato.")
-				else -> throw IllegalStateException("GitHub respondió $codigo.")
+				404 -> throw FalloEstado(R.string.cj_act_github_sin_versiones, repo)
+				403, 429 -> throw FalloIo(R.string.cj_act_github_limite)
+				else -> throw FalloEstado(R.string.cj_act_github_respondio, codigo)
 			}
 		} finally {
 			c.disconnect()
@@ -159,9 +162,9 @@ object Actualizador {
 		val adjuntos = o.optJSONArray("assets") ?: org.json.JSONArray()
 		val lista = (0 until adjuntos.length()).map { adjuntos.getJSONObject(it) }
 		val apk = lista.firstOrNull { Regex("[A-Za-z0-9._-]+\\.apk").matches(it.optString("name")) }
-			?: throw IllegalStateException("La última versión de GitHub no trae el archivo de la app (APK).")
+			?: throw FalloEstado(R.string.cj_act_github_sin_apk)
 		val urlApk = apk.optString("browser_download_url")
-		require(urlApk.startsWith("https://github.com/")) { "La dirección del APK de GitHub no es válida." }
+		if (!urlApk.startsWith("https://github.com/")) throw FalloEstado(R.string.cj_act_github_apk_no_valido)
 		// version.json adjunto (lo sube publicar_actualizacion.ps1): versionCode y novedades
 		val json = lista.firstOrNull { it.optString("name") == "version.json" }?.let { a ->
 			runCatching {
@@ -174,7 +177,7 @@ object Actualizador {
 			}.getOrNull()
 		}
 		val version = json?.optString("version")?.trim()?.takeIf { it.isNotEmpty() } ?: o.optString("tag_name").trim().removePrefix("v").removePrefix("V")
-		require(version.isNotEmpty()) { "La última versión de GitHub no dice su número." }
+		if (version.isEmpty()) throw FalloEstado(R.string.cj_act_github_sin_numero)
 		val digest = apk.optString("digest").takeIf { it.startsWith("sha256:") }?.removePrefix("sha256:")
 		return VersionPublicada(
 			version = version,
@@ -193,13 +196,13 @@ object Actualizador {
 	private fun leerVersion(base: String): VersionPublicada {
 		val c = conexion("$base/version.json?t=${System.currentTimeMillis()}", conectar = 8_000)
 		try {
-			if (c.responseCode != 200) throw IllegalStateException("El servidor respondió ${c.responseCode}.")
+			if (c.responseCode != 200) throw FalloEstado(R.string.cj_act_servidor_respondio, c.responseCode)
 			val o = JSONObject(c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() })
 			val version = o.optString("version").trim()
 			val archivo = o.optString("file").trim()
-			require(version.isNotEmpty() && archivo.isNotEmpty()) { "El archivo de versión del servidor no es válido." }
+			if (version.isEmpty() || archivo.isEmpty()) throw FalloEstado(R.string.cj_act_version_no_valida)
 			// Solo un nombre de archivo, nunca una ruta ni otra web
-			require(Regex("[A-Za-z0-9._-]+\\.apk").matches(archivo)) { "El archivo de versión del servidor no es válido." }
+			if (!Regex("[A-Za-z0-9._-]+\\.apk").matches(archivo)) throw FalloEstado(R.string.cj_act_version_no_valida)
 			return VersionPublicada(
 				version = version,
 				versionCode = o.optInt("versionCode", 0),
@@ -249,7 +252,7 @@ object Actualizador {
 							leidos = 0
 							total = c.contentLengthLong.takeIf { it > 0 } ?: v.tamano
 						} else if (codigo != 206 || leidos == 0L) {
-							throw IllegalStateException("El servidor respondió $codigo al descargar.")
+							throw FalloEstado(R.string.cj_act_servidor_respondio_descarga, codigo)
 						}
 						c.inputStream.use { entrada ->
 							FileOutputStream(parcial, leidos > 0).use { salida ->
@@ -270,18 +273,18 @@ object Actualizador {
 						Log.w(ETIQUETA, "Descarga cortada en $leidos de $total bytes", e)
 						if (leidos > alEmpezar) intentos = 0
 						if (++intentos > REINTENTOS) {
-							throw IllegalStateException("La conexión se cortó varias veces (${e.message}). Inténtalo de nuevo.")
+							throw FalloEstado(R.string.cj_act_cortes)
 						}
 						delay(2000L * minOf(intentos, 5))
 					} finally {
 						c.disconnect()
 					}
 				}
-				if (v.tamano > 0 && parcial.length() != v.tamano) throw IllegalStateException("La descarga está incompleta. Inténtalo de nuevo.")
+				if (v.tamano > 0 && parcial.length() != v.tamano) throw FalloEstado(R.string.cj_act_incompleta)
 				if (v.sha256.isNotEmpty() && sha256(parcial) != v.sha256) {
-					throw IllegalStateException("El archivo descargado no coincide con el publicado (SHA-256). No se instalará.")
+					throw FalloEstado(R.string.cj_act_sha)
 				}
-				if (!parcial.renameTo(destino)) throw IllegalStateException("No se pudo guardar la actualización.")
+				if (!parcial.renameTo(destino)) throw FalloEstado(R.string.cj_act_no_guardada)
 				comprobarApk(contexto, destino)
 				destino
 			} catch (e: Exception) {
@@ -310,15 +313,15 @@ object Actualizador {
 		val banderas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) PackageManager.GET_SIGNING_CERTIFICATES
 		else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
 		val nueva = pm.getPackageArchiveInfo(apk.absolutePath, banderas)
-			?: throw IllegalStateException("El archivo descargado no es una aplicación válida.")
-		if (nueva.packageName != contexto.packageName) throw IllegalStateException("El archivo descargado no es Lector Universal.")
+			?: throw FalloEstado(R.string.cj_act_no_app)
+		if (nueva.packageName != contexto.packageName) throw FalloEstado(R.string.cj_act_no_lector)
 		val codigoNuevo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) nueva.longVersionCode else @Suppress("DEPRECATION") nueva.versionCode.toLong()
-		if (codigoNuevo <= BuildConfig.VERSION_CODE) throw IllegalStateException("El archivo descargado no es más nuevo que la versión instalada.")
+		if (codigoNuevo <= BuildConfig.VERSION_CODE) throw FalloEstado(R.string.cj_act_no_nueva)
 		val instalada = pm.getPackageInfo(contexto.packageName, banderas)
 		val firmasNuevas = firmas(nueva)
 		// Si el sistema no da las firmas del archivo, el instalador las comprobará igualmente
 		if (firmasNuevas.isNotEmpty() && firmasNuevas.intersect(firmas(instalada)).isEmpty()) {
-			throw IllegalStateException("La actualización no está firmada con la clave de Lector Universal. No se instalará.")
+			throw FalloEstado(R.string.cj_act_firma)
 		}
 	}
 

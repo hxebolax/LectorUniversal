@@ -36,6 +36,7 @@ enum class ZonaAcciones(val titulo: Int) {
 	PROGRAMACION(R.string.zona_programacion),
 	COMPARTIDO(R.string.zona_compartido),
 	DISPOSITIVO(R.string.zona_dispositivo),
+	GRUPO(R.string.zona_grupo),
 }
 
 /** Una acción del catálogo: clave guardada, textos con los que aparece, si sale sin tocar nada y su nombre en Ajustes. */
@@ -63,6 +64,7 @@ object AccionesTalkBack {
 			e("compartir", R.string.compartir_archivo), e("quitar", R.string.quitar_de_biblioteca),
 			o("estado", R.string.estado_de_lectura), o("colecciones", R.string.colecciones_puntos), o("serie", R.string.serie_puntos),
 			o("tipo", R.string.cambiar_tipo), o("voz_libro", R.string.voz_de_este_libro),
+			e("seleccion", R.string.seleccionar, R.string.quitar_seleccion),
 		)
 		ZonaAcciones.CARPETA -> listOf(
 			e("abrir", R.string.abrir), o("seguido", R.string.seguido_carpeta), e("renombrar", R.string.renombrar), e("subcarpeta", R.string.nueva_subcarpeta),
@@ -73,7 +75,10 @@ object AccionesTalkBack {
 			e("leido", R.string.comp_marcar_leido, R.string.comp_marcar_no_leido), e("navegador", R.string.abrir_navegador),
 			e("compartir", R.string.compartir), e("borrar", R.string.borrar), o("renombrar", R.string.renombrar),
 			o("copiar", R.string.comp_copiar_enlace), o("info", R.string.informacion),
+			e("favorito", R.string.anadir_favoritos, R.string.quitar_favoritos), e("descargar", R.string.comp_volver_descargar),
 		)
+		// Autores, series y colecciones de la Biblioteca (Mostrar)
+		ZonaAcciones.GRUPO -> listOf(e("abrir", R.string.abrir), e("renombrar", R.string.renombrar), e("borrar", R.string.borrar_coleccion))
 		// Libros del dispositivo (Biblioteca, Añadir, Buscar en el dispositivo)
 		ZonaAcciones.DISPOSITIVO -> listOf(
 			e("abrir", R.string.disp_abrir_anadir, R.string.disp_ya_abrir, R.string.disp_ya_compartidos_abrir), e("anadir", R.string.disp_anadir),

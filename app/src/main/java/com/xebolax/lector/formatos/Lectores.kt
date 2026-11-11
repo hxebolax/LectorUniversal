@@ -42,7 +42,7 @@ object Lectores {
 	fun abrir(fuente: Fuente, ctx: ContextoLectura, formato: Formato = Formato.reconocer(fuente)): Contenido {
 		val clave = CacheContenido.clave(fuente, formato, ctx.opciones)
 		CacheContenido.cargar(ctx.app, clave)?.let { return it }
-		val lector = lectorDe(formato) ?: throw ExcepcionFormato("Formato no compatible.")
+		val lector = lectorDe(formato) ?: throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_no_compatible)
 		val contenido = try {
 			lector.leer(fuente, ctx)
 		} catch (e: ExcepcionFormato) {
@@ -50,9 +50,16 @@ object Lectores {
 		} catch (e: InterruptedException) {
 			throw e
 		} catch (e: OutOfMemoryError) {
-			throw ExcepcionFormato("El documento es demasiado grande para la memoria del dispositivo.", e)
+			throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_sin_memoria, e)
+		} catch (e: java.io.FileNotFoundException) {
+			// Movido o borrado (o la carpeta ya no está)
+			throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_no_encontrado, e)
+		} catch (e: SecurityException) {
+			// Se perdió el permiso para abrirlo (por ejemplo, tras restaurar una copia)
+			throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_sin_permiso, e)
 		} catch (e: Exception) {
-			throw ExcepcionFormato("No se pudo leer el archivo: ${e.message ?: e.javaClass.simpleName}", e)
+			// El detalle técnico va en la causa (para el registro), no en el mensaje
+			throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_no_leido, e)
 		}
 		// Con contraseña no se guarda en la caché (sería una copia sin proteger)
 		if (ctx.opciones.clave == null) runCatching { CacheContenido.guardar(ctx.app, clave, contenido) }

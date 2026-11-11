@@ -76,7 +76,11 @@ class CompartidosActivity : AppCompatActivity() {
 		ponerPestanas(b.barra, b.paginas, b.pestanas, pestanas.map { it.nombre to it.icono }, getString(R.string.compartidos))
 		if (savedInstanceState == null) atender(intent)
 		// Los leídos de hace tiempo se borran solos (si se eligió en Ajustes)
-		LectorApp.ambito.launch { runCatching { Compartidos.limpiar(applicationContext) } }
+		LectorApp.ambito.launch {
+			runCatching { Compartidos.limpiar(applicationContext) }
+			// Lo pendiente de descargar se vuelve a intentar (el trabajo se rinde tras varios fallos)
+			runCatching { DescargasPendientes.reprogramarSiHace(applicationContext) }
+		}
 	}
 
 	override fun onNewIntent(intent: Intent) {
@@ -108,11 +112,11 @@ class CompartidosActivity : AppCompatActivity() {
 					!texto.isNullOrBlank() -> recibirTexto(texto, asunto)
 				}
 			}
+			// Accesos directos del icono de la app: solo por su alias, que no está abierto a otras apps
+			Compartidos.ATAJO_COPIADO -> if (Compartidos.esAtajo(i)) copiadoPendiente = true
+			Compartidos.ATAJO_PENDIENTE -> if (Compartidos.esAtajo(i)) leerPendiente()
+			Compartidos.ATAJO_WEB -> if (Compartidos.esAtajo(i)) pedirWeb()
 			// Texto seleccionado en otra app: se guarda y se lee en voz alta al momento
-			// Accesos directos del icono de la app
-			Compartidos.ATAJO_COPIADO -> copiadoPendiente = true
-			Compartidos.ATAJO_PENDIENTE -> leerPendiente()
-			Compartidos.ATAJO_WEB -> pedirWeb()
 			Intent.ACTION_PROCESS_TEXT -> {
 				val texto = i.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
 				if (!texto.isNullOrBlank()) lifecycleScope.launch {
@@ -137,6 +141,7 @@ class CompartidosActivity : AppCompatActivity() {
 						}
 					}
 					val ids = guardados.map { it.first }
+					val fallidos = lista.size - guardados.size
 					TareasInicio.completar(this@CompartidosActivity, guardados.filter { it.second }.map { it.first })
 					// Lo que ya estaba en la biblioteca sigue ahí: se dice aparte
 					val enBiblioteca = withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -144,9 +149,11 @@ class CompartidosActivity : AppCompatActivity() {
 						ids.count { db.libro(it)?.compartido == false }
 					}
 					val enCompartidos = ids.size - enBiblioteca
+					// Los que no se pudieron guardar también se dicen (no se callan)
 					avisar(listOfNotNull(
-						resources.getQuantityString(R.plurals.comp_recibidos, enCompartidos, enCompartidos).takeIf { enCompartidos > 0 || enBiblioteca == 0 },
+						resources.getQuantityString(R.plurals.comp_recibidos, enCompartidos, enCompartidos).takeIf { enCompartidos > 0 || (enBiblioteca == 0 && fallidos == 0) },
 						resources.getQuantityString(R.plurals.comp_ya_biblioteca_n, enBiblioteca, enBiblioteca).takeIf { enBiblioteca > 0 },
+						resources.getQuantityString(R.plurals.comp_no_guardados_n, fallidos, fallidos).takeIf { fallidos > 0 },
 					).joinToString(". "), mostrar = true)
 				}
 			}
@@ -212,8 +219,15 @@ class CompartidosActivity : AppCompatActivity() {
 					.setMessage(getString(R.string.error_web, e.message ?: "") + "\n\n" + getString(R.string.comp_guardar_pendiente_pregunta))
 					.setPositiveButton(R.string.comp_guardar_pendiente) { _, _ ->
 						lifecycleScope.launch {
-							runCatching { com.xebolax.lector.ui.PaginaWeb.guardarPendiente(this@CompartidosActivity, url) }
-							avisar(getString(R.string.comp_pendiente_guardado), mostrar = true)
+							try {
+								com.xebolax.lector.ui.PaginaWeb.guardarPendiente(this@CompartidosActivity, url)
+								avisar(getString(R.string.comp_pendiente_guardado), mostrar = true)
+							} catch (e: kotlinx.coroutines.CancellationException) {
+								throw e
+							} catch (e: Exception) {
+								// No se pudo guardar: se dice, no se da por guardado
+								mensaje(getString(R.string.abrir_pagina_web), getString(R.string.comp_pendiente_no_guardado, e.message ?: ""))
+							}
 						}
 					}
 					.setNegativeButton(R.string.cancelar, null)
@@ -246,7 +260,9 @@ class CompartidosActivity : AppCompatActivity() {
 
 	private fun leerPendiente() {
 		lifecycleScope.launch {
-			val lista = withContext(kotlinx.coroutines.Dispatchers.IO) { BaseDatos.obtener(this@CompartidosActivity).compartidos().filter { it.estado != Estado.TERMINADO }.reversed() }
+			val lista = withContext(kotlinx.coroutines.Dispatchers.IO) { BaseDatos.obtener(this@CompartidosActivity).compartidos()
+				// Sin los enlaces pendientes de descargar: solo tienen un aviso, no el artículo
+				.filter { it.estado != Estado.TERMINADO && !DescargasPendientes.pendiente(it.ajustes) }.reversed() }
 			com.xebolax.lector.voz.ListaLectura.empezar(this@CompartidosActivity, lista)
 		}
 	}
@@ -269,13 +285,23 @@ class CompartidosActivity : AppCompatActivity() {
 
 	/** Al abrir Compartidos con un enlace nuevo copiado: «¿Guardar el enlace copiado?» (una vez por enlace; se quita en Ajustes). */
 	private fun ofrecerCopiado() {
-		if (!androidx.preference.PreferenceManager.getDefaultSharedPreferences(this).getBoolean("comp_ofrecer_copiado", true)) return
-		val texto = runCatching {
-			(getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager).primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()
-		}.getOrNull()?.trim().orEmpty()
+		val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+		if (!prefs.getBoolean("comp_ofrecer_copiado", true)) return
+		val portapapeles = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+		// Primero solo la descripción (no avisa de que se ha leído el portapapeles): el contenido se lee
+		// solo si es un texto nuevo que puede ser un enlace, y cada copia una sola vez
+		val descripcion = runCatching { portapapeles.primaryClipDescription }.getOrNull() ?: return
+		if (!descripcion.hasMimeType("text/*")) return
+		if (android.os.Build.VERSION.SDK_INT >= 26) {
+			val marca = descripcion.timestamp
+			if (marca > 0 && prefs.getLong("comp_ultimo_clip", 0L) == marca) return
+			prefs.edit().putLong("comp_ultimo_clip", marca).apply()
+		}
+		if (android.os.Build.VERSION.SDK_INT >= 31 && descripcion.classificationStatus == android.content.ClipDescription.CLASSIFICATION_COMPLETE &&
+			descripcion.getConfidenceScore(android.view.textclassifier.TextClassifier.TYPE_URL) < 0.5f) return
+		val texto = runCatching { portapapeles.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString() }.getOrNull()?.trim().orEmpty()
 		if (texto.isEmpty() || texto.length > 400) return
 		val url = Compartidos.enlaceDe(texto) ?: return
-		val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
 		if (prefs.getString("comp_ultimo_copiado", "") == url) return
 		prefs.edit().putString("comp_ultimo_copiado", url).apply()
 		lifecycleScope.launch {
@@ -347,6 +373,8 @@ class CompartidosActivity : AppCompatActivity() {
 			if (lista.isEmpty()) return@launch avisar(getString(if (soloLeidos) R.string.comp_sin_leidos else R.string.comp_vacio_corto))
 			val pregunta = if (soloLeidos) R.plurals.comp_confirmar_borrar_leidos else R.plurals.comp_confirmar_borrar_todo
 			confirmar(resources.getQuantityString(pregunta, lista.size, lista.size), getString(R.string.borrar)) {
+				// Si algo de eso se está leyendo o sonando, se para antes
+				com.xebolax.lector.ui.AccionesLibro.pararSiSeUsa(lista.map { it.id })
 				lifecycleScope.launch {
 					withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) { lista.forEach { Compartidos.borrar(applicationContext, it) } }
 					avisar(resources.getQuantityString(R.plurals.comp_borrados, lista.size, lista.size))

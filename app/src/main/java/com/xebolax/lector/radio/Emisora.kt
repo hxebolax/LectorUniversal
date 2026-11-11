@@ -32,8 +32,11 @@ data class Emisora(
 ) {
 	val propia get() = uuid.startsWith(PROPIA)
 
-	/** Id del audio para el reproductor (negativo y único, no choca con libros ni episodios). */
-	val idAudio: Long get() = -5_000_000_000L - (uuid.hashCode().toLong() and 0x7fffffff)
+	/**
+	 * Id del audio para el reproductor (negativo y único). Tramos: libros > 0; episodios -1e9 - id;
+	 * noticias -2e9 - id; episodios sin suscribirse -3·2^32 - …; emisoras -4·2^32 - …; grabaciones -5·2^32 - id.
+	 */
+	val idAudio: Long get() = -(4L shl 32) - (uuid.hashCode().toLong() and 0xffffffffL)
 
 	/** El país en el idioma de la app (radio-browser lo da en inglés). */
 	fun paisLegible(): String =

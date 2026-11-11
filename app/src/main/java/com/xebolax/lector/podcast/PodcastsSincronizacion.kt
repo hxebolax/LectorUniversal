@@ -87,7 +87,8 @@ object PodcastsSincronizacion {
 			val fallidas = HashSet<String>()
 			for (url in (remotos.anadir + antes).distinct()) if (url !in locales) {
 				try {
-					Podcasts.suscribir(c, url)
+					// Si el feed no responde, se quita y se lanza el error: queda apuntada para reintentarla
+					Podcasts.suscribir(c, url, lanzar = true)
 					anadidos++
 				} catch (e: kotlinx.coroutines.CancellationException) {
 					throw e

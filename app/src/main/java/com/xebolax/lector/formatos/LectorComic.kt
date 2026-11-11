@@ -19,11 +19,11 @@ object LectorComic : LectorFormato {
 	fun esImagen(ruta: String) = Fuente.extensionDe(ruta).lowercase() in IMAGENES
 
 	override fun leer(fuente: Fuente, ctx: ContextoLectura): Contenido {
-		val zip = fuente.contenedor() as? ContenedorZip ?: throw ExcepcionFormato("No es un cómic válido.")
+		val zip = fuente.contenedor() as? ContenedorZip ?: throw ExcepcionFormato.noValido(Formato.COMIC)
 		zip.use { z ->
 			val entradas = z.entradas().filterNot { it.startsWith("__MACOSX") || it.substringAfterLast('/').startsWith(".") }
 			val paginas = entradas.filter { esImagen(it) }.sortedWith(OrdenNatural)
-			if (paginas.isEmpty()) throw ExcepcionFormato("El cómic no tiene páginas.")
+			if (paginas.isEmpty()) throw ExcepcionFormato(com.xebolax.lector.R.string.fmt_vacio)
 			val c = ctx.nuevoConstructor()
 			c.titulo = fuente.nombre.substringBeforeLast('.')
 			// ComicInfo.xml (el estándar de ComicRack): título, serie, número, autores y resumen

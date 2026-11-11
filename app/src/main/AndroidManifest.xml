@@ -180,6 +180,11 @@
 				<data android:mimeType="text/plain" />
 			</intent-filter>
 		</activity-alias>
+		<!-- Accesos directos del icono (leer lo copiado, leer lo pendiente, guardar una web): solo la propia app puede usarlos -->
+		<activity-alias
+			android:name=".compartidos.AtajosCompartidos"
+			android:exported="false"
+			android:targetActivity=".compartidos.CompartidosActivity" />
 
 		<activity
 			android:name=".lectura.LectorActivity"

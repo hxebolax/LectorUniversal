@@ -95,7 +95,7 @@ class AdaptadorLibros(
 	private fun formatoDe(l: Libro): String =
 		// Audio suelto: la extensión dice más (M4B, MP3...)
 		if (l.formato == Formato.AUDIO.name && l.nombre.contains('.')) l.nombre.substringAfterLast('.').uppercase()
-		else runCatching { Formato.valueOf(l.formato).nombre }.getOrDefault(l.formato)
+		else Formato.nombreDe(contexto, l.formato)
 
 	private fun estadoDe(l: Libro): String = when (l.estado) {
 		Estado.TERMINADO -> contexto.getString(if (l.compartido) R.string.estado_leido else R.string.estado_terminado)
@@ -172,8 +172,9 @@ class AdaptadorLibros(
 				// El estado primero (como en Noticias): «Sin leer, título, página web, elpais.com, hace 5 minutos»
 				val minutos = com.xebolax.lector.compartidos.Compartidos.minutos(l)
 				val pendiente = com.xebolax.lector.compartidos.DescargasPendientes.pendiente(l.ajustes)
+				// «Pendiente de descarga» es su estado: va delante del título, como «Sin leer»
+				val estado = if (pendiente) contexto.getString(R.string.comp_pendiente_descarga) else estadoDe(l)
 				val partes = listOfNotNull(
-					contexto.getString(R.string.comp_pendiente_descarga).takeIf { pendiente },
 					contexto.getString(R.string.rss_favorito).takeIf { l.favorito },
 					contexto.getString(tipo.nombre),
 					sitio,
@@ -181,11 +182,11 @@ class AdaptadorLibros(
 					formatoDe(l).takeIf { tipo != TipoContenido.WEB && it.isNotBlank() },
 					cuando,
 				)
-				b.detalle.text = (listOf(estadoDe(l)) + partes).joinToString(" · ")
+				b.detalle.text = (listOf(estado) + partes).joinToString(" · ")
 				b.detalle.isVisible = true
 				b.progreso.isVisible = l.estado == Estado.LEYENDO
 				b.progreso.progress = l.progreso.toInt()
-				b.root.contentDescription = (listOf(estadoDe(l), l.tituloVisible) + partes).joinToString(", ")
+				b.root.contentDescription = (listOf(estado, l.tituloVisible) + partes).joinToString(", ")
 			}
 		}
 		val elegido = (fila is Fila.DeLibro && fila.libro.id in seleccionados) || (fila is Fila.DeCompartido && fila.libro.id in seleccionados)
@@ -198,6 +199,7 @@ class AdaptadorLibros(
 			is Fila.DeLibro -> ZonaAcciones.LIBRO
 			is Fila.DeCarpeta -> ZonaAcciones.CARPETA
 			is Fila.DeCompartido -> ZonaAcciones.COMPARTIDO
+			is Fila.Grupo -> ZonaAcciones.GRUPO
 			else -> null
 		})
 		b.root.setOnLongClickListener {

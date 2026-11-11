@@ -170,8 +170,8 @@ object PaginaWeb {
 	private suspend fun registrar(c: Context, url: String, titulo: String?, archivo: File, datos: Datos, compartido: Boolean, forzar: Boolean): Long {
 		val db = BaseDatos.obtener(c)
 		db.libroPorUri(Uri.fromFile(archivo).toString())?.let { ya ->
-			// Ya estaba (Volver a descargar): se actualizan su título y sus datos
-			if (forzar && titulo != null) {
+			// Ya estaba (Volver a descargar, o un enlace pendiente que se vuelve a compartir): se actualizan su título y sus datos
+			if ((forzar || com.xebolax.lector.compartidos.DescargasPendientes.pendiente(ya.ajustes)) && titulo != null) {
 				db.renombrar(ya.id, titulo.ifBlank { ya.titulo }, datos.autor.ifBlank { ya.autor })
 				guardarDatos(db, ya.id, datos, pendiente = false)
 			}
@@ -179,10 +179,21 @@ object PaginaWeb {
 		}
 		// Un documento descargado: se añade con su formato real y se leen su título y autor por detrás
 		if (titulo == null) {
-			val nuevo = com.xebolax.lector.biblioteca.Importador.anadirArchivos(c, listOf(Uri.fromFile(archivo)), null).anadidos.firstOrNull()
+			// Era un enlace pendiente de descargar: esa misma fila pasa a ser el documento (no se duplica ni se queda pendiente)
+			db.porOrigen(url)?.takeIf { com.xebolax.lector.compartidos.DescargasPendientes.pendiente(it.ajustes) }?.let { p ->
+				val formato = Formato.deExtension(Fuente.extensionDe(archivo.name)).takeIf { it != Formato.DESCONOCIDO } ?: Formato.TXT
+				// El aviso de «pendiente» que se guardó en su lugar ya no hace falta
+				Uri.parse(p.uri).path?.takeIf { it.startsWith(File(c.filesDir, "web").absolutePath) }?.let { File(it).delete() }
+				db.sustituirArchivo(p.id, Uri.fromFile(archivo).toString(), archivo.name, formato.name, formato.audio, archivo.length())
+				guardarDatos(db, p.id, datos, pendiente = false)
+				com.xebolax.lector.LectorApp.ambito.launch { com.xebolax.lector.biblioteca.Importador.completarDatos(c.applicationContext, listOf(p.id)) }
+				return p.id
+			}
+			val nuevo = com.xebolax.lector.biblioteca.Importador.anadirArchivos(c, listOf(Uri.fromFile(archivo)), null).nuevos.firstOrNull()
 			val id = nuevo ?: db.libroPorUri(Uri.fromFile(archivo).toString())?.id ?: error(c.getString(com.xebolax.lector.R.string.error_guardar_archivo))
 			if (compartido && nuevo != null) db.moverACompartidos(id, url)
-			com.xebolax.lector.LectorApp.ambito.launch { com.xebolax.lector.biblioteca.Importador.completarDatos(c.applicationContext, listOf(id)) }
+			// Título y autor reales por detrás, solo si es nuevo (si ya estaba, se respeta lo que se editó)
+			if (nuevo != null) com.xebolax.lector.LectorApp.ambito.launch { com.xebolax.lector.biblioteca.Importador.completarDatos(c.applicationContext, listOf(id)) }
 			return id
 		}
 		val id = if (compartido) db.anadirCompartido(Uri.fromFile(archivo).toString(), archivo.name, titulo.ifBlank { url }, Formato.HTML.name, false, archivo.length(), url)

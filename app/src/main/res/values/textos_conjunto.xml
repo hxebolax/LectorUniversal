@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos de la revisión de la app en conjunto (permiso de avisos, errores, formatos…) -->
+<resources>
+	<!-- Permiso de avisos, pedido en contexto -->
+	<string name="cj_avisos_titulo">Permitir avisos</string>
+	<string name="cj_avisos_permitir">Permitir</string>
+	<string name="cj_avisos_si_no">Si no los permites, la app funciona igual. Puedes cambiarlo cuando quieras en Ajustes del sistema, Aplicaciones, Lector Universal, Notificaciones.</string>
+	<string name="cj_avisos_sin_permiso">Sin permiso para los avisos. La app funciona igual, pero no verás sus avisos.</string>
+	<string name="cj_avisos_por_lectura">Mientras lees o escuchas con la pantalla apagada, Lector Universal puede avisarte de lo que pasa: los controles de lo que suena, el temporizador, el progreso de una exportación o de una grabación y los fallos que impidan seguir.</string>
+	<string name="cj_avisos_por_noticias">Para avisarte de las noticias nuevas de las fuentes que elijas, Lector Universal necesita permiso para mostrar avisos.</string>
+	<string name="cj_avisos_por_podcasts">Para avisarte de los episodios nuevos de los podcasts que elijas, Lector Universal necesita permiso para mostrar avisos.</string>
+	<string name="cj_avisos_por_descargas">Para mostrarte el progreso de las descargas de podcasts y avisarte si alguna falla, Lector Universal necesita permiso para mostrar avisos.</string>
+
+	<!-- Ajustes -->
+	<string name="cj_por_defecto_x">Por defecto: %1$s</string>
+	<string name="cj_hora_pista">Hora (por ejemplo, 23:00)</string>
+	<string name="cj_hora_no_valida">No es una hora válida. Escribe las horas y los minutos, por ejemplo 23:00 o 7:30.</string>
+	<string name="cj_exportar_sin_tiempo">Android ha parado la exportación porque se acabó el tiempo que da a estas tareas cada día. Los capítulos ya exportados están en la carpeta que elegiste; puedes volver a exportar el libro más tarde.</string>
+
+	<!-- Errores comunes -->
+	<string name="cj_error_inesperado">Ha ocurrido un error inesperado. Inténtalo de nuevo y, si se repite, informa del problema desde Ajustes, General.</string>
+	<string name="cj_sin_espacio">No hay espacio suficiente en el dispositivo.</string>
+
+	<!-- Actualizaciones -->
+	<string name="cj_act_sin_direccion">No hay dirección personalizada para las actualizaciones. Escríbela en Ajustes, General.</string>
+	<string name="cj_act_github_sin_versiones">GitHub no tiene versiones publicadas en %1$s.</string>
+	<string name="cj_act_github_limite">GitHub no deja consultar más por ahora (límite de consultas). Inténtalo dentro de un rato.</string>
+	<string name="cj_act_github_respondio">GitHub respondió con un error (%1$d). Inténtalo más tarde.</string>
+	<string name="cj_act_github_sin_apk">La última versión de GitHub no trae el archivo de la app (APK).</string>
+	<string name="cj_act_github_apk_no_valido">La dirección del archivo de la app en GitHub no es válida.</string>
+	<string name="cj_act_github_sin_numero">La última versión de GitHub no dice su número.</string>
+	<string name="cj_act_servidor_respondio">El servidor respondió con un error (%1$d). Inténtalo más tarde.</string>
+	<string name="cj_act_version_no_valida">El archivo de versión del servidor no es válido.</string>
+	<string name="cj_act_respuesta_no_valida">La respuesta del servidor no es válida. Inténtalo más tarde.</string>
+	<string name="cj_act_servidor_respondio_descarga">El servidor respondió con un error (%1$d) al descargar. Inténtalo más tarde.</string>
+	<string name="cj_act_cortes">La conexión se cortó varias veces. Inténtalo de nuevo.</string>
+	<string name="cj_act_incompleta">La descarga está incompleta. Inténtalo de nuevo.</string>
+	<string name="cj_act_sha">El archivo descargado no coincide con el publicado. No se instalará.</string>
+	<string name="cj_act_no_guardada">No se pudo guardar la actualización.</string>
+	<string name="cj_act_no_app">El archivo descargado no es una aplicación válida.</string>
+	<string name="cj_act_no_lector">El archivo descargado no es Lector Universal.</string>
+	<string name="cj_act_no_nueva">El archivo descargado no es más nuevo que la versión instalada.</string>
+	<string name="cj_act_firma">La actualización no está firmada con la clave de Lector Universal. No se instalará.</string>
+	<string name="cj_act_sin_instalador">no se pudo abrir el instalador de aplicaciones del sistema.</string>
+
+	<!-- Copias de seguridad -->
+	<string name="cj_copia_contrasena_incorrecta">La contraseña no es correcta, o la copia está dañada.</string>
+	<string name="cj_copia_con_contrasena">La copia está protegida con contraseña.</string>
+	<string name="cj_copia_no_es_copia">El archivo no es una copia de seguridad de Lector Universal.</string>
+	<string name="cj_copia_incompleta">La copia está incompleta: puede que no se terminara de guardar o de copiar.</string>
+	<string name="cj_copia_danada">La copia está dañada.</string>
+	<string name="cj_copia_mas_nueva">La copia es de una versión más nueva de la app. Actualiza Lector Universal y vuelve a intentarlo.</string>
+	<string name="cj_copia_no_restaurado">No se pudo restaurar %1$s.</string>
+
+	<!-- Informe de fallos (se lo envías al autor) -->
+	<string name="cj_fallo_hilo">Hilo: %1$s</string>
+	<string name="cj_fallo_movil">Móvil: %1$s</string>
+	<string name="cj_fallo_fecha">Fecha: %1$s</string>
+
+	<!-- Datos de un audiolibro (Información) -->
+	<string name="cj_audiolibro">Audiolibro</string>
+	<string name="cj_meta_autor">Autor</string>
+	<string name="cj_meta_narrador">Narrador</string>
+	<string name="cj_meta_album">Álbum</string>
+	<string name="cj_meta_titulo_pista">Título de la pista</string>
+	<string name="cj_meta_genero">Género</string>
+	<string name="cj_meta_fecha">Fecha</string>
+	<string name="cj_meta_duracion">Duración</string>
+	<string name="cj_meta_duracion_total">Duración total</string>
+	<string name="cj_meta_capitulos">Capítulos</string>
+	<string name="cj_meta_pistas">Pistas</string>
+	<string name="cj_meta_archivo">Archivo</string>
+
+	<!-- Nombres de los formatos (en la biblioteca y en Información) -->
+	<string name="formato_epub">EPUB</string>
+	<string name="formato_pdf">PDF</string>
+	<string name="formato_word">Word</string>
+	<string name="formato_word_antiguo">Word 97-2003</string>
+	<string name="formato_opendocument">OpenDocument</string>
+	<string name="formato_rtf">RTF</string>
+	<string name="formato_texto">Texto</string>
+	<string name="formato_html">HTML</string>
+	<string name="formato_markdown">Markdown</string>
+	<string name="formato_fictionbook">FictionBook</string>
+	<string name="formato_kindle">Kindle</string>
+	<string name="formato_powerpoint">PowerPoint</string>
+	<string name="formato_hoja_calculo">Hoja de cálculo</string>
+	<string name="formato_chm">Ayuda CHM</string>
+	<string name="formato_braille">Braille</string>
+	<string name="formato_daisy">DAISY</string>
+	<string name="formato_audio">Audio</string>
+	<string name="formato_lista">Lista de reproducción</string>
+	<string name="formato_carpeta">Carpeta</string>
+	<string name="formato_comic">Cómic</string>
+	<string name="formato_zip">ZIP</string>
+	<string name="formato_desconocido">Desconocido</string>
+
+	<!-- Por qué no se puede abrir un documento -->
+	<string name="fmt_no_compatible">Este formato de archivo no es compatible.</string>
+	<string name="fmt_no_valido">Este archivo no es válido (formato: %1$s). Puede que esté dañado o que no sea de ese formato.</string>
+	<string name="fmt_danado">El archivo está dañado o incompleto y no se puede leer.</string>
+	<string name="fmt_falta_parte">Falta una parte del archivo o no se puede leer. Puede que esté dañado o incompleto.</string>
+	<string name="fmt_parte_no_legible">No se puede leer «%1$s», que está dentro del archivo.</string>
+	<string name="fmt_vacio">El archivo no contiene nada que se pueda leer.</string>
+	<string name="fmt_zip_sin_documento">El archivo comprimido no contiene ningún documento que se pueda leer.</string>
+	<string name="fmt_no_descomprimir">No se pudo descomprimir el archivo. Puede que esté dañado o que use una compresión que la app no conoce.</string>
+	<string name="fmt_cifrado">El archivo está protegido con contraseña y no se puede abrir. Ábrelo con el programa con el que se creó y guárdalo sin contraseña.</string>
+	<string name="fmt_hoja_cifrada_o_antigua">La hoja de cálculo está protegida con contraseña o es de Excel antiguo (.xls). Ábrela con tu programa de hojas de cálculo y guárdala como .xlsx, sin contraseña.</string>
+	<string name="fmt_ppt_antiguo">Las presentaciones antiguas de PowerPoint (.ppt) no se pueden abrir. Guárdala como .pptx y ábrela de nuevo.</string>
+	<string name="fmt_xls_antiguo">Las hojas de cálculo antiguas de Excel (.xls) no se pueden abrir. Guárdala como .xlsx y ábrela de nuevo.</string>
+	<string name="fmt_doc_muy_antiguo">Este documento de Word es demasiado antiguo o está dañado. Guárdalo como .docx y ábrelo de nuevo.</string>
+	<string name="fmt_manipulado">El documento está dañado o manipulado y, por seguridad, no se abrirá.</string>
+	<string name="fmt_drm">Este libro tiene DRM (protección anticopia) y no se puede abrir. Usa la aplicación de la tienda donde lo compraste.</string>
+	<string name="fmt_clave_incorrecta">Contraseña incorrecta.</string>
+	<string name="fmt_clave_necesaria">Este documento necesita contraseña.</string>
+	<string name="fmt_demasiado_grande">El archivo es demasiado grande (%1$d MB).</string>
+	<string name="fmt_demasiado_grande_mas">El archivo es demasiado grande (más de %1$d MB).</string>
+	<string name="fmt_parte_grande">Hay un archivo demasiado grande dentro del libro: %1$s.</string>
+	<string name="fmt_sin_espacio">No hay espacio para descomprimir el libro, o el archivo comprimido está manipulado.</string>
+	<string name="fmt_sin_memoria">El documento es demasiado grande para la memoria del dispositivo.</string>
+	<string name="fmt_no_leido">No se pudo leer el archivo. Puede que esté dañado o que su formato no sea compatible.</string>
+	<string name="fmt_no_encontrado">No se encuentra el archivo. Puede que se haya movido o borrado.</string>
+	<string name="fmt_sin_permiso">La app ya no tiene permiso para abrir este archivo. Vuelve a añadirlo a la biblioteca.</string>
+	<string name="fmt_carpeta_no_abre">No se puede abrir la carpeta.</string>
+	<string name="fmt_carpeta_abre_archivo">Esta carpeta no es un libro DAISY ni un audiolibro. Abre el archivo directamente.</string>
+	<string name="fmt_carpeta_sin_libro">Esta carpeta no contiene un libro DAISY ni archivos de audio.</string>
+	<string name="fmt_carpeta_audio_no">No se pueden reproducir los archivos de audio de esta carpeta.</string>
+	<string name="fmt_lista_carpeta">Para abrir una lista de reproducción, añade la carpeta que la contiene.</string>
+	<string name="fmt_lista_vacia">La lista de reproducción está vacía o sus archivos no existen.</string>
+	<string name="fmt_daisy_carpeta">Para abrir un libro DAISY, elige su carpeta completa o el archivo ZIP.</string>
+	<string name="fmt_daisy_no_encontrado">No se ha encontrado un libro DAISY: falta su archivo de inicio (ncc.html o el paquete .opf).</string>
+</resources>
