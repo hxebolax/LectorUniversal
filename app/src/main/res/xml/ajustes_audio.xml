@@ -53,6 +53,11 @@
 		android:title="@string/saltar_silencios"
 		android:defaultValue="false" />
 	<SwitchPreferenceCompat
+		android:key="audio_mono"
+		android:title="@string/aj_audio_mono"
+		android:summary="@string/aj_audio_mono_desc"
+		android:defaultValue="false" />
+	<SwitchPreferenceCompat
 		android:key="reproducir_al_abrir"
 		android:title="@string/aj_reproducir_al_abrir"
 		android:defaultValue="false" />

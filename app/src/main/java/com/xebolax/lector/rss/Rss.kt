@@ -112,7 +112,11 @@ object Rss {
 		if (RssSincronizacion.configurado(c)) {
 			runCatching { RssSincronizacion.sincronizar(c) }
 				.onSuccess { nuevos += it.nuevos; prefs(c).edit().putString("rss_sinc_error", "").apply() }
-				.onFailure { errores++; prefs(c).edit().putString("rss_sinc_error", it.message ?: it.javaClass.simpleName).apply() }
+				.onFailure {
+					if (it is kotlinx.coroutines.CancellationException) throw it
+					errores++
+					prefs(c).edit().putString("rss_sinc_error", it.message ?: it.javaClass.simpleName).apply()
+				}
 			sincronizadas = db.remotosDeFuentes().keys
 		}
 		val fuentes = db.fuentes().filter { !it.pausada && it.id !in sincronizadas }

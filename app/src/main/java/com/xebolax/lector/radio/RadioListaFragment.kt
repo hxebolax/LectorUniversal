@@ -635,7 +635,8 @@ class RadioListaFragment : Fragment() {
 			filas = nuevas
 			@Suppress("NotifyDataSetChanged")
 			b.recycler.adapter?.notifyDataSetChanged()
-			b.estado.text = estado()
+			// Solo si cambia: la línea de estado es una región viva y TalkBack la repetiría en cada recarga
+			estado().let { if (b.estado.text.toString() != it) b.estado.text = it }
 		}
 	}
 
@@ -856,6 +857,10 @@ class RadioListaFragment : Fragment() {
 	private fun accionesGrabacion(g: Grabacion): List<Accion> {
 		val a = actividad ?: return emptyList()
 		val f = java.io.File(g.archivo)
+		// La que se está grabando: solo detenerla (renombrarla o borrarla ahora la perdería)
+		if (ServicioGrabacion.grabando != null && f.absolutePath == ServicioGrabacion.archivoActual) return listOf(
+			getString(R.string.radio_detener_grabacion) to { ServicioGrabacion.parar(a) },
+		)
 		return listOf(
 			getString(R.string.radio_escuchar) to { RadioAcciones.escucharGrabacion(a, g) },
 			getString(R.string.radio_guardar_biblioteca) to { RadioAcciones.guardarEnBiblioteca(a, g) },

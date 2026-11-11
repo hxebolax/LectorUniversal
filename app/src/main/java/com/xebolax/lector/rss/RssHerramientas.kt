@@ -1,5 +1,6 @@
 package com.xebolax.lector.rss
 
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.Spinner
@@ -55,11 +56,12 @@ object RssHerramientas {
 		a.elegir(a.getString(R.string.rss_reglas), opciones)
 	}
 
-	private fun etiqueta(a: AppCompatActivity, texto: Int) = TextView(a).apply {
+	/** La etiqueta visible de un desplegable: TalkBack la dice con él (labelFor) y no aparte. */
+	private fun etiqueta(a: AppCompatActivity, texto: Int, de: View) = TextView(a).apply {
 		setText(texto)
 		setPadding(0, dp(a, 12), 0, 0)
-		// TalkBack lee la etiqueta junto al desplegable que tiene debajo
-		isFocusable = false
+		labelFor = de.id
+		importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
 	}
 
 	private fun editarRegla(a: AppCompatActivity, indice: Int?) {
@@ -68,9 +70,19 @@ object RssHerramientas {
 		val fuentes = db.fuentes()
 		val (cPalabras, palabras) = a.campoTexto(a.getString(R.string.rss_regla_palabras), original?.palabras.orEmpty())
 		fun desplegable(nombres: List<String>, actual: Int, descripcion: Int) = Spinner(a).apply {
+			id = View.generateViewId()
 			adapter = ArrayAdapter(a, android.R.layout.simple_spinner_dropdown_item, nombres)
 			setSelection(actual.coerceIn(0, nombres.size - 1))
-			contentDescription = a.getString(descripcion)
+			minimumHeight = dp(a, 48)
+			// Nombre y valor: «Dónde buscar, en el título, desplegable»
+			val nombre = a.getString(descripcion)
+			androidx.core.view.ViewCompat.setAccessibilityDelegate(this, object : androidx.core.view.AccessibilityDelegateCompat() {
+				override fun onInitializeAccessibilityNodeInfo(v: View, info: androidx.core.view.accessibility.AccessibilityNodeInfoCompat) {
+					super.onInitializeAccessibilityNodeInfo(v, info)
+					info.hintText = nombre
+					info.text = (v as Spinner).selectedItem?.toString()
+				}
+			})
 		}
 		val donde = desplegable(listOf(a.getString(R.string.rss_regla_en_titulo), a.getString(R.string.rss_regla_en_texto)), if (original?.enTexto == true) 1 else 0, R.string.rss_regla_donde)
 		val fuente = desplegable(listOf(a.getString(R.string.rss_todas_fuentes)) + fuentes.map { it.titulo },
@@ -81,9 +93,9 @@ object RssHerramientas {
 			val m = dp(a, 20)
 			setPadding(m, m / 2, m, 0)
 			addView(cPalabras)
-			addView(etiqueta(a, R.string.rss_regla_donde)); addView(donde)
-			addView(etiqueta(a, R.string.rss_regla_fuente)); addView(fuente)
-			addView(etiqueta(a, R.string.rss_regla_accion)); addView(accion)
+			addView(etiqueta(a, R.string.rss_regla_donde, donde)); addView(donde)
+			addView(etiqueta(a, R.string.rss_regla_fuente, fuente)); addView(fuente)
+			addView(etiqueta(a, R.string.rss_regla_accion, accion)); addView(accion)
 		}
 		MaterialAlertDialogBuilder(a)
 			.setTitle(if (original == null) R.string.rss_anadir_regla else R.string.editar)

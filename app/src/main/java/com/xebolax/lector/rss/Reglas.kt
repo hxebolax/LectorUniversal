@@ -47,11 +47,29 @@ object Reglas {
 		Rss.prefs(c).edit().putString("rss_reglas", JSONArray(lista.map { it.json() }).toString()).apply()
 	}
 
+	/** Sin tildes y en minúsculas (así «Educación» casa con «educacion»). */
+	fun normal(t: String): String = java.text.Normalizer.normalize(t.lowercase(), java.text.Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")
+
+	/**
+	 * ¿Está esta palabra o frase en el texto? Palabras completas («pan» no salta
+	 * con «España»); con * al final o al principio busca dentro de otras palabras
+	 * («educa*» casa con «educación»). Sin distinguir tildes ni mayúsculas.
+	 */
+	fun contiene(texto: String, termino: String): Boolean {
+		val t = normal(termino.trim().removeSurrounding("\""))
+		if (t.isBlank()) return false
+		val alPrincipio = t.startsWith("*")
+		val alFinal = t.endsWith("*")
+		val base = Regex.escape(t.trim('*'))
+		val patron = (if (alPrincipio) "" else "(?<![\\p{L}\\p{N}])") + base + (if (alFinal) "" else "(?![\\p{L}\\p{N}])")
+		return Regex(patron).containsMatchIn(texto)
+	}
+
 	/** La palabra que hace saltar la regla en ese artículo, o null. */
 	fun coincide(r: Regla, a: Articulo): String? {
 		if (!r.activa || (r.fuente > 0 && r.fuente != a.fuente)) return null
-		val donde = (a.titulo + " " + if (r.enTexto) a.resumen + " " + Jsoup.parse(a.contenido).text() else "").lowercase()
-		return r.lista().firstOrNull { donde.contains(it) }
+		val donde = normal(a.titulo + " " + if (r.enTexto) a.resumen + " " + Jsoup.parse(a.contenido).text() else "")
+		return r.lista().firstOrNull { contiene(donde, it) }
 	}
 
 	/** Aplica las reglas a los artículos nuevos. Devuelve cuántos ha tocado. */

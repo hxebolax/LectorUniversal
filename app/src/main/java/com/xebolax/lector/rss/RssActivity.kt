@@ -102,7 +102,9 @@ class RssActivity : AppCompatActivity() {
 		ponerPestanas(b.barra, b.paginas, b.pestanas, pestanas.map { it.nombre to it.icono }, getString(R.string.noticias))
 		RssTrabajo.programar(this)
 		// Al entrar, actualizar si hace más de 15 minutos
-		if (savedInstanceState == null && System.currentTimeMillis() - Rss.prefs(this).getLong("rss_ultima", 0) > 15 * 60_000L) actualizarTodo(silencioso = true)
+		val soloWifi = Rss.prefs(this).getBoolean("rss_solo_wifi", false) &&
+			(getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager).isActiveNetworkMetered
+		if (savedInstanceState == null && !soloWifi && System.currentTimeMillis() - Rss.prefs(this).getLong("rss_ultima", 0) > 15 * 60_000L) actualizarTodo(silencioso = true)
 		if (savedInstanceState == null) {
 			compartido(intent)
 			desdeAviso(intent)

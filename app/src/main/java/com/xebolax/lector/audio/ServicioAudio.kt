@@ -41,8 +41,16 @@ class ServicioAudio : MediaSessionService() {
 		ControlAudio.iniciar(this)
 		val p = Preferencias(this)
 		// Decodificadores del móvil y, de reserva, los de FFmpeg (MP2 de algunas radios HLS, AC-3…)
-		val decodificadores = androidx.media3.exoplayer.DefaultRenderersFactory(this)
-			.setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+		// Sonido en mono (Ajustes): una mezcla propia antes de la salida de audio
+		MezclaMono.activo = p.p.getBoolean("audio_mono", false)
+		val decodificadores = object : androidx.media3.exoplayer.DefaultRenderersFactory(this) {
+			override fun buildAudioSink(contexto: android.content.Context, flotante: Boolean, parametros: Boolean): androidx.media3.exoplayer.audio.AudioSink =
+				androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(contexto)
+					.setEnableFloatOutput(flotante)
+					.setEnableAudioTrackPlaybackParams(parametros)
+					.setAudioProcessors(arrayOf(MezclaMono))
+					.build()
+		}.setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 		val exo = ExoPlayer.Builder(this, decodificadores)
 			// Internet con agente propio, redirecciones http↔https y reserva a http (FuenteRed)
 			// Grabaciones de radio y audios sin índice (MP3 sin cabecera Xing, AAC en ADTS): se salta

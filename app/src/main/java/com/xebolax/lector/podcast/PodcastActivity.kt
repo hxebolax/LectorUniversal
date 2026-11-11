@@ -386,7 +386,7 @@ class PodcastActivity : AppCompatActivity() {
 					antiguosPrimero = antiguos.isChecked,
 					usuario = usuario.text.toString().trim(),
 					clave = clave.text.toString(),
-					velocidad = velocidad.text.toString().toIntOrNull()?.coerceIn(0, 400) ?: 0,
+					velocidad = velocidad.text.toString().toIntOrNull()?.let { if (it <= 0) 0 else it.coerceIn(25, 400) } ?: 0,
 					volumen = volumenes[volumen],
 					saltarInicio = inicio.text.toString().toIntOrNull()?.coerceIn(0, 600) ?: 0,
 					saltarFinal = final.text.toString().toIntOrNull()?.coerceIn(0, 600) ?: 0,

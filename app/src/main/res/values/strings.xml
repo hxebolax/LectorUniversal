@@ -1226,7 +1226,7 @@
 		<item quantity="other">%d artículos cumplen esta regla</item>
 	</plurals>
 	<string name="rss_confirmar_borrar_regla">¿Borrar esta regla?</string>
-	<string name="rss_regla_palabras">Palabras, separadas por comas</string>
+	<string name="rss_regla_palabras">Palabras o frases, separadas por comas (palabras completas; con * al final busca también dentro de otras, como educa*)</string>
 	<string name="rss_regla_en_titulo">En el título</string>
 	<string name="rss_regla_en_texto">En el título y en el texto</string>
 	<string name="rss_regla_donde">Dónde buscarlas</string>
@@ -2307,6 +2307,9 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 		<item>empezados</item>
 		<item>titulo</item>
 	</string-array>
+	<string name="aj_audio_mono">Sonido en mono</string>
+	<string name="aj_audio_mono_desc">Junta los dos canales en uno: para quien lleva un solo auricular o oye peor por un lado. Vale para audiolibros, podcasts y radio, y se aplica al momento.</string>
+	<string name="voz_motor_no_responde">El motor de voz no responde. Prueba otro en Ajustes, General, Lectura en voz alta.</string>
 	<string name="leer_con_lector">Leer con Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: leer</string>
 	<string name="comp_web_o_texto">Una página web o un texto (en Compartidos)</string>

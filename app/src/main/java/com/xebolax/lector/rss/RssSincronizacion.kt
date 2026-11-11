@@ -93,7 +93,8 @@ object RssSincronizacion {
 				db.ponerRemotoFuente(id, r.id)
 				idLocal[r.id] = id
 			}
-			for (f in db.fuentes().filter { f -> remotas.none { it.url == f.url } }) {
+			// Se suben las que nunca se enlazaron; las que estaban enlazadas y ya no vienen se borraron en el servidor
+			for (f in db.fuentes().filter { f -> remotas.none { it.url == f.url } && enlazadas[f.id].isNullOrBlank() }) {
 				runCatching { s.suscribir(f.url, f.titulo, f.categoria) }.getOrNull()?.let {
 					db.ponerRemotoFuente(f.id, it)
 					idLocal[it] = f.id
@@ -288,7 +289,7 @@ object RssSincronizacion {
 
 		override fun marcarLeidos(ids: List<String>, leido: Boolean) {
 			for (trozo in ids.chunked(300)) {
-				val cuerpo = JSONObject().put("entry_ids", JSONArray(trozo.map { it.toLong() })).put("status", if (leido) "read" else "unread")
+				val cuerpo = JSONObject().put("entry_ids", JSONArray(trozo.mapNotNull { it.toLongOrNull() })).put("status", if (leido) "read" else "unread")
 				peticion("$api/entries", "PUT", cuerpo.toString(), cabeceras = cab)
 			}
 		}
@@ -357,7 +358,7 @@ object RssSincronizacion {
 
 		private fun multiple(accion: String, ids: List<String>) {
 			for (trozo in ids.chunked(300)) {
-				peticion("$api/items/$accion/multiple", "PUT", JSONObject().put("itemIds", JSONArray(trozo.map { it.toLong() })).toString(), cabeceras = cab)
+				peticion("$api/items/$accion/multiple", "PUT", JSONObject().put("itemIds", JSONArray(trozo.mapNotNull { it.toLongOrNull() })).toString(), cabeceras = cab)
 			}
 		}
 

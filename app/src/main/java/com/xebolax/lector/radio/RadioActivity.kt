@@ -116,6 +116,8 @@ class RadioActivity : AppCompatActivity() {
 	}
 
 	private fun atender(i: Intent) {
+		// Por el alias que ven otras apps (Compartir) solo se acepta Compartir: no se escucha ni se programa lo que mande otra app
+		if (i.component?.className?.endsWith("AnadirARadio") == true && i.action != Intent.ACTION_SEND) return
 		when (i.action) {
 			ACCION_ESCUCHAR -> Emisora.deJson(i.getStringExtra(EXTRA_EMISORA).orEmpty())?.let { Radio.escuchar(this, it) }
 			ACCION_GRABACIONES -> irA(RadioListaFragment.Modo.HISTORIAL) { it.verGrabaciones() }
@@ -229,16 +231,30 @@ class RadioActivity : AppCompatActivity() {
 			setPadding(m, m / 2, m, 0)
 			listOf(cNombre, cUrl, cGenero, cWeb).forEach { addView(it) }
 		}
-		MaterialAlertDialogBuilder(this)
+		val dialogo = MaterialAlertDialogBuilder(this)
 			.setTitle(if (editar != null) R.string.radio_editar else R.string.radio_anadir_a_mano)
 			.setView(android.widget.ScrollView(this).apply { addView(formulario) })
-			.setPositiveButton(R.string.guardar) { _, _ ->
+			.setPositiveButton(R.string.guardar, null)
+			.setNegativeButton(R.string.cancelar, null)
+			.show()
+		dialogo.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
 				var direccion = campoUrl.text.toString().trim()
-				if (direccion.isBlank() || direccion.contains(' ')) return@setPositiveButton mensaje(getString(R.string.radio_anadir_a_mano), getString(R.string.radio_direccion_mal))
+				val mal = getString(R.string.radio_direccion_mal)
+				// La dirección no vale: se dice en el campo (TalkBack lo lee) y la ventana sigue abierta con lo escrito
+				if (direccion.isBlank() || direccion.contains(' ')) {
+					(cUrl as? com.google.android.material.textfield.TextInputLayout)?.error = mal
+					campoUrl.requestFocus()
+					return@setOnClickListener
+				}
 				// «radioarrecife.com» o «icy://…» también valen
 				direccion = direccion.replaceFirst(Regex("(?i)^(icy|mms|mmsh)://"), "http://")
 				if (!direccion.contains("://")) direccion = "https://$direccion"
-				if (!direccion.startsWith("http", ignoreCase = true)) return@setPositiveButton mensaje(getString(R.string.radio_anadir_a_mano), getString(R.string.radio_direccion_mal))
+				if (!direccion.startsWith("http", ignoreCase = true)) {
+					(cUrl as? com.google.android.material.textfield.TextInputLayout)?.error = mal
+					campoUrl.requestFocus()
+					return@setOnClickListener
+				}
+				dialogo.dismiss()
 				lifecycleScope.launch {
 					val r = try {
 						conEspera(getString(R.string.radio_anadir_a_mano), getString(R.string.radio_comprobando)) { analizar(direccion) }
@@ -278,8 +294,6 @@ class RadioActivity : AppCompatActivity() {
 							.show()
 					}
 				}
-			}
-			.setNegativeButton(R.string.cancelar, null)
-			.show()
+		}
 	}
 }

@@ -39,7 +39,8 @@ object LectorBraille : LectorFormato {
 			}
 		}
 		ctx.comprobar()
-		val comoTexto = ctx.opciones.brailleComoTexto
+		// El BRF suele ser braille inglés contraído (grado 2), que no se pasa a texto con las reglas del español
+		val comoTexto = ctx.opciones.brailleComoTexto && !(fuente.extension == "brf" && !pareceEspanol(paginas))
 		if (comoTexto) c.idioma = c.idioma.ifBlank { "es" }
 		var primero = true
 		for (t in Braille.maquetar(paginas)) {
@@ -60,6 +61,14 @@ object LectorBraille : LectorFormato {
 		}
 		if (c.estaVacio()) throw ExcepcionFormato("El archivo braille está vacío.")
 		return Contenido.Texto(c.construir())
+	}
+
+	/** ¿Parece braille español? (tiene letras con acento o ñ, que el inglés no usa: á é í ó ú ñ) */
+	private fun pareceEspanol(paginas: List<List<IntArray>>): Boolean {
+		val propias = setOf(0x37, 0x2E, 0x0C, 0x2C, 0x3E, 0x3B)
+		var n = 0
+		for (p in paginas) for (l in p) for (x in l) if (x in propias) n++
+		return n >= 5
 	}
 
 	/** PEF: volúmenes, secciones, páginas y filas de celdas Unicode. */

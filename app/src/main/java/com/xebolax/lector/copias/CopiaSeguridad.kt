@@ -362,7 +362,7 @@ object CopiaSeguridad {
 		} else Secretos.reubicar(c)
 		// Despertadores, grabaciones programadas y actualización de noticias, según lo restaurado
 		runCatching { com.xebolax.lector.radio.RadioProgramador.programar(c) }
-		runCatching { com.xebolax.lector.rss.RssTrabajo.programar(c) }
+		runCatching { com.xebolax.lector.rss.RssTrabajo.programar(c, cambio = true) }
 	}
 
 	private fun cambiarRuta(c: Context, base: String, sql: String, antes: String, ahora: String, restaurada: Boolean) {

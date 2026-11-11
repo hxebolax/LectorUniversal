@@ -213,6 +213,12 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 			generateSequence { if (c.moveToNext()) Triple(c.getString(0), c.getInt(1) == 1, c.getInt(2) == 1) else null }.toList()
 		}
 
+	/** Otra cuenta de sincronización: los enlaces con la anterior ya no valen (ids de otro servidor). */
+	fun olvidarRemotos() {
+		writableDatabase.execSQL("UPDATE fuentes SET remoto = ''")
+		writableDatabase.execSQL("UPDATE articulos SET remoto = '', cambiado = 0")
+	}
+
 	fun cambiosEnviados() = writableDatabase.execSQL("UPDATE articulos SET cambiado = 0 WHERE cambiado = 1")
 
 	/** Ids remotos de los artículos sin leer y de los favoritos de aquí (para comparar con el servidor). */

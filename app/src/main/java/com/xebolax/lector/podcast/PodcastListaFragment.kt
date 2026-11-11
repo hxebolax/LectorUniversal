@@ -371,7 +371,11 @@ class PodcastListaFragment : Fragment() {
 		}
 	}
 
+	/** El error al cargar Los más escuchados (para no quedarse en «Cargando…» para siempre). */
+	private var errorCarga: String? = null
+
 	private fun cargarMasEscuchados() {
+		errorCarga = null
 		b.estado.text = getString(R.string.cargando)
 		viewLifecycleOwner.lifecycleScope.launch {
 			sugerencias = try {
@@ -380,7 +384,8 @@ class PodcastListaFragment : Fragment() {
 				throw e
 			} catch (e: Exception) {
 				// Se salió de la pestaña mientras cargaba: ya no hay vista
-				_b?.estado?.text = getString(R.string.error_catalogo, e.message.orEmpty())
+				errorCarga = getString(R.string.error_catalogo, e.message.orEmpty())
+				_b?.estado?.text = errorCarga
 				return@launch
 			}
 			recargar()
@@ -391,6 +396,14 @@ class PodcastListaFragment : Fragment() {
 
 	private fun episodiosVisibles() = filas.mapNotNull { (it as? Fila.DeEpisodio)?.episodio }
 
+	/** Los podcasts suscritos (se leen en cada recarga, fuera del hilo principal). */
+	private var misPodcasts: List<Podcast> = emptyList()
+
+	/** ¿Estás suscrito a esta sugerencia? Con la lista ya leída (sin consultar la base de datos al dibujar). */
+	private fun suscritoA(s: Podcasts.Sugerencia): Podcast? =
+		(if (s.url.isNotBlank()) misPodcasts.firstOrNull { it.url == s.url } else null)
+			?: misPodcasts.firstOrNull { it.titulo.trim().equals(s.titulo.trim(), ignoreCase = true) }
+
 	private fun recargar() {
 		if (_b == null) return
 		val m = efectivo
@@ -400,6 +413,8 @@ class PodcastListaFragment : Fragment() {
 		val texto = busqueda.trim()
 		carga?.cancel()
 		carga = viewLifecycleOwner.lifecycleScope.launch {
+			// Los podcasts suscritos, una vez por recarga (las filas los consultan al dibujarse: sin base de datos en el hilo principal)
+			misPodcasts = withContext(Dispatchers.IO) { db.podcasts() }
 			val nuevas: List<Fila> = withContext(Dispatchers.IO) {
 				fun filtrar(l: List<Episodio>) = if (texto.length < 2) l else l.filter {
 					it.titulo.contains(texto, true) || it.nombrePodcast.contains(texto, true)
@@ -440,7 +455,8 @@ class PodcastListaFragment : Fragment() {
 			}
 			@Suppress("NotifyDataSetChanged")
 			b.recycler.adapter?.notifyDataSetChanged()
-			b.estado.text = estado()
+			// Solo si cambia: la línea de estado es una región viva y TalkBack la repetiría en cada recarga
+			estado().let { if (b.estado.text.toString() != it) b.estado.text = it }
 		}
 	}
 
@@ -449,7 +465,7 @@ class PodcastListaFragment : Fragment() {
 		return when {
 			modo == Modo.DESCUBRIR && episodiosEncontrados != null -> getString(R.string.resultados_de, episodiosEncontrados!!.size, textoBuscado)
 			modo == Modo.DESCUBRIR && resultados != null -> getString(R.string.resultados_de, resultados!!.size, textoBuscado)
-			modo == Modo.DESCUBRIR -> if (sugerencias.isEmpty()) getString(R.string.cargando) else getString(R.string.pod_descubrir_ayuda)
+			modo == Modo.DESCUBRIR -> if (sugerencias.isEmpty()) errorCarga ?: getString(R.string.cargando) else getString(R.string.pod_descubrir_ayuda)
 			modo == Modo.SUSCRIPCIONES && podcast == null -> {
 				val p = filas.count { it is Fila.DePodcast } + filas.filterIsInstance<Fila.Carpeta>().sumOf { it.podcasts }
 				if (p == 0) getString(R.string.pod_sin_suscripciones) else resources.getQuantityString(R.plurals.pod_n_podcasts, p, p)
@@ -838,7 +854,7 @@ class PodcastListaFragment : Fragment() {
 				is Fila.DeSugerencia -> {
 					val s = fila.sugerencia
 					// Si ya estás suscrito, se dice (y sus acciones cambian)
-					val suscrito = Podcasts.suscritoA(requireContext(), s) != null
+					val suscrito = suscritoA(s) != null
 					val d = listOfNotNull(getString(R.string.pod_suscrito).takeIf { suscrito }, s.autor.ifBlank { null }, s.genero.ifBlank { null }).joinToString(" · ")
 					Triple("${posicion + 1}. ${s.titulo}", d, "${posicion + 1}. ${s.titulo}, " + d.replace(" · ", ", "))
 				}
@@ -866,7 +882,7 @@ class PodcastListaFragment : Fragment() {
 				is Fila.Encontrado -> accionesEncontrado(fila.e)
 				is Fila.DeSugerencia -> listOf(
 					getString(R.string.pod_ver_ficha) to { PodcastFichaActivity.abrir(a, fila.sugerencia) },
-					Podcasts.suscritoA(a, fila.sugerencia)?.let { p -> getString(R.string.pod_ver_suscrito) to { a.irAPodcast(p.id) } }
+					suscritoA(fila.sugerencia)?.let { p -> getString(R.string.pod_ver_suscrito) to { a.irAPodcast(p.id) } }
 						?: (getString(R.string.pod_suscribirse) to { a.suscribirSugerencia(fila.sugerencia) }),
 					getString(R.string.compartir) to {
 						val texto = listOf(fila.sugerencia.titulo, fila.sugerencia.url.ifBlank { "https://podcasts.apple.com/podcast/id${fila.sugerencia.id}" }).joinToString("\n")

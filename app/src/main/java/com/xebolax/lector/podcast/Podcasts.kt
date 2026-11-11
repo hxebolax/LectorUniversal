@@ -458,6 +458,11 @@ object Podcasts {
 		// Sale de Novedades al escucharlo
 		if (e.nuevo) db.quitarDeNovedades(listOf(e.id))
 		val ext = preparar(c, e)
+		// Ya suena este episodio: solo se va a ese momento (capítulo, hora de las notas o de la transcripción)
+		if (ControlAudio.esActual(ext.id)) {
+			ControlAudio.irA(0, e.posicion)
+			ControlAudio.reproducir()
+		}
 		buscarCapitulosIncrustados(c.applicationContext, ext)
 		ControlAudio.externoPendiente = ext
 		c.startActivity(Intent(c, com.xebolax.lector.audio.ReproductorActivity::class.java)

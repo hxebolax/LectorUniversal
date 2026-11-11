@@ -65,20 +65,27 @@ class RssTrabajo(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
 			return m
 		}
 
-		/** Programa (o quita) la actualización de las noticias y la de los podcasts según Ajustes. */
-		fun programar(c: Context) {
-			programar(c, NOTICIAS)
-			programar(c, PODCASTS)
+		/**
+		 * Programa (o quita) la actualización de las noticias y la de los podcasts según Ajustes.
+		 * cambio: se acaba de cambiar en Ajustes (se rehace); si no (al entrar en Noticias o Podcasts),
+		 * lo que ya está programado se deja como está (no se corta una actualización en marcha).
+		 */
+		fun programar(c: Context, cambio: Boolean = false) {
+			programar(c, NOTICIAS, cambio = cambio)
+			programar(c, PODCASTS, cambio = cambio)
 		}
 
 		/** desdeTrabajo: la llama la propia tarea al acabar (la siguiente va detrás de ella, sin cancelarla). */
-		private fun programar(c: Context, que: String, desdeTrabajo: Boolean = false) {
+		private fun programar(c: Context, que: String, desdeTrabajo: Boolean = false, cambio: Boolean = false) {
 			val p = Rss.prefs(c)
 			val nombre = if (que == PODCASTS) NOMBRE_PODCASTS else NOMBRE
+			// La de una vez (menos de 15 minutos) y la periódica, con nombres distintos (WorkManager no deja mezclarlas)
+			val nombreCorto = nombre + "_corta"
 			val minutos = minutos(c, que)
 			val wm = WorkManager.getInstance(c)
 			if (minutos <= 0) {
 				wm.cancelUniqueWork(nombre)
+				wm.cancelUniqueWork(nombreCorto)
 				return
 			}
 			// Las noticias, solo con wifi si se eligió; los podcasts comprueban sus fuentes con cualquier red
@@ -96,13 +103,19 @@ class RssTrabajo(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
 					.setConstraints(restricciones)
 					.setInputData(datos)
 					.build()
-				wm.enqueueUniqueWork(nombre, if (desdeTrabajo) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.REPLACE, una)
+				wm.cancelUniqueWork(nombre)
+				wm.enqueueUniqueWork(nombreCorto, when {
+					desdeTrabajo -> ExistingWorkPolicy.APPEND_OR_REPLACE
+					cambio -> ExistingWorkPolicy.REPLACE
+					else -> ExistingWorkPolicy.KEEP
+				}, una)
 			} else {
+				wm.cancelUniqueWork(nombreCorto)
 				val peticion = PeriodicWorkRequestBuilder<RssTrabajo>(minutos, TimeUnit.MINUTES)
 					.setConstraints(restricciones)
 					.setInputData(datos)
 					.build()
-				wm.enqueueUniquePeriodicWork(nombre, ExistingPeriodicWorkPolicy.UPDATE, peticion)
+				wm.enqueueUniquePeriodicWork(nombre, if (cambio) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.KEEP, peticion)
 			}
 		}
 	}

@@ -121,7 +121,9 @@ object LectorVoz {
 	/** El usuario quiere que lea (aunque esté un momento callada porque habla TalkBack). */
 	var leyendo = false
 		private set
-	private var generacion = 0
+	@Volatile private var generacion = 0
+	/** Tandas seguidas en las que no se pudo generar nada (para no quedarse en silencio). */
+	private var tandasFallidas = 0
 	/** La posición cambió (salto, velocidad, voz): al reanudar hay que generar desde ahí. */
 	private var rehacer = true
 	private var pronunciador: Pronunciador? = null
@@ -453,7 +455,12 @@ object LectorVoz {
 						hablar()
 					}
 				} else {
+					// El motor no arranca: se suelta todo y se dice (si no, el móvil seguiría despierto sin sonar)
 					leyendo = false
+					soltarFoco()
+					bloquearCpu(false)
+					principal.removeCallbacks(latido)
+					android.widget.Toast.makeText(app, R.string.voz_motor_no_responde, android.widget.Toast.LENGTH_LONG).show()
 					avisar()
 				}
 			}
@@ -733,6 +740,8 @@ object LectorVoz {
 
 	/** Deja de leer y olvida el documento (cierra la notificación). */
 	fun detener() {
+		ListaLectura.cancelar()
+		temporizador(0)
 		pausar()
 		generacion++
 		cola.clear()
@@ -809,12 +818,16 @@ object LectorVoz {
 	}
 
 	fun anteriorParrafo() {
-		if (frase > 0) irA(bloque) else if (bloque > 0) irA(bloque - 1)
+		if (frase > 0) return irA(bloque)
+		// El anterior que tenga algo que leer (no un separador ni una nota saltada)
+		var b = bloque - 1
+		while (b > 0 && frasesDe(b).isEmpty()) b--
+		if (b >= 0) irA(b)
 	}
 
 	/** Cambia la velocidad (en %); se aplica desde la frase actual. */
 	fun cambiarVelocidad(porcentaje: Int) {
-		val v = porcentaje.coerceIn(10, 600)
+		val v = porcentaje.coerceIn(10, 400)
 		// Se cambia donde está puesta: la del libro, la de su sección o, si no, la general
 		val propio = if (esNoticia) null else libro.takeIf { it > 0 }
 		val seccion = if (esNoticia) PerfilesVoz.NOTICIAS else PerfilesVoz.seccionDe(app, libro)
@@ -1035,12 +1048,16 @@ object LectorVoz {
 			pausar()
 			return
 		}
-		// Este trozo y los siguientes, con la voz del móvil
-		if (!yaFallida) aplicarAjustes()
-		val r = t!!.synthesizeToFile(texto, Bundle(), s.archivo, s.id)
-		if (r != TextToSpeech.SUCCESS) {
-			s.estado = FALLIDO
-			alimentar()
+		// Desde aquí, con la voz del móvil: se vuelve a empezar desde el párrafo de este trozo (los trozos de
+		// ElevenLabs eran párrafos y los del móvil son frases: los números ya no casan)
+		if (!yaFallida) {
+			aplicarAjustes()
+			val actual = jugador?.currentMediaItem?.mediaId?.split(':')?.getOrNull(1)?.toIntOrNull() ?: s.b
+			bloque = actual
+			frases = frasesDe(actual)
+			frase = 0
+			rehacer = true
+			if (leyendo) hablar()
 		}
 	}
 
@@ -1083,8 +1100,19 @@ object LectorVoz {
 		if (j.mediaItemCount == antes) {
 			// Nada nuevo y el reproductor ya acabó lo que tenía: quizá es el final del libro
 			if (cola.isEmpty() && j.playbackState == Player.STATE_ENDED) alAcabarLoGenerado()
+			// Todo lo pedido falló y no hay nada que sonar: se piden las siguientes (unas pocas veces; si no, se para y se dice)
+			else if (cola.isEmpty() && j.mediaItemCount == 0 && leyendo && !rehacer) {
+				tandasFallidas++
+				if (tandasFallidas <= 5) alAcabarLoGenerado()
+				else {
+					tandasFallidas = 0
+					pausar()
+					android.widget.Toast.makeText(app, R.string.voz_motor_no_responde, android.widget.Toast.LENGTH_LONG).show()
+				}
+			}
 			return
 		}
+		tandasFallidas = 0
 		when (j.playbackState) {
 			Player.STATE_IDLE -> j.prepare()
 			// Había acabado lo generado (el motor iba más lento): sigue con lo nuevo

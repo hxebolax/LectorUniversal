@@ -272,7 +272,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		// Posición: la indicada, la de la voz si está leyendo este libro, o la guardada
 		val inicio = when {
 			intent.hasExtra(EXTRA_BLOQUE) -> intent.getIntExtra(EXTRA_BLOQUE, 0)
-			LectorVoz.esActual(l.id) -> LectorVoz.bloque
+			LectorVoz.esActual(l.id) && l.id > 0 -> LectorVoz.bloque
 			else -> l.posicion?.takeIf { !it.audio }?.bloque ?: 0
 		}
 		actual = inicio.coerceIn(0, (d.bloques.size - 1).coerceAtLeast(0))
@@ -363,7 +363,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		b.vozPausa.setOnClickListener { LectorVoz.alternar() }
 		b.vozPausa.conTemporizadorAlMantener { leerConTemporizador() }
 		// Llevar el foco al párrafo que suena (la app no lo mueve sola: TalkBack lo leería encima de la voz)
-		val irALaVoz = getString(R.string.ir_a_lectura) to { if (LectorVoz.esActual(idLibro)) irA(LectorVoz.bloque) }
+		val irALaVoz = getString(R.string.ir_a_lectura) to { if (esMiLectura()) irA(LectorVoz.bloque) }
 		b.vozPausa.accionesAccesibles(listOf(irALaVoz))
 		b.botonVoz.accionesAccesibles(listOf(irALaVoz))
 		b.vozFraseAnterior.setOnClickListener { LectorVoz.anteriorFrase() }
@@ -461,7 +461,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		// El texto de un DAISY con audio no cambia la posición del audio
 		if (intent.getBooleanExtra(EXTRA_TEXTO_DE_AUDIO, false)) return
 		// Si la voz está leyendo este libro, ella guarda su posición
-		if (LectorVoz.esActual(idLibro) && LectorVoz.leyendo) return
+		if (esMiLectura() && LectorVoz.leyendo) return
 		db.guardarPosicion(idLibro, Posicion.texto(actual), d.porcentaje(actual))
 	}
 
@@ -503,7 +503,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		moverActual(destino)
 		(b.lista.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(destino, 0)
 		enfocar(destino)
-		if (LectorVoz.esActual(idLibro) && LectorVoz.leyendo) LectorVoz.irA(destino, caracter)
+		if (esMiLectura() && LectorVoz.leyendo) LectorVoz.irA(destino, caracter)
 	}
 
 	/** Pone el foco de accesibilidad en un bloque cuando ya está en pantalla. */
@@ -1305,6 +1305,9 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		}
 	}
 
+	/** ¿La voz lee este documento? (no basta el id: las noticias y los archivos de fuera comparten el -1) */
+	private fun esMiLectura(): Boolean = LectorVoz.esActual(idLibro) && (doc == null || LectorVoz.documento === doc)
+
 	private fun cambiarVelocidad(paso: Int) {
 		// De 5 en 5 y siempre en múltiplos de 5 (como en el reproductor y en Ajustes)
 		val v = LectorVoz.velocidadActual()
@@ -1892,7 +1895,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 				return true
 			}
 			KeyEvent.KEYCODE_MEDIA_PLAY -> {
-				if (!(LectorVoz.esActual(idLibro) && LectorVoz.leyendo)) alternarVoz()
+				if (!(esMiLectura() && LectorVoz.leyendo)) alternarVoz()
 				return true
 			}
 			KeyEvent.KEYCODE_MEDIA_PAUSE -> {
@@ -1900,11 +1903,11 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 				return true
 			}
 			KeyEvent.KEYCODE_MEDIA_NEXT -> {
-				if (LectorVoz.esActual(idLibro)) LectorVoz.siguienteFrase() else saltar(true)
+				if (esMiLectura()) LectorVoz.siguienteFrase() else saltar(true)
 				return true
 			}
 			KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-				if (LectorVoz.esActual(idLibro)) LectorVoz.anteriorFrase() else saltar(false)
+				if (esMiLectura()) LectorVoz.anteriorFrase() else saltar(false)
 				return true
 			}
 		}

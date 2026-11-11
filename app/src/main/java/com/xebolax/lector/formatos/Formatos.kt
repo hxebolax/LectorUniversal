@@ -106,10 +106,11 @@ enum class Formato(val nombre: String, val extensiones: List<String>, val audio:
 					entradas.any { it.endsWith("ncc.html") } -> DAISY
 					entradas.any { it.endsWith(".opf") } && entradas.any { it.endsWith(".smil") || it.endsWith(".ncx") } -> DAISY
 					entradas.any { it.endsWith(".fb2") } -> FB2
-					entradas.any { it.endsWith(".epub") } -> EPUB
+					// Un ZIP con un EPUB, una web o un texto dentro: lo abre el lector de ZIP (que busca el libro de dentro)
+					entradas.any { it.endsWith(".epub") } -> ZIP
 					entradas.any { e -> AUDIO.extensiones.any { e.endsWith(".$it") } } -> AUDIO
-					entradas.any { it.endsWith(".html") || it.endsWith(".htm") || it.endsWith(".xhtml") } -> HTML
-					entradas.any { it.endsWith(".txt") } -> TXT
+					entradas.any { it.endsWith(".html") || it.endsWith(".htm") || it.endsWith(".xhtml") } -> ZIP
+					entradas.any { it.endsWith(".txt") } -> ZIP
 					// Solo imágenes (y quizá su ComicInfo.xml): un cómic
 					entradas.count { LectorComic.esImagen(it) } >= 2 && entradas.all { LectorComic.esImagen(it) || it.endsWith("/") || it.endsWith(".xml") || it.substringAfterLast('/').startsWith(".") || it.startsWith("__macosx") } -> COMIC
 					else -> ZIP

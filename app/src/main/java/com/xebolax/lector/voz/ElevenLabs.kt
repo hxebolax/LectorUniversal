@@ -93,9 +93,9 @@ object ElevenLabs {
 		val detalle = runCatching { JSONObject(cuerpo).optJSONObject("detail") }.getOrNull()
 		val clave = listOfNotNull(detalle?.optString("code"), detalle?.optString("status")).joinToString(" ")
 		val tipo = when {
+			codigo == 402 || "credits" in clave || "quota" in clave || "limit_reached" in clave -> Error.Tipo.CREDITOS
 			codigo == 401 || "api_key" in clave -> Error.Tipo.CLAVE
-			codigo == 402 || "credits" in clave || "quota" in clave -> Error.Tipo.CREDITOS
-			"voice" in clave && (codigo == 403 || codigo == 404) -> Error.Tipo.VOZ
+			"voice" in clave && (codigo == 400 || codigo == 403 || codigo == 404) -> Error.Tipo.VOZ
 			codigo == 403 -> Error.Tipo.PERMISOS
 			codigo == 429 || codigo == 503 || "busy" in clave -> Error.Tipo.OCUPADO
 			else -> Error.Tipo.OTRO
@@ -201,11 +201,11 @@ object ElevenLabs {
 		val app = c.applicationContext
 		cola.execute {
 			if (!vigente()) return@execute alTerminar(Error(Error.Tipo.OTRO, "ya no hace falta"))
-			alTerminar(runCatching { generar(app, texto, voz, idioma, anterior, siguiente, destino) }.exceptionOrNull())
+			alTerminar(runCatching { generar(app, texto, voz, idioma, anterior, siguiente, destino, vigente) }.exceptionOrNull())
 		}
 	}
 
-	private fun generar(c: Context, texto: String, vozPedida: String, idioma: String?, anterior: String, siguiente: String, destino: File) {
+	private fun generar(c: Context, texto: String, vozPedida: String, idioma: String?, anterior: String, siguiente: String, destino: File, vigente: () -> Boolean = { true }) {
 		val voz = if (esVozSuya(vozPedida)) vozPedida else vozPorDefecto(c)
 		val modelo = modelo(c)
 		val guardado = File(carpetaCache(c), huella(modelo, voz, idioma.orEmpty(), texto) + ".mp3")
@@ -251,6 +251,7 @@ object ElevenLabs {
 			}
 			Thread.sleep(espera)
 			espera *= 2
+			if (!vigente()) throw Error(Error.Tipo.OTRO, "ya no hace falta")
 		}
 	}
 

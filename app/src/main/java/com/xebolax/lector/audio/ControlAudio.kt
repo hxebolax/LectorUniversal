@@ -64,6 +64,8 @@ object ControlAudio {
 	private var controlador: ListenableFuture<MediaController>? = null
 	private var pausadoEn = 0L
 	private var finTemporizador = 0L
+	/** Lo que quedaba del temporizador al pausar (ms); vuelve a contar al reanudar. */
+	private var restanteTemporizador = 0L
 	var alFinalDelCapitulo = false
 		private set
 	private var refuerzo: LoudnessEnhancer? = null
@@ -145,6 +147,7 @@ object ControlAudio {
 			return
 		}
 		guardar(forzar = true)
+		usarAlarma(e.despertador)
 		externo = e
 		idLibro = e.id
 		cancion = ""
@@ -322,6 +325,7 @@ object ControlAudio {
 			?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
 			?: android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE) ?: return
 		alarmaDeReserva = true
+		usarAlarma(true)
 		principal.removeCallbacks(reintentar)
 		problema = app.getString(com.xebolax.lector.R.string.radio_alarma_reserva)
 		j.setMediaItem(MediaItem.Builder().setUri(tono).setMediaId("alarma").setMediaMetadata(MediaMetadata.Builder().setTitle(app.getString(com.xebolax.lector.R.string.radio_despertador)).build()).build())
@@ -377,6 +381,18 @@ object ControlAudio {
 		if (::app.isInitialized) jugador?.setAudioAttributes(atributos(app), manejaFoco(app))
 	}
 
+	/** ¿Suena ahora como alarma (despertador)? */
+	private var comoAlarma = false
+
+	/** El despertador, con el volumen de alarma (suena aunque el multimedia esté a 0); lo demás, como multimedia. */
+	private fun usarAlarma(si: Boolean) {
+		if (si == comoAlarma) return
+		comoAlarma = si
+		val j = jugador ?: return
+		if (si) j.setAudioAttributes(androidx.media3.common.AudioAttributes.Builder().setUsage(C.USAGE_ALARM).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
+		else aplicarAtributos()
+	}
+
 	fun registrar(o: Oyente) = oyentes.addIfAbsent(o)
 	fun desregistrar(o: Oyente) = oyentes.remove(o)
 	fun avisar() = principal.post { oyentes.forEach { runCatching { it.alCambiar() } } }
@@ -395,6 +411,7 @@ object ControlAudio {
 
 	/** Carga un libro en el reproductor y lo coloca en su posición guardada. */
 	fun cargar(id: Long, l: LibroAudio, posicion: Posicion?) {
+		usarAlarma(false)
 		val j = jugador ?: return
 		if (esActual(id)) return
 		guardar(forzar = true)
@@ -467,6 +484,11 @@ object ControlAudio {
 		j.volume = 1f
 		j.play()
 		pausadoPorDesconexion = 0
+		// El temporizador que se paró con la pausa vuelve a contar desde donde estaba
+		if (restanteTemporizador > 0) {
+			finTemporizador = SystemClock.elapsedRealtime() + restanteTemporizador
+			restanteTemporizador = 0
+		}
 		// Temporizador automático por la noche (Ajustes, Audiolibros): si no hay ya uno puesto
 		Preferencias(app).let { pr ->
 			if (pr.temporizadorAuto && minutosTemporizador() == 0 && dentroDeFranja(pr.temporizadorAutoDesde, pr.temporizadorAutoHasta)) {
@@ -487,6 +509,10 @@ object ControlAudio {
 		principal.removeCallbacks(subida)
 		j.pause()
 		pausadoEn = SystemClock.elapsedRealtime()
+		if (finTemporizador > 0) {
+			restanteTemporizador = (finTemporizador - pausadoEn).coerceAtLeast(1000)
+			finTemporizador = 0
+		}
 		guardar(forzar = true)
 		avisar()
 	}
@@ -568,7 +594,7 @@ object ControlAudio {
 		if (l.niveles.size > 1) l.niveles.forEach { n -> if (n in 1..6) r += UnidadAudio.entries.first { it.nivel == n } }
 		if (l.paginas.isNotEmpty()) r += UnidadAudio.PAGINA
 		if (l.frases.isNotEmpty()) r += UnidadAudio.FRASE
-		r += UnidadAudio.MARCADOR
+		if (externo == null) r += UnidadAudio.MARCADOR
 		if (l.pistas.size > 1 && l.capitulos.isNotEmpty()) r += UnidadAudio.PISTA
 		r += listOf(UnidadAudio.S10, UnidadAudio.S30, UnidadAudio.M1, UnidadAudio.M5, UnidadAudio.M10)
 		return r
@@ -611,8 +637,8 @@ object ControlAudio {
 
 	fun cambiarVelocidad(porcentaje: Int) {
 		val v = porcentaje.coerceIn(25, 400)
-		// Se guarda en el libro (y como velocidad para los audiolibros nuevos)
-		Preferencias(app).p.edit().putInt("velocidad_audio", v).apply()
+		// Se guarda en el libro (y como velocidad para los audiolibros nuevos); la de un episodio va a su podcast
+		if (idLibro > 0) Preferencias(app).p.edit().putInt("velocidad_audio", v).apply()
 		if (idLibro > 0) BaseDatos.obtener(app).guardarAjustesLibro(idLibro, ajustesLibro().put("velocidad_audio", v))
 		externo?.takeIf { it.id == idLibro }?.alCambiarVelocidad?.invoke(v)
 		jugador?.playbackParameters = PlaybackParameters(v / 100f)
@@ -651,8 +677,9 @@ object ControlAudio {
 	private val latido = object : Runnable {
 		override fun run() {
 			val j = jugador ?: return
-			if (!j.isPlaying) return
-			guardar()
+			// En pausa de verdad se para; cargando (búfer) o con TalkBack hablando, sigue contando
+			if (!j.playWhenReady) return
+			if (j.isPlaying) guardar()
 			val ahora = SystemClock.elapsedRealtime()
 			if (finTemporizador > 0) {
 				val queda = finTemporizador - ahora
@@ -747,6 +774,7 @@ object ControlAudio {
 		principal.removeCallbacks(dejarDeAgitar)
 		if (minutos != 0) agitar.empezar { alAgitar() } else agitar.parar()
 		finTemporizador = 0
+		restanteTemporizador = 0
 		alFinalDelCapitulo = false
 		jugador?.volume = 1f
 		when {
@@ -780,7 +808,8 @@ object ControlAudio {
 		episodiosTemporizador == 1 -> -2
 		episodiosTemporizador > 1 -> -100 - episodiosTemporizador
 		alFinalDelCapitulo -> -1
-		finTemporizador > 0 -> ((finTemporizador - SystemClock.elapsedRealtime()) / 60_000 + 1).toInt()
+		finTemporizador > 0 -> ((finTemporizador - SystemClock.elapsedRealtime()).coerceAtLeast(0) / 60_000 + 1).toInt()
+		restanteTemporizador > 0 -> (restanteTemporizador / 60_000 + 1).toInt()
 		else -> 0
 	}
 

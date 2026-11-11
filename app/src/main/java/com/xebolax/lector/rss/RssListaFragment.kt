@@ -300,7 +300,8 @@ class RssListaFragment : Fragment() {
 			filas = nuevas
 			@Suppress("NotifyDataSetChanged")
 			b.recycler.adapter?.notifyDataSetChanged()
-			b.estado.text = estado()
+			// Solo si cambia: la línea de estado es una región viva y TalkBack la repetiría en cada recarga
+			estado().let { if (b.estado.text.toString() != it) b.estado.text = it }
 			b.estado.isVisible = true
 		}
 	}

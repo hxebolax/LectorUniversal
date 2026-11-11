@@ -1215,7 +1215,7 @@
 		<item quantity="other">%d articles match this rule</item>
 	</plurals>
 	<string name="rss_confirmar_borrar_regla">Delete this rule?</string>
-	<string name="rss_regla_palabras">Words, separated by commas</string>
+	<string name="rss_regla_palabras">Words or phrases, separated by commas (whole words; with * at the end it also matches inside other words, like educa*)</string>
 	<string name="rss_regla_en_titulo">In the title</string>
 	<string name="rss_regla_en_texto">In the title and the text</string>
 	<string name="rss_regla_donde">Where to look for them</string>
@@ -2279,6 +2279,9 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 		<item>Started first</item>
 		<item>By title</item>
 	</string-array>
+	<string name="aj_audio_mono">Mono audio</string>
+	<string name="aj_audio_mono_desc">Mixes both channels into one: for people who wear a single earbud or hear worse on one side. It applies to audiobooks, podcasts and radio, straight away.</string>
+	<string name="voz_motor_no_responde">The speech engine is not responding. Try another one in Settings, General, Read aloud.</string>
 	<string name="leer_con_lector">Read with Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: read</string>
 	<string name="comp_web_o_texto">A web page or a text (in Shared)</string>

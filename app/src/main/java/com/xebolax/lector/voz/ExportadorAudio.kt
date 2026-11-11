@@ -121,20 +121,22 @@ class ExportadorAudio(private val c: Context) {
 
 	private suspend fun iniciarMotor(idLibro: Long, doc: Documento): TextToSpeech {
 		val p = Preferencias(c)
+		// La voz con la que se lee este libro (la suya sobre la de su sección; lo demás, la general)
+		val perfil = withContext(Dispatchers.IO) { PerfilesVoz.efectivo(c, idLibro) }
 		val listo = CompletableDeferred<Boolean>()
 		val tts = withContext(Dispatchers.Main) {
-			TextToSpeech(c, { listo.complete(it == TextToSpeech.SUCCESS) }, p.motorVoz.ifBlank { null }?.takeUnless { ElevenLabs.esMotor(it) })
+			TextToSpeech(c, { listo.complete(it == TextToSpeech.SUCCESS) }, perfil.motorEfectivo(p).ifBlank { null }?.takeUnless { ElevenLabs.esMotor(it) })
 		}
 		if (!listo.await()) {
 			tts.shutdown()
 			error("El motor de voz no está disponible")
 		}
-		val json = runCatching { org.json.JSONObject(BaseDatos.obtener(c).libro(idLibro)?.ajustes.orEmpty()) }.getOrNull()
-		val velocidad = json?.optInt("velocidad", 0)?.takeIf { it > 0 } ?: p.velocidadVoz
-		val nombreVoz = json?.optString("voz", "")?.takeIf { it.isNotBlank() } ?: p.voz
+		val velocidad = perfil.velocidadEfectiva(p)
+		val nombreVoz = perfil.vozEfectiva(p).takeUnless { ElevenLabs.esVozSuya(it) }.orEmpty()
 		tts.setSpeechRate(velocidad / 100f)
-		tts.setPitch(p.tonoVoz / 100f)
-		val voz = if (nombreVoz.isNotBlank()) runCatching { tts.voices?.firstOrNull { it.name == nombreVoz } }.getOrNull() else null
+		tts.setPitch(perfil.tonoEfectivo(p) / 100f)
+		// Pedir las voces es una llamada al motor: fuera del hilo principal
+		val voz = if (nombreVoz.isNotBlank()) withContext(Dispatchers.IO) { runCatching { tts.voices?.firstOrNull { it.name == nombreVoz } }.getOrNull() } else null
 		if (voz != null) tts.voice = voz
 		else runCatching { tts.language = doc.idioma.takeIf { it.isNotBlank() }?.let { Locale.forLanguageTag(it) } ?: Locale.getDefault() }
 		return tts

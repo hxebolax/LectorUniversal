@@ -221,6 +221,11 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		// La voz de cada sección (la general está en General, Lectura en voz alta)
 		alPulsar("ir_voz_biblioteca") { com.xebolax.lector.voz.VozPerfilActivity.abrirSeccion(requireContext(), com.xebolax.lector.voz.PerfilesVoz.BIBLIOTECA) }
 		alPulsar("ir_voz_compartidos") { com.xebolax.lector.voz.VozPerfilActivity.abrirSeccion(requireContext(), com.xebolax.lector.voz.PerfilesVoz.COMPARTIDOS) }
+		// Sonido en mono: al momento, también con algo sonando
+		findPreference<Preference>("audio_mono")?.setOnPreferenceChangeListener { _, nuevo ->
+			com.xebolax.lector.audio.MezclaMono.activo = nuevo as Boolean
+			true
+		}
 		// Está en Voz y en Audiolibros: se aplica a los dos reproductores
 		findPreference<Preference>("talkback_al_hablar")?.setOnPreferenceChangeListener { _, _ ->
 			view?.post {
@@ -245,7 +250,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		val minutos = findPreference<androidx.preference.EditTextPreference>("${pre}_frecuencia_minutos")
 		// Podcasts sin elegir aún: la que tenían las dos juntas
 		if (pre == "pod" && lista?.value == null) lista?.value = PreferenceManager.getDefaultSharedPreferences(requireContext()).getString("rss_frecuencia", "180")
-		fun reprogramar() = view?.post { com.xebolax.lector.rss.RssTrabajo.programar(requireContext()) }
+		fun reprogramar() = view?.post { com.xebolax.lector.rss.RssTrabajo.programar(requireContext(), cambio = true) }
 		fun mostrar(valor: String?) {
 			minutos?.isVisible = valor == "-1"
 		}
@@ -863,10 +868,12 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				if (p.text.isNullOrBlank()) "" else getString(R.string.aj_ia_clave_puesta)
 			}
 		}
-		// Otra cuenta: los podcasts empiezan de cero con ella
-		if (pre == "pod") for (clave in listOf("pod_sinc_tipo", "pod_sinc_url", "pod_sinc_usuario")) {
+		// Otra cuenta: empiezan de cero con ella (los ids de la anterior no valen en otro servidor)
+		for (clave in listOf("${pre}_sinc_tipo", "${pre}_sinc_url", "${pre}_sinc_usuario")) {
 			findPreference<Preference>(clave)?.setOnPreferenceChangeListener { _, _ ->
-				com.xebolax.lector.podcast.PodcastsSincronizacion.olvidar(requireContext())
+				val c = requireContext().applicationContext
+				if (pre == "pod") com.xebolax.lector.podcast.PodcastsSincronizacion.olvidar(c)
+				else com.xebolax.lector.LectorApp.ambito.launch { com.xebolax.lector.rss.RssBaseDatos.obtener(c).olvidarRemotos() }
 				true
 			}
 		}
@@ -897,6 +904,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				} catch (e: kotlinx.coroutines.CancellationException) {
 					throw e
 				} catch (e: Exception) {
+					prefs.edit().putString("${pre}_sinc_error", e.message ?: e.javaClass.simpleName).apply()
 					getString(R.string.sinc_error, e.message ?: e.javaClass.simpleName)
 				}
 				ahora?.summary = texto

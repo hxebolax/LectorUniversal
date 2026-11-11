@@ -50,6 +50,9 @@ class ServicioGrabacion : Service() {
 		/** Lo que se está grabando (null si nada). */
 		@Volatile
 		var grabando: Emisora? = null
+		/** El archivo de la grabación en marcha (para no renombrarlo ni borrarlo mientras se graba). */
+		@Volatile
+		var archivoActual: String? = null
 			private set
 
 		@Volatile
@@ -62,8 +65,12 @@ class ServicioGrabacion : Service() {
 			private set
 
 		fun grabar(c: Context, e: Emisora, minutos: Int = 0) {
-			ContextCompat.startForegroundService(c, Intent(c, ServicioGrabacion::class.java).setAction(ACCION_GRABAR)
-				.putExtra(EXTRA_EMISORA, e.json().toString()).putExtra(EXTRA_MINUTOS, minutos))
+			// Las emisoras HLS (por trozos) no se pueden grabar así
+			if (!sePuedeGrabar(e)) return
+			runCatching {
+				ContextCompat.startForegroundService(c, Intent(c, ServicioGrabacion::class.java).setAction(ACCION_GRABAR)
+					.putExtra(EXTRA_EMISORA, e.json().toString()).putExtra(EXTRA_MINUTOS, minutos))
+			}
 		}
 
 		fun parar(c: Context) {
@@ -92,10 +99,15 @@ class ServicioGrabacion : Service() {
 					pararServicio()
 					return START_NOT_STICKY
 				}
-				// Siempre en primer plano en cuanto se pide (lo exige Android)
-				enPrimerPlano(e)
+				// Siempre en primer plano en cuanto se pide (lo exige Android); si Android no lo deja (límite diario), no se graba
 				if (grabando != null) terminar()
-				empezar(e, intent.getIntExtra(EXTRA_MINUTOS, 0))
+				val min = intent.getIntExtra(EXTRA_MINUTOS, 0)
+				minutos = min
+				if (runCatching { enPrimerPlano(e) }.isFailure) {
+					stopSelf()
+					return START_NOT_STICKY
+				}
+				empezar(e, min)
 			}
 			ACCION_PARAR -> {
 				if (grabando == null) {
@@ -182,6 +194,7 @@ class ServicioGrabacion : Service() {
 					if (salida == null) {
 						val f = nombreArchivo(e, extension(c.contentType, e))
 						archivo = f
+						archivoActual = f.absolutePath
 						salida = FileOutputStream(f)
 						idGrabacion = db.nuevaGrabacion(f.absolutePath, e)
 					}
@@ -191,7 +204,12 @@ class ServicioGrabacion : Service() {
 							val bufer = ByteArray(16 * 1024)
 							while (isActive && SystemClock.elapsedRealtime() < fin) {
 								val n = entrada.read(bufer)
-								if (n < 0) break
+								if (n < 0) {
+									// El servidor cortó: se reintenta con una espera creciente (no sin parar)
+									fallos++
+									delay(2_000L * fallos)
+									break
+								}
 								destino.write(bufer, 0, n)
 								fallos = 0
 							}
@@ -216,6 +234,12 @@ class ServicioGrabacion : Service() {
 		}
 	}
 
+	/** Android 15: el tiempo de un servicio así se acaba (6 horas al día): se guarda lo grabado y se cierra. */
+	override fun onTimeout(startId: Int, tipo: Int) {
+		terminar()
+		pararServicio()
+	}
+
 	/** Cierra la grabación y apunta su duración y tamaño. */
 	private fun terminar() {
 		trabajo?.cancel()
@@ -231,6 +255,7 @@ class ServicioGrabacion : Service() {
 		}
 		idGrabacion = 0
 		archivo = null
+		archivoActual = null
 		grabando = null
 		minutos = 0
 		db.avisar()

@@ -105,14 +105,17 @@ class ConversorHtml(
 
 	private fun procesar(e: Element, nombre: String, tipo: String) {
 		when (nombre) {
+			// En XHTML mal cerrado (<br> sin «/», leído como XML) el texto que sigue queda dentro: se recorre también
 			"br" -> {
 				registrarAnclas(e)
 				if (texto.isNotEmpty() && texto.last() != '\n') texto.append('\n')
+				hijos(e)
 			}
 			"hr" -> {
 				registrarAnclas(e)
 				volcar()
 				c.separador()
+				hijos(e)
 			}
 			"h1", "h2", "h3", "h4", "h5", "h6" -> {
 				volcar()
@@ -122,7 +125,10 @@ class ConversorHtml(
 				volcar()
 				nivelEncabezado = 0
 			}
-			"img", "image" -> imagen(e)
+			"img", "image" -> {
+				imagen(e)
+				hijos(e)
+			}
 			"svg" -> {
 				registrarAnclas(e)
 				val titulo = e.selectFirst("title")?.text().orEmpty().ifBlank { e.attr("aria-label") }
