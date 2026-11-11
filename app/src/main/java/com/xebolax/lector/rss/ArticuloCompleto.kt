@@ -135,6 +135,10 @@ object ArticuloCompleto {
 		return suscripciones(c).any { d == it || d.endsWith(".$it") }
 	}
 
+	/** Las cookies de tu sesión en ese medio, si estás suscrito y has entrado (para guardar sus artículos completos). */
+	fun cookiesDe(c: Context, url: String): String? =
+		if (conSesion(c, url)) runCatching { CookieManager.getInstance().getCookie(url) }.getOrNull() else null
+
 	/** ¿Se usa la sesión de ese medio? (estás suscrito y hay cookies de haber entrado) */
 	private fun conSesion(c: Context, url: String): Boolean =
 		estaSuscrito(c, url) && runCatching { !CookieManager.getInstance().getCookie(url).isNullOrBlank() }.getOrDefault(false)

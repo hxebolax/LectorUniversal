@@ -2255,6 +2255,58 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	<string name="aj_frecuencia_cada">Cada %1$d minutos</string>
 	<string name="aj_epub_con_audio">EPUB con narración: usar su audio</string>
 	<string name="aj_epub_con_audio_desc">Los EPUB 3 con narración sincronizada (texto y audio humano, Media Overlays) se abren en el reproductor y el texto sigue a la voz, como un DAISY. Si lo quitas, se abren como texto para leerlos con TalkBack o con la voz de la app.</string>
+	<string name="coleccion_ya_existe">Ya hay una colección que se llama %1$s.</string>
+	<string name="tipo_sale_de_carpeta">Como su carpeta es de otro tipo, ha pasado a la raíz de la biblioteca.</string>
+	<string name="error_archivo_interno">Ese archivo es de dentro de la app y no se puede abrir así.</string>
+	<string name="disp_en_compartidos">En Compartidos</string>
+	<string name="error_guardar_archivo">No se pudo guardar el archivo descargado.</string>
+	<string name="cat_error_401">Hace falta usuario y contraseña (401).</string>
+	<string name="cat_error_redirecciones">El servidor redirige demasiadas veces.</string>
+	<string name="cat_error_vacia">La lista está vacía.</string>
+	<string name="cat_error_no_opds">No es un catálogo OPDS ni una lista de noticias.</string>
+	<string name="cat_error_sin_buscador">El catálogo no tiene buscador.</string>
+	<string name="cat_error_ia_archivos">Internet Archive no da los archivos de este libro.</string>
+	<string name="cat_error_ia_descargables">Este libro de Internet Archive no tiene archivos que se puedan descargar.</string>
+	<string name="error_leer_archivo">No se puede leer el archivo.</string>
+	<string name="comp_pendiente_texto">Pendiente de descargar: no había conexión. Se descargará solo en cuanto la haya.</string>
+	<string name="comp_pendiente_descarga">Pendiente de descargar</string>
+	<plurals name="comp_minutos_escucha">
+		<item quantity="one">%d minuto</item>
+		<item quantity="other">%d minutos</item>
+	</plurals>
+	<string name="comp_volver_descargar">Volver a descargar</string>
+	<string name="comp_descargado_otra_vez">Descargado otra vez</string>
+	<string name="comp_info_medio">Medio: %1$s</string>
+	<string name="comp_info_fecha">Publicado: %1$s</string>
+	<string name="comp_guardar_pendiente">Guardar el enlace</string>
+	<string name="comp_guardar_pendiente_pregunta">¿Guardar el enlace en Compartidos para descargarlo solo cuando haya conexión?</string>
+	<string name="comp_pendiente_guardado">Guardado en Compartidos: se descargará cuando haya conexión.</string>
+	<string name="comp_ya_en_compartidos">Ya lo tienes en Compartidos (%1$s).</string>
+	<string name="comp_ya_en_biblioteca">Ya lo tienes en tu biblioteca.</string>
+	<string name="comp_leido">leído</string>
+	<string name="comp_sin_leer">sin leer</string>
+	<string name="comp_enlace_copiado_titulo">Enlace copiado</string>
+	<string name="comp_enlace_copiado_pregunta">¿Guardarlo en Compartidos para leerlo?\n\n%1$s</string>
+	<string name="aj_comp_orden">Ordenar</string>
+	<string name="aj_comp_ofrecer_copiado">Ofrecer el enlace copiado</string>
+	<string name="aj_comp_ofrecer_copiado_desc">Al abrir Compartidos con un enlace nuevo copiado, pregunta si guardarlo (una sola vez por enlace)</string>
+	<string name="atajo_leer_copiado">Leer lo copiado</string>
+	<string name="atajo_leer_pendiente">Leer lo pendiente</string>
+	<string name="atajo_guardar_web">Guardar una página web</string>
+	<string-array name="comp_orden_nombres">
+		<item>Lo más nuevo primero</item>
+		<item>Lo más antiguo primero</item>
+		<item>Lo más corto primero</item>
+		<item>Lo empezado primero</item>
+		<item>Por título</item>
+	</string-array>
+	<string-array name="comp_orden_valores" translatable="false">
+		<item>nuevos</item>
+		<item>antiguos</item>
+		<item>cortos</item>
+		<item>empezados</item>
+		<item>titulo</item>
+	</string-array>
 	<string name="leer_con_lector">Leer con Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: leer</string>
 	<string name="comp_web_o_texto">Una página web o un texto (en Compartidos)</string>

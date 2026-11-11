@@ -805,7 +805,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			val nombre = com.xebolax.lector.formatos.Fuente.nombreDe(c, android.net.Uri.parse(uri))
 			opciones += getString(R.string.dejar_de_vigilar, nombre) to {
 				p.carpetasVigiladas = p.carpetasVigiladas - uri
-				runCatching { c.contentResolver.releasePersistableUriPermission(android.net.Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+				// El permiso se conserva: los libros ya añadidos de esa carpeta lo necesitan para abrirse
 				(activity as? AppCompatActivity)?.avisar(getString(R.string.ya_no_se_vigila, nombre))
 				actualizarVigiladas()
 			}

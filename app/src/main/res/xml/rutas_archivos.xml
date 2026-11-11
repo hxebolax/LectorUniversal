@@ -5,4 +5,6 @@
 	<cache-path name="cache" path="." />
 	<!-- Grabaciones de la Radio (Android/data/…/files/Music/Radio) -->
 	<external-files-path name="musica" path="Music/" />
+	<!-- Libros añadidos con «Buscar libros en todo el dispositivo» (con permiso de todos los archivos) -->
+	<external-path name="dispositivo" path="." />
 </paths>

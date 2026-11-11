@@ -117,14 +117,24 @@ class PortadaActivity : AppCompatActivity() {
 		}
 	}
 
+	/** Cambió la biblioteca o Compartidos (borrar, marcar leído, pasar a la biblioteca...): se recarga una vez. */
+	private val recargaDiferida = Runnable { cargar() }
+	private val oyenteDatos = BaseDatos.Oyente {
+		b.recycler.removeCallbacks(recargaDiferida)
+		b.recycler.postDelayed(recargaDiferida, 400)
+	}
+
 	override fun onStart() {
 		super.onStart()
+		BaseDatos.obtener(this).suscribir(oyenteDatos)
 		ControlAudio.registrar(oyenteAudio)
 		// Sincronizar con el servidor (si está configurado): trae lo leído en otros dispositivos
 		com.xebolax.lector.LectorApp.ambito.launch { com.xebolax.lector.sincronizacion.Sincronizador.siToca(applicationContext, 60_000L) }
 	}
 
 	override fun onStop() {
+		BaseDatos.obtener(this).desuscribir(oyenteDatos)
+		b.recycler.removeCallbacks(recargaDiferida)
 		ControlAudio.desregistrar(oyenteAudio)
 		super.onStop()
 	}

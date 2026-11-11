@@ -348,6 +348,8 @@ class CatalogoFragment : Fragment() {
 				throw e
 			} catch (e: Exception) {
 				if (_b == null) return@launch
+				// No se pudo abrir el catálogo: se sigue en la lista de catálogos
+				if (pila.isEmpty()) fuente = null
 				b.estado.text = getString(R.string.error_catalogo, e.message.orEmpty())
 				actividad?.avisar(getString(R.string.error_catalogo, e.message.orEmpty()))
 			}
@@ -415,11 +417,17 @@ class CatalogoFragment : Fragment() {
 	/** El libro ya descargado de este catálogo (está en la biblioteca), o null. */
 	private fun yaDescargado(e: Feed.Entrada): Long? {
 		val a = actividad ?: return null
-		val base = e.titulo.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(80).ifBlank { "libro" }
+		val base = nombreBase(e)
 		val db = BaseDatos.obtener(a)
 		return File(a.filesDir, "biblioteca/descargas").listFiles().orEmpty()
 			.filter { it.name.startsWith("$base.") && !it.name.endsWith(".parte") }
 			.firstNotNullOfOrNull { db.libroPorUri(Uri.fromFile(it).toString())?.id }
+	}
+
+	/** Nombre del archivo de un libro del catálogo: título y una huella de título y autor (dos libros con el mismo título no se pisan). */
+	private fun nombreBase(e: Feed.Entrada): String {
+		val titulo = e.titulo.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(70).ifBlank { "libro" }
+		return titulo + " " + com.xebolax.lector.formatos.Fuente.hash(e.titulo + "\u0000" + e.autor).take(6)
 	}
 
 	/** Libro del catálogo: información y descargar para leerlo (o abrirlo, si ya lo tienes). */
@@ -457,14 +465,25 @@ class CatalogoFragment : Fragment() {
 			try {
 				val id = a.conEspera(getString(R.string.descargar_y_leer), getString(R.string.descargando_libro, e.titulo)) { withContext(Dispatchers.IO) {
 					val carpeta = File(a.filesDir, "biblioteca/descargas").apply { mkdirs() }
-					val base = e.titulo.replace(Regex("[\\\\/:*?\"<>|]"), "_").take(80).ifBlank { "libro" }
+					val base = nombreBase(e)
 					val temporal = File(carpeta, "$base.parte")
 					// Internet Archive: el archivo real se busca en su lista de archivos (su enlace directo falla)
 					val real = Feed.archivoInternetArchive(d) ?: d
-					val tipo = Feed.descargarArchivo(real.url, temporal, f.credenciales()).orEmpty()
-					val destino = File(carpeta, "$base.${Feed.extension(real.tipo.ifBlank { tipo }, real.url)}")
-					destino.delete()
-					temporal.renameTo(destino)
+					val destino = try {
+						val tipo = Feed.descargarArchivo(real.url, temporal, f.credenciales()).orEmpty()
+						var ext = Feed.extension(real.tipo.ifBlank { tipo }, real.url)
+						// Si el tipo no lo dice, lo dice el contenido
+						if (Formato.deExtension(ext) == Formato.DESCONOCIDO) {
+							val cabecera = temporal.inputStream().use { val b = ByteArray(8); val n = it.read(b); b.copyOf(maxOf(n, 0)) }
+							com.xebolax.lector.catalogo.NombreDescarga.extensionDeContenido(cabecera).takeIf { it.isNotEmpty() }?.let { ext = it }
+						}
+						val destino = File(carpeta, "$base.$ext")
+						destino.delete()
+						if (!temporal.renameTo(destino)) throw java.io.IOException(getString(R.string.error_guardar_archivo))
+						destino
+					} finally {
+						temporal.delete()
+					}
 					val formato = Formato.deExtension(destino.extension).takeIf { it != Formato.DESCONOCIDO } ?: Formato.EPUB
 					BaseDatos.obtener(a).anadirLibro(
 						Uri.fromFile(destino).toString(), destino.name, e.titulo, e.autor, formato.name, formato.audio, destino.length(), null,
@@ -497,6 +516,13 @@ class CatalogoFragment : Fragment() {
 	private inner class Vista(val f: ItemListaBinding) : RecyclerView.ViewHolder(f.root)
 
 	private inner class Adaptador : RecyclerView.Adapter<Vista>() {
+		// Ids estables: al cambiar la lista, TalkBack no pierde el foco
+		init { setHasStableIds(true) }
+		override fun getItemId(posicion: Int): Long = when (val f = filas[posicion]) {
+			is Fila.DeFuente -> ("f" + f.fuente.url + f.fuente.nombre).hashCode().toLong()
+			is Fila.DeEntrada -> ("e" + f.entrada.titulo + f.entrada.autor + f.entrada.descargas.firstOrNull()?.url.orEmpty() + f.entrada.navegacion.orEmpty()).hashCode().toLong() * 31 + posicion
+			is Fila.Mas -> ("m" + f.url).hashCode().toLong()
+		}
 		override fun getItemCount() = filas.size
 
 		override fun onCreateViewHolder(padre: ViewGroup, tipo: Int) = Vista(ItemListaBinding.inflate(LayoutInflater.from(padre.context), padre, false))

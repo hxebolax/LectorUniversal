@@ -33,10 +33,25 @@ object Compartidos {
 	/** Días tras los que se borran solos los leídos (0 = nunca). */
 	private fun diasBorrar(c: Context) = prefs(c).getString("comp_borrar_leidos", "0")?.toIntOrNull() ?: 0
 
+	/** Quita la puntuación pegada al final de un enlace; el «)» o «]» solo si no abre ninguno dentro (Pan_(alimento)). */
+	private fun limpiarFinal(url: String): String {
+		var u = url
+		while (u.isNotEmpty()) {
+			val c = u.last()
+			u = when {
+				c in ".,;:!?»\"'" -> u.dropLast(1)
+				c == ')' && u.count { it == ')' } > u.count { it == '(' } -> u.dropLast(1)
+				c == ']' && u.count { it == ']' } > u.count { it == '[' } -> u.dropLast(1)
+				else -> return u
+			}
+		}
+		return u
+	}
+
 	/** Una sola dirección web en el texto (con, como mucho, un título corto delante): es un enlace para leer. */
 	fun enlaceDe(texto: String): String? {
 		val t = texto.trim()
-		val enlaces = Regex("""https?://\S+""").findAll(t).map { it.value.trimEnd('.', ',', ')', ']', '»', '"') }.toList()
+		val enlaces = Regex("""https?://\S+""").findAll(t).map { limpiarFinal(it.value) }.toList()
 		if (enlaces.size != 1) return null
 		val resto = t.replace(enlaces[0], "").trim()
 		return enlaces[0].takeIf { resto.length <= 300 }
@@ -51,8 +66,44 @@ object Compartidos {
 		BaseDatos.obtener(c).anadirCompartido(Uri.fromFile(archivo).toString(), archivo.name, nombre, Formato.TXT.name, false, archivo.length(), "")
 	}
 
+	/** Minutos de escucha de un artículo (unas 170 palabras por minuto), o 0 si no se sabe. */
+	fun minutos(l: com.xebolax.lector.datos.Libro): Int {
+		val palabras = runCatching { org.json.JSONObject(l.ajustes).optInt("palabras") }.getOrDefault(0)
+		return if (palabras <= 0) 0 else ((palabras + 169) / 170).coerceAtLeast(1)
+	}
+
+	/** El orden de las listas de Compartidos (Ajustes, Compartidos). */
+	fun ordenar(c: Context, lista: List<com.xebolax.lector.datos.Libro>): List<com.xebolax.lector.datos.Libro> =
+		when (prefs(c).getString("comp_orden", "nuevos")) {
+			"antiguos" -> lista.sortedBy { it.anadido }
+			"cortos" -> lista.sortedWith(compareBy({ minutos(it).let { m -> if (m == 0) Int.MAX_VALUE else m } }, { -it.anadido }))
+			"empezados" -> lista.sortedWith(compareBy({ if (it.estado == com.xebolax.lector.datos.Estado.LEYENDO) 0 else 1 }, { -it.anadido }))
+			"titulo" -> lista.sortedBy { it.tituloVisible.lowercase() }
+			else -> lista.sortedByDescending { it.anadido }
+		}
+
 	/** Descarga una página web (o el documento al que lleva el enlace) y la guarda en Compartidos. */
-	suspend fun guardarWeb(c: Context, url: String): Long = PaginaWeb.guardar(c, url, compartido = true)
+	suspend fun guardarWeb(c: Context, url: String, forzar: Boolean = false): Long = PaginaWeb.guardar(c, url, compartido = true, forzar = forzar)
+
+	/** Acciones de los accesos directos del icono de la app (mantener pulsado el icono). */
+	const val ATAJO_COPIADO = "com.xebolax.lector.ATAJO_LEER_COPIADO"
+	const val ATAJO_PENDIENTE = "com.xebolax.lector.ATAJO_LEER_PENDIENTE"
+	const val ATAJO_WEB = "com.xebolax.lector.ATAJO_GUARDAR_WEB"
+
+	/** Los accesos directos: Leer lo copiado, Leer lo pendiente y Guardar una página web. */
+	fun ponerAtajos(c: Context) = runCatching {
+		fun atajo(id: String, accion: String, texto: Int, icono: Int) = androidx.core.content.pm.ShortcutInfoCompat.Builder(c, id)
+			.setShortLabel(c.getString(texto))
+			.setLongLabel(c.getString(texto))
+			.setIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(c, icono))
+			.setIntent(Intent(c, CompartidosActivity::class.java).setAction(accion))
+			.build()
+		androidx.core.content.pm.ShortcutManagerCompat.setDynamicShortcuts(c, listOf(
+			atajo("copiado", ATAJO_COPIADO, com.xebolax.lector.R.string.atajo_leer_copiado, com.xebolax.lector.R.drawable.ic_compartido),
+			atajo("pendiente", ATAJO_PENDIENTE, com.xebolax.lector.R.string.atajo_leer_pendiente, com.xebolax.lector.R.drawable.ic_voz),
+			atajo("web", ATAJO_WEB, com.xebolax.lector.R.string.atajo_guardar_web, com.xebolax.lector.R.drawable.ic_anadir),
+		))
+	}
 
 	/** Un archivo que llega de otra app. Si ya estaba en la biblioteca, se usa ese. */
 	suspend fun guardarArchivo(c: Context, uri: Uri): Long = withContext(Dispatchers.IO) {

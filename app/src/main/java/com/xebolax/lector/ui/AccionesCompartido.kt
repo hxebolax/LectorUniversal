@@ -3,6 +3,10 @@ package com.xebolax.lector.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import com.xebolax.lector.ui.mensaje
+import com.xebolax.lector.ui.conEspera
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import android.net.Uri
 import android.text.format.DateFormat
 import androidx.appcompat.app.AppCompatActivity
@@ -32,13 +36,24 @@ object AccionesCompartido {
 		// Su propia voz (lo que no cambie sigue a la voz de Compartidos)
 		if (!l.audio) lista += a.getString(R.string.voz_de_esto) to { com.xebolax.lector.voz.VozPerfilActivity.abrirLibro(a, l.id, l.tituloVisible) }
 		lista += a.getString(R.string.comp_mover_biblioteca) to { moverABiblioteca(a, l) }
+		// Favoritos: no se borran solos
+		lista += if (l.favorito) a.getString(R.string.quitar_favoritos) to {
+			db.cambiarFavorito(l.id, false)
+			a.avisar(a.getString(R.string.quitado_favoritos))
+		} else a.getString(R.string.anadir_favoritos) to {
+			db.cambiarFavorito(l.id, true)
+			a.avisar(a.getString(R.string.anadido_favoritos))
+		}
 		lista += if (l.estado == Estado.TERMINADO) a.getString(R.string.comp_marcar_no_leido) to {
-			db.cambiarEstado(l.id, Estado.NUEVO)
+			// Vuelve a pendientes sin perder por dónde ibas
+			if (l.posicion != null) db.marcarNoLeido(l.id) else db.cambiarEstado(l.id, Estado.NUEVO)
 			a.avisar(a.getString(R.string.comp_marcado_no_leido))
 		} else a.getString(R.string.comp_marcar_leido) to {
 			db.cambiarEstado(l.id, Estado.TERMINADO)
 			a.avisar(a.getString(R.string.comp_marcado_leido))
 		}
+		// Una página web: descargarla otra vez (si cambió, o si quedó pendiente sin conexión)
+		if (web != null && l.formato == Formato.HTML.name) lista += a.getString(R.string.comp_volver_descargar) to { volverADescargar(a, l, web) }
 		if (web != null) {
 			lista += a.getString(R.string.abrir_navegador) to {
 				runCatching { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(web))) }.onFailure { a.avisar(a.getString(R.string.no_disponible)) }
@@ -70,6 +85,22 @@ object AccionesCompartido {
 		return lista
 	}
 
+	fun volverADescargar(a: AppCompatActivity, l: Libro, web: String) {
+		a.lifecycleScope.launch {
+			try {
+				a.conEspera(a.getString(R.string.comp_volver_descargar), a.getString(R.string.descargando_pagina)) {
+					com.xebolax.lector.ui.PaginaWeb.guardar(a, web, compartido = true, forzar = true)
+				}
+				com.xebolax.lector.lectura.Abiertos.olvidar()
+				a.avisar(a.getString(R.string.comp_descargado_otra_vez))
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				a.mensaje(a.getString(R.string.comp_volver_descargar), a.getString(R.string.error_web, e.message ?: ""))
+			}
+		}
+	}
+
 	/** Pasarlo a la biblioteca: se elige el tipo (con el que le toca ya marcado) y la carpeta. */
 	fun moverABiblioteca(a: AppCompatActivity, l: Libro) {
 		val db = BaseDatos.obtener(a)
@@ -92,6 +123,11 @@ object AccionesCompartido {
 			appendLine(a.getString(R.string.info_titulo, l.tituloVisible))
 			appendLine(a.getString(R.string.comp_info_tipo, Tipos.de(a, l.claveTipo)?.nombreSingular ?: Tipos.nombre(a, l.claveTipo)))
 			appendLine(a.getString(R.string.info_formato, formato))
+			if (l.autor.isNotBlank()) appendLine(a.getString(R.string.info_autor, l.autor))
+			val extra = runCatching { org.json.JSONObject(l.ajustes) }.getOrNull()
+			extra?.optString("medio")?.takeIf { it.isNotBlank() }?.let { appendLine(a.getString(R.string.comp_info_medio, it)) }
+			extra?.optString("fecha")?.takeIf { it.isNotBlank() }?.let { appendLine(a.getString(R.string.comp_info_fecha, it)) }
+			com.xebolax.lector.compartidos.Compartidos.minutos(l).takeIf { it > 0 }?.let { appendLine(a.resources.getQuantityString(R.plurals.comp_minutos_escucha, it, it)) }
 			if (l.origen.startsWith("http")) appendLine(a.getString(R.string.comp_info_origen, l.origen))
 			if (l.tamano > 0) appendLine(a.getString(R.string.info_tamano, tamanoLegible(l.tamano)))
 			appendLine(a.getString(R.string.info_progreso, l.progreso.toInt()))

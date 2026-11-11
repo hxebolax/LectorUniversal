@@ -126,12 +126,15 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 
 	private suspend fun actualizarBiblioteca() {
 		enBiblioteca = withContext(Dispatchers.IO) {
-			BaseDatos.obtener(this@LibrosDispositivoActivity).todosConCompartidos()
-				.mapNotNull { l -> Uri.parse(l.uri).takeIf { it.scheme == "file" }?.path?.let { it to l.id } }.toMap()
+			val todos = BaseDatos.obtener(this@LibrosDispositivoActivity).todosConCompartidos()
+			compartidos = todos.filter { it.compartido }.map { it.id }.toSet()
+			todos.mapNotNull { l -> Uri.parse(l.uri).takeIf { it.scheme == "file" }?.path?.let { it to l.id } }.toMap()
 		}
 	}
 
 	private fun ya(e: BuscadorDispositivo.Encontrado) = enBiblioteca[e.archivo.path]
+	private var compartidos: Set<Long> = emptySet()
+	private fun enCompartidos(e: BuscadorDispositivo.Encontrado) = ya(e)?.let { it in compartidos } == true
 
 	private fun filtrar() {
 		val t = b.filtro.text?.toString()?.trim().orEmpty()
@@ -238,7 +241,7 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 			// «En tu biblioteca» primero (el estado), después el formato, la carpeta y el tamaño
 			val carpeta = e.archivo.parentFile?.name.orEmpty()
 			val partes = listOfNotNull(
-				getString(R.string.disp_en_biblioteca).takeIf { ya(e) != null },
+				(if (enCompartidos(e)) getString(R.string.disp_en_compartidos) else getString(R.string.disp_en_biblioteca)).takeIf { ya(e) != null },
 				e.formato.nombre,
 				carpeta.takeIf { it.isNotBlank() }?.let { getString(R.string.en_carpeta, it) },
 				tamanoLegible(e.archivo.length()),
@@ -247,7 +250,7 @@ class LibrosDispositivoActivity : AppCompatActivity() {
 			b.titulo.text = titulo
 			b.detalle.text = partes.joinToString(" · ")
 			b.progreso.visibility = android.view.View.GONE
-			b.root.contentDescription = (listOfNotNull(getString(R.string.disp_en_biblioteca).takeIf { ya(e) != null }, titulo) + partes.drop(if (ya(e) != null) 1 else 0)).joinToString(", ")
+			b.root.contentDescription = (listOfNotNull(partes.firstOrNull().takeIf { ya(e) != null }, titulo) + partes.drop(if (ya(e) != null) 1 else 0)).joinToString(", ")
 			b.root.setOnClickListener { abrir(e) }
 			val lista = acciones(e)
 			b.root.accionesAccesibles(lista)

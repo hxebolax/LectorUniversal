@@ -53,8 +53,13 @@ object Importador {
 		var yaEstaban = 0
 		for (uri in uris) {
 			guardarPermiso(contexto, uri)
-			if (db.libroPorUri(uri.toString()) != null) {
-				yaEstaban++
+			val existe = db.libroPorUri(uri.toString())
+			if (existe != null) {
+				// Estaba en Compartidos: pasa a la biblioteca (a esta carpeta)
+				if (existe.compartido) {
+					db.moverABiblioteca(existe.id, existe.tipo, carpeta)
+					anadidos += existe.id
+				} else yaEstaban++
 				continue
 			}
 			anadidos += anadir(contexto, uri, null, carpeta)
@@ -82,6 +87,7 @@ object Importador {
 	 * ya existía con esa dirección).
 	 */
 	suspend fun anadirExterno(contexto: Context, uri: Uri): Long = withContext(Dispatchers.IO) {
+		if (esInterno(contexto, uri)) throw SecurityException(contexto.getString(com.xebolax.lector.R.string.error_archivo_interno))
 		val db = BaseDatos.obtener(contexto)
 		db.libroPorUri(uri.toString())?.let { return@withContext it.id }
 		if (guardarPermiso(contexto, uri)) return@withContext anadir(contexto, uri, null, null)
@@ -95,11 +101,19 @@ object Importador {
 		}
 		if (!destino.exists()) {
 			contexto.contentResolver.openInputStream(uri)?.use { e -> destino.outputStream().use { e.copyTo(it) } }
-				?: throw IllegalStateException("No se puede leer el archivo.")
+				?: throw IllegalStateException(contexto.getString(com.xebolax.lector.R.string.error_leer_archivo))
 		}
 		val local = Uri.fromFile(destino)
 		db.libroPorUri(local.toString())?.let { return@withContext it.id }
 		anadir(contexto, local, nombre, null)
+	}
+
+	/** ¿Es un archivo de dentro de la app (file:// en su carpeta de datos)? No se acepta desde otras apps. */
+	fun esInterno(contexto: Context, uri: Uri): Boolean {
+		if (uri.scheme != "file") return false
+		val ruta = runCatching { File(uri.path ?: return false).canonicalPath }.getOrNull() ?: return true
+		val datos = runCatching { contexto.dataDir.canonicalPath }.getOrDefault(contexto.filesDir.parent ?: "")
+		return ruta.startsWith(datos)
 	}
 
 	/** Un documento de una carpeta elegida con el selector. */
@@ -145,8 +159,11 @@ object Importador {
 		fun carpetaBiblioteca(nombre: String, padre: Long?): Long =
 			db.carpetas(padre).firstOrNull { it.nombre.equals(nombre, ignoreCase = true) }?.id ?: db.crearCarpeta(nombre, padre)
 
+		val trabajo = coroutineContext[kotlinx.coroutines.Job]
 		fun recorrer(docId: String, nombre: String, destino: Long?, profundidad: Int) {
 			if (profundidad > 12) return
+			// Cancelar (botón de la espera): se para de verdad
+			if (trabajo?.isActive == false) throw kotlinx.coroutines.CancellationException()
 			progreso(nombre)
 			val lista = hijos(contexto, arbol, docId)
 			val nombres = lista.map { it.nombre.lowercase() }
@@ -166,6 +183,7 @@ object Importador {
 				return
 			}
 			for (doc in lista.filter { !it.esCarpeta && esLibro(it.nombre) }) {
+				if (trabajo?.isActive == false) throw kotlinx.coroutines.CancellationException()
 				val uri = DocumentsContract.buildDocumentUriUsingTree(arbol, doc.id)
 				if (db.libroPorUri(uri.toString()) != null) {
 					yaEstaban++
@@ -214,9 +232,14 @@ object Importador {
 		var total = 0
 		for (texto in Preferencias(contexto).carpetasVigiladas) {
 			val arbol = Uri.parse(texto)
-			total += runCatching { anadirCarpeta(contexto, arbol, null, crearCarpetas = true).anadidos.size }
-				.onFailure { Log.w(ETIQUETA, "No se pudo revisar $texto", it) }
-				.getOrDefault(0)
+			total += try {
+				anadirCarpeta(contexto, arbol, null, crearCarpetas = true).anadidos.size
+			} catch (e: kotlinx.coroutines.CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Log.w(ETIQUETA, "No se pudo revisar $texto", e)
+				0
+			}
 		}
 		return total
 	}

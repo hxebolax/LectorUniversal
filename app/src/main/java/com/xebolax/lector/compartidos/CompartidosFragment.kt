@@ -116,7 +116,7 @@ class CompartidosFragment : Fragment() {
 		carga?.cancel()
 		carga = viewLifecycleOwner.lifecycleScope.launch {
 			val (filas, estado) = withContext(Dispatchers.IO) {
-				val todos = db.compartidos()
+				val todos = Compartidos.ordenar(requireContext(), db.compartidos())
 				val lista = when (modo) {
 					Modo.PENDIENTES -> todos.filter { it.estado != Estado.TERMINADO }
 					Modo.LEIDOS -> todos.filter { it.estado == Estado.TERMINADO }

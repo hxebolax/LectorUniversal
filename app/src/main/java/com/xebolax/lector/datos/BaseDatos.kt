@@ -391,7 +391,12 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 			putNull("posicion")
 			put("progreso", 0.0)
 		}
+		// Terminado ahora: el borrado automático de leídos cuenta desde aquí
+		if (estado == Estado.TERMINADO) put("abierto", System.currentTimeMillis())
 	})
+
+	/** Marcar como no leído sin perder por dónde iba (Compartidos). */
+	fun marcarNoLeido(id: Long) = actualizar(id, ContentValues().apply { put("estado", Estado.LEYENDO) })
 
 	// --- Subrayados -------------------------------------------------------------------
 
@@ -469,9 +474,13 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 		return id
 	}
 
-	fun renombrarColeccion(id: Long, nombre: String) {
-		writableDatabase.update("colecciones", ContentValues().apply { put("nombre", nombre.trim()) }, "id = ?", arrayOf(id.toString()))
+	/** Devuelve false si ya hay otra colección con ese nombre (no se cambia). */
+	fun renombrarColeccion(id: Long, nombre: String): Boolean {
+		val n = nombre.trim()
+		if (colecciones().any { it.id != id && it.nombre.equals(n, ignoreCase = true) }) return false
+		val r = writableDatabase.updateWithOnConflict("colecciones", ContentValues().apply { put("nombre", n) }, "id = ?", arrayOf(id.toString()), android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE)
 		avisar()
+		return r > 0
 	}
 
 	/** Borra la colección; los libros se quedan en la biblioteca. */
@@ -601,8 +610,13 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 	})
 
 	/** Compartidos terminados hace más de esos días (para borrarlos solos). */
+	/** Para el borrado automático: nunca los favoritos ni lo que tiene marcadores, notas o subrayados. */
 	fun compartidosLeidosAntesDe(limite: Long): List<Libro> =
-		libros("estado = ${Estado.TERMINADO} AND (CASE WHEN abierto > 0 THEN abierto ELSE anadido END) < ?", arrayOf(limite.toString()), "id", compartidos = true)
+		libros("estado = ${Estado.TERMINADO} AND favorito = 0 AND (CASE WHEN abierto > 0 THEN abierto ELSE anadido END) < ? " +
+			"AND id NOT IN (SELECT libro FROM marcadores) AND id NOT IN (SELECT libro FROM subrayados)", arrayOf(limite.toString()), "id", compartidos = true)
+
+	/** Lo guardado desde esa dirección (en Compartidos o en la biblioteca), para avisar de que ya estaba. */
+	fun porOrigen(origen: String): Libro? = libros("origen = ?", arrayOf(origen), "id", compartidos = null).firstOrNull()
 
 	fun quitarLibro(id: Long) {
 		writableDatabase.delete("libros", "id = ?", arrayOf(id.toString()))

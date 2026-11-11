@@ -21,6 +21,18 @@
 		android:defaultValue="abrir"
 		app:useSimpleSummaryProvider="true" />
 	<ListPreference
+		android:key="comp_orden"
+		android:title="@string/aj_comp_orden"
+		android:entries="@array/comp_orden_nombres"
+		android:entryValues="@array/comp_orden_valores"
+		android:defaultValue="nuevos"
+		app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat
+		android:key="comp_ofrecer_copiado"
+		android:title="@string/aj_comp_ofrecer_copiado"
+		android:summary="@string/aj_comp_ofrecer_copiado_desc"
+		android:defaultValue="true" />
+	<ListPreference
 		android:key="comp_borrar_leidos"
 		android:title="@string/aj_comp_borrar_leidos"
 		android:entries="@array/comp_borrar_nombres"

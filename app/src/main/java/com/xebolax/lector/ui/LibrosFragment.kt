@@ -430,8 +430,8 @@ class LibrosFragment : Fragment() {
 						}
 						val filas = mutableListOf<Fila>()
 						// Al buscar también salen las carpetas cuyo nombre coincide
-						if (texto.isNotBlank()) carpetas.filter { it.nombre.contains(texto, ignoreCase = true) }
-							.forEach { h -> filas += Fila.DeCarpeta(h, todos.count { it.carpeta == h.id }, hijas[h.id].orEmpty().size) }
+						if (texto.isNotBlank()) carpetas.filter { it.nombre.contains(texto, ignoreCase = true) && (tipo == null || it.tipo.isEmpty() || it.tipo == tipo) }
+							.forEach { h -> filas += Fila.DeCarpeta(h, delTipo.count { it.carpeta == h.id }, hijas[h.id].orEmpty().size) }
 						val libros = base.filter { l ->
 							when (filtroActual) {
 								Filtro.FAVORITOS -> l.favorito
@@ -589,7 +589,9 @@ class LibrosFragment : Fragment() {
 				listOf(
 					getString(R.string.abrir) to { alAbrir(fila) },
 					getString(R.string.renombrar) to {
-						a.pedirTexto(getString(R.string.renombrar), getString(R.string.nombre), fila.nombre) { n -> if (n.isNotBlank()) db.renombrarColeccion(id, n) }
+						a.pedirTexto(getString(R.string.renombrar), getString(R.string.nombre), fila.nombre) { n ->
+							if (n.isNotBlank() && !db.renombrarColeccion(id, n)) a.avisar(getString(R.string.coleccion_ya_existe, n.trim()))
+						}
 					},
 					getString(R.string.borrar_coleccion) to {
 						a.confirmar(getString(R.string.confirmar_borrar_coleccion, fila.nombre), getString(R.string.borrar)) {

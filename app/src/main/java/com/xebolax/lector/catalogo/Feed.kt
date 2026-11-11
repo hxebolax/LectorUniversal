@@ -61,13 +61,17 @@ object Feed {
 
 	private fun abrir(url: String, credenciales: Credenciales?): Conexion {
 		var actual = url
+		val original = URL(url)
 		repeat(6) {
 			val c = URL(actual).openConnection() as HttpURLConnection
 			c.connectTimeout = 20_000
 			c.readTimeout = 60_000
 			c.instanceFollowRedirects = false
 			c.setRequestProperty("User-Agent", "LectorUniversal/${BuildConfig.VERSION_NAME} (Android)")
-			if (credenciales != null && credenciales.usuario.isNotBlank()) {
+			// Usuario y contraseña solo al servidor del catálogo (no a otro al que redirija) y nunca sin cifrar si el catálogo es https
+			val aqui = URL(actual)
+			val mismoServidor = aqui.host.equals(original.host, true) && aqui.port == original.port && !(original.protocol == "https" && aqui.protocol != "https")
+			if (credenciales != null && credenciales.usuario.isNotBlank() && mismoServidor) {
 				val token = Base64.encodeToString("${credenciales.usuario}:${credenciales.clave}".toByteArray(), Base64.NO_WRAP)
 				c.setRequestProperty("Authorization", "Basic $token")
 			}
@@ -81,7 +85,7 @@ object Feed {
 			}
 			if (codigo == 401) {
 				c.disconnect()
-				error("Hace falta usuario y contraseña (401)")
+				error(com.xebolax.lector.LectorApp.texto(com.xebolax.lector.R.string.cat_error_401))
 			}
 			if (codigo !in 200..299) {
 				c.disconnect()
@@ -89,7 +93,7 @@ object Feed {
 			}
 			return Conexion(c)
 		}
-		error("Demasiadas redirecciones")
+		error(com.xebolax.lector.LectorApp.texto(com.xebolax.lector.R.string.cat_error_redirecciones))
 	}
 
 	/** Lee una lista OPDS, Atom o RSS. base: dirección de la que viene (para los enlaces relativos). */
@@ -97,11 +101,11 @@ object Feed {
 		// OPDS 2 (JSON): Internet Archive, Open Library...
 		if (xml.trimStart().startsWith("{")) return leerOpds2(org.json.JSONObject(xml), base)
 		val doc = Jsoup.parse(xml, base, Parser.xmlParser())
-		val raiz = doc.children().firstOrNull() ?: error("Lista vacía")
+		val raiz = doc.children().firstOrNull() ?: error(com.xebolax.lector.LectorApp.texto(com.xebolax.lector.R.string.cat_error_vacia))
 		return when (nombre(raiz)) {
 			"rss", "rdf" -> leerRss(raiz, base)
 			"feed" -> leerAtom(raiz, base)
-			else -> error("No es un catálogo OPDS ni una lista de noticias")
+			else -> error(com.xebolax.lector.LectorApp.texto(com.xebolax.lector.R.string.cat_error_no_opds))
 		}
 	}
 
@@ -248,7 +252,7 @@ object Feed {
 			val d = Jsoup.parse(xml, desc, Parser.xmlParser())
 			val url = d.getAllElements().filter { nombre(it) == "url" }
 				.sortedByDescending { it.attr("type").contains("atom") }
-				.firstOrNull()?.attr("template") ?: error("El catálogo no tiene buscador")
+				.firstOrNull()?.attr("template") ?: error(com.xebolax.lector.LectorApp.texto(com.xebolax.lector.R.string.cat_error_sin_buscador))
 			p = absoluta(desc, url)
 		}
 		return p.replace("{searchTerms}", URLEncoder.encode(texto, "UTF-8"))
@@ -263,14 +267,14 @@ object Feed {
 	fun archivoInternetArchive(d: Enlace): Enlace? {
 		val id = Regex("""archive\.org/services/opds/book/([^?/]+)""").find(d.url)?.groupValues?.get(1) ?: return null
 		val json = org.json.JSONObject(descargarTexto("https://archive.org/metadata/$id/files"))
-		val archivos = json.optJSONArray("result") ?: error("Internet Archive no da los archivos de este libro")
+		val archivos = json.optJSONArray("result") ?: error(com.xebolax.lector.LectorApp.texto(com.xebolax.lector.R.string.cat_error_ia_archivos))
 		val lista = (0 until archivos.length()).mapNotNull { archivos.optJSONObject(it) }
 		fun primero(prueba: (String, String) -> Boolean) = lista.firstOrNull { prueba(it.optString("name").lowercase(), it.optString("format")) }
 		val elegido = primero { n, _ -> n.endsWith(".epub") }
 			?: primero { n, f -> n.endsWith(".pdf") && f.contains("Text PDF") }
 			?: primero { n, _ -> n.endsWith("_djvu.txt") }
 			?: primero { n, _ -> n.endsWith(".pdf") }
-			?: error("Este libro de Internet Archive no tiene archivos que se puedan descargar")
+			?: error(com.xebolax.lector.LectorApp.texto(com.xebolax.lector.R.string.cat_error_ia_descargables))
 		val nombre = elegido.optString("name")
 		val tipo = when {
 			nombre.endsWith(".epub", true) -> "application/epub+zip"
@@ -303,6 +307,6 @@ object Feed {
 		tipo.contains("mp4") || tipo.contains("m4b") -> "m4b"
 		tipo.contains("text/plain") -> "txt"
 		tipo.contains("html") -> "html"
-		else -> url.substringBefore('?').substringAfterLast('.', "epub").take(5)
+		else -> url.substringBefore('?').substringAfterLast('/').substringAfterLast('.', "epub").lowercase().takeIf { Regex("[a-z0-9]{1,5}").matches(it) } ?: "epub"
 	}
 }

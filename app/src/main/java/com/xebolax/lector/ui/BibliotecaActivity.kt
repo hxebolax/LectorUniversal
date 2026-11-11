@@ -365,10 +365,11 @@ class BibliotecaActivity : AppCompatActivity() {
 			Intent.ACTION_SEND -> {
 				@Suppress("DEPRECATION")
 				val flujo = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-				val texto = intent.getStringExtra(Intent.EXTRA_TEXT)
+				val texto = intent.getStringExtra(Intent.EXTRA_TEXT) ?: intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+				val enlace = texto?.let { com.xebolax.lector.compartidos.Compartidos.enlaceDe(it) }
 				when {
 					flujo != null -> abrirExterno(flujo)
-					texto != null && Regex("^https?://\\S+$").matches(texto.trim()) -> abrirWeb(texto.trim())
+					enlace != null -> abrirWeb(enlace)
 					!texto.isNullOrBlank() -> guardarTexto(texto)
 				}
 			}
@@ -376,7 +377,12 @@ class BibliotecaActivity : AppCompatActivity() {
 				@Suppress("DEPRECATION")
 				intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let { lista ->
 					lifecycleScope.launch {
-						val ids = lista.mapNotNull { runCatching { Importador.anadirExterno(this@BibliotecaActivity, it) }.getOrNull() }
+						val ids = runCatching {
+							conEspera(getString(R.string.seccion_biblioteca), getString(R.string.comp_guardando)) {
+								lista.mapNotNull { runCatching { aBiblioteca(Importador.anadirExterno(this@BibliotecaActivity, it)) }.getOrNull() }
+							}
+						}.getOrNull() ?: return@launch
+						TareasInicio.completar(this@BibliotecaActivity, ids)
 						avisar(resources.getQuantityString(R.plurals.libros_anadidos, ids.size, ids.size), mostrar = true)
 					}
 				}
@@ -385,10 +391,17 @@ class BibliotecaActivity : AppCompatActivity() {
 		intent.action = null
 	}
 
+	/** Si ya estaba en Compartidos, pasa a la biblioteca (aquí es donde se quería). */
+	private fun aBiblioteca(id: Long): Long {
+		val db = com.xebolax.lector.datos.BaseDatos.obtener(this)
+		db.libro(id)?.takeIf { it.compartido }?.let { db.moverABiblioteca(it.id, it.tipo, null) }
+		return id
+	}
+
 	private fun abrirExterno(uri: Uri) {
 		lifecycleScope.launch {
 			try {
-				val id = Importador.anadirExterno(this@BibliotecaActivity, uri)
+				val id = conEspera(getString(R.string.seccion_biblioteca), getString(R.string.comp_guardando)) { aBiblioteca(Importador.anadirExterno(this@BibliotecaActivity, uri)) }
 				TareasInicio.completar(this@BibliotecaActivity, listOf(id))
 				Abiertos.abrirPantalla(this@BibliotecaActivity, id)
 			} catch (e: kotlinx.coroutines.CancellationException) {

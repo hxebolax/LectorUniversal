@@ -2234,6 +2234,51 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 	<string name="aj_frecuencia_cada">Every %1$d minutes</string>
 	<string name="aj_epub_con_audio">EPUB with narration: use its audio</string>
 	<string name="aj_epub_con_audio_desc">EPUB 3 books with synchronized narration (text and human audio, Media Overlays) open in the player and the text follows the voice, like a DAISY book. If you turn it off, they open as text to read with TalkBack or the app voice.</string>
+	<string name="coleccion_ya_existe">There is already a collection called %1$s.</string>
+	<string name="tipo_sale_de_carpeta">As its folder is of another type, it has moved to the top of the library.</string>
+	<string name="error_archivo_interno">That file belongs to the app itself and cannot be opened this way.</string>
+	<string name="disp_en_compartidos">In Shared</string>
+	<string name="error_guardar_archivo">The downloaded file could not be saved.</string>
+	<string name="cat_error_401">A user name and password are needed (401).</string>
+	<string name="cat_error_redirecciones">The server redirects too many times.</string>
+	<string name="cat_error_vacia">The list is empty.</string>
+	<string name="cat_error_no_opds">It is not an OPDS catalog or a news feed.</string>
+	<string name="cat_error_sin_buscador">The catalog has no search.</string>
+	<string name="cat_error_ia_archivos">Internet Archive does not give the files of this book.</string>
+	<string name="cat_error_ia_descargables">This Internet Archive book has no files that can be downloaded.</string>
+	<string name="error_leer_archivo">The file cannot be read.</string>
+	<string name="comp_pendiente_texto">Waiting to be downloaded: there was no connection. It will download by itself as soon as there is one.</string>
+	<string name="comp_pendiente_descarga">Waiting to download</string>
+	<plurals name="comp_minutos_escucha">
+		<item quantity="one">%d minute</item>
+		<item quantity="other">%d minutes</item>
+	</plurals>
+	<string name="comp_volver_descargar">Download again</string>
+	<string name="comp_descargado_otra_vez">Downloaded again</string>
+	<string name="comp_info_medio">Site: %1$s</string>
+	<string name="comp_info_fecha">Published: %1$s</string>
+	<string name="comp_guardar_pendiente">Save the link</string>
+	<string name="comp_guardar_pendiente_pregunta">Save the link in Shared to download it automatically when there is a connection?</string>
+	<string name="comp_pendiente_guardado">Saved in Shared: it will download when there is a connection.</string>
+	<string name="comp_ya_en_compartidos">You already have it in Shared (%1$s).</string>
+	<string name="comp_ya_en_biblioteca">You already have it in your library.</string>
+	<string name="comp_leido">read</string>
+	<string name="comp_sin_leer">unread</string>
+	<string name="comp_enlace_copiado_titulo">Copied link</string>
+	<string name="comp_enlace_copiado_pregunta">Save it in Shared to read it?\n\n%1$s</string>
+	<string name="aj_comp_orden">Sort</string>
+	<string name="aj_comp_ofrecer_copiado">Offer the copied link</string>
+	<string name="aj_comp_ofrecer_copiado_desc">When you open Shared with a new copied link, asks whether to save it (only once per link)</string>
+	<string name="atajo_leer_copiado">Read copied text</string>
+	<string name="atajo_leer_pendiente">Read what is pending</string>
+	<string name="atajo_guardar_web">Save a web page</string>
+	<string-array name="comp_orden_nombres">
+		<item>Newest first</item>
+		<item>Oldest first</item>
+		<item>Shortest first</item>
+		<item>Started first</item>
+		<item>By title</item>
+	</string-array>
 	<string name="leer_con_lector">Read with Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: read</string>
 	<string name="comp_web_o_texto">A web page or a text (in Shared)</string>

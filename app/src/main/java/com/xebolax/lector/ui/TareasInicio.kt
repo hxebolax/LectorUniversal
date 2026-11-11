@@ -22,10 +22,12 @@ object TareasInicio {
 		if (System.currentTimeMillis() - ultima < CADA_MS) return
 		p.p.edit().putLong("ultima_revision", System.currentTimeMillis()).apply()
 		val app = actividad.applicationContext
+		val debil = java.lang.ref.WeakReference(actividad)
 		LectorApp.ambito.launch {
 			val n = runCatching { Importador.revisarVigiladas(app) }.getOrDefault(0)
-			if (n > 0) actividad.runOnUiThread {
-				if (!actividad.isFinishing) actividad.avisar(actividad.resources.getQuantityString(R.plurals.libros_nuevos_carpetas, n, n))
+			val a = debil.get() ?: return@launch
+			if (n > 0) a.runOnUiThread {
+				if (!a.isFinishing && !a.isDestroyed) a.avisar(a.resources.getQuantityString(R.plurals.libros_nuevos_carpetas, n, n))
 			}
 		}
 	}

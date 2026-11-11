@@ -170,9 +170,14 @@ class AdaptadorLibros(
 				val cuando = if (System.currentTimeMillis() - l.anadido < DateUtils.MINUTE_IN_MILLIS) contexto.getString(R.string.comp_ahora_mismo)
 				else DateUtils.getRelativeTimeSpanString(l.anadido, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
 				// El estado primero (como en Noticias): «Sin leer, título, página web, elpais.com, hace 5 minutos»
+				val minutos = com.xebolax.lector.compartidos.Compartidos.minutos(l)
+				val pendiente = com.xebolax.lector.compartidos.DescargasPendientes.pendiente(l.ajustes)
 				val partes = listOfNotNull(
+					contexto.getString(R.string.comp_pendiente_descarga).takeIf { pendiente },
+					contexto.getString(R.string.rss_favorito).takeIf { l.favorito },
 					contexto.getString(tipo.nombre),
 					sitio,
+					minutos.takeIf { it > 0 }?.let { contexto.resources.getQuantityString(R.plurals.comp_minutos_escucha, it, it) },
 					formatoDe(l).takeIf { tipo != TipoContenido.WEB && it.isNotBlank() },
 					cuando,
 				)

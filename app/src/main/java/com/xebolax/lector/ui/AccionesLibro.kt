@@ -132,8 +132,12 @@ object AccionesLibro {
 		lista += a.getString(R.string.serie_puntos) to { editarSerie(a, l) }
 		lista += a.getString(R.string.cambiar_tipo) to {
 			elegirTipo(a, l.tipo) { tipo ->
+				// En una carpeta de otro tipo no se vería en la pestaña nueva: sale a la raíz
+				val deCarpeta = l.carpeta?.let { db.carpeta(it) }?.tipo.orEmpty()
+				val sale = deCarpeta.isNotEmpty() && tipo.isNotEmpty() && deCarpeta != tipo
+				if (sale) db.moverLibro(l.id, null)
 				db.cambiarTipo(l.id, tipo)
-				a.avisar(a.getString(R.string.tipo_cambiado, nombreTipo(a, tipo)))
+				a.avisar(a.getString(R.string.tipo_cambiado, nombreTipo(a, tipo)) + if (sale) " " + a.getString(R.string.tipo_sale_de_carpeta) else "")
 			}
 		}
 		if (!l.audio) lista += a.getString(R.string.voz_de_este_libro) to { com.xebolax.lector.voz.VozPerfilActivity.abrirLibro(a, l.id, l.tituloVisible) }
@@ -270,7 +274,11 @@ object AccionesLibro {
 					val ids = mutableListOf<Long>()
 					fun recoger(id: Long) {
 						ids += db.deCarpeta(id).map { it.id }
-						db.carpetas(id).forEach { recoger(it.id) }
+						// Las subcarpetas también pasan a ese tipo (si no, quedarían ocultas en la pestaña nueva)
+						db.carpetas(id).forEach {
+							db.cambiarTipoCarpeta(it.id, tipo)
+							recoger(it.id)
+						}
 					}
 					recoger(c.id)
 					db.cambiarTipo(ids, tipo)
