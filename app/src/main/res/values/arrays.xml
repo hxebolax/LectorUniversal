@@ -32,6 +32,7 @@
 		<item>Negro sobre blanco (alto contraste)</item>
 		<item>Blanco sobre negro</item>
 		<item>Pantalla negra (ahorra batería, para escuchar)</item>
+		<item>Colores a tu gusto</item>
 	</string-array>
 	<string-array name="tema_lectura_valores" translatable="false">
 		<item>app</item>
@@ -42,6 +43,7 @@
 		<item>contraste</item>
 		<item>blanco_negro</item>
 		<item>negro</item>
+		<item>propio</item>
 	</string-array>
 
 	<string-array name="fuentes_nombres">
@@ -51,6 +53,10 @@
 		<item>Monoespaciada</item>
 		<item>Estrecha</item>
 		<item>Ligera</item>
+		<item>Atkinson Hyperlegible (muy legible, para baja visión)</item>
+		<item>OpenDyslexic (para dislexia)</item>
+		<item>Lexend (lectura más fluida)</item>
+		<item>Una letra tuya (archivo TTF u OTF)</item>
 	</string-array>
 	<string-array name="fuentes_valores" translatable="false">
 		<item>sistema</item>
@@ -59,6 +65,10 @@
 		<item>mono</item>
 		<item>condensada</item>
 		<item>ligera</item>
+		<item>atkinson</item>
+		<item>opendyslexic</item>
+		<item>lexend</item>
+		<item>propia</item>
 	</string-array>
 
 	<string-array name="orientacion_nombres">
@@ -529,5 +539,75 @@
 		<item>servidor</item>
 		<item>github</item>
 		<item>personalizada</item>
+	</string-array>
+	<!-- Al encender la pantalla (o desbloquear) con la lectura en voz alta o el audio sonando -->
+	<string-array name="al_encender_voz_nombres">
+		<item>Seguir leyendo</item>
+		<item>Pausar la lectura al encender la pantalla</item>
+		<item>Pausar la lectura al desbloquear el móvil</item>
+	</string-array>
+	<string-array name="al_encender_audio_nombres">
+		<item>Seguir sonando</item>
+		<item>Pausar al encender la pantalla</item>
+		<item>Pausar al desbloquear el móvil</item>
+	</string-array>
+	<string-array name="al_encender_valores" translatable="false">
+		<item>seguir</item>
+		<item>encender</item>
+		<item>desbloquear</item>
+	</string-array>
+	<!-- Colores a tu gusto (Aspecto del texto): nombre y valor -->
+	<string-array name="colores_nombres">
+		<item>Negro</item>
+		<item>Blanco</item>
+		<item>Amarillo</item>
+		<item>Crema</item>
+		<item>Sepia</item>
+		<item>Gris muy oscuro</item>
+		<item>Gris claro</item>
+		<item>Azul marino</item>
+		<item>Azul claro</item>
+		<item>Cian</item>
+		<item>Verde</item>
+		<item>Verde oscuro</item>
+		<item>Naranja</item>
+		<item>Rosa</item>
+		<item>Rojo oscuro</item>
+		<item>Morado</item>
+	</string-array>
+	<string-array name="colores_valores" translatable="false">
+		<item>#000000</item>
+		<item>#FFFFFF</item>
+		<item>#FFFF00</item>
+		<item>#FFF8E1</item>
+		<item>#F4ECD8</item>
+		<item>#202020</item>
+		<item>#E0E0E0</item>
+		<item>#001F5C</item>
+		<item>#8AB4F8</item>
+		<item>#00FFFF</item>
+		<item>#00C853</item>
+		<item>#1B5E20</item>
+		<item>#FF9800</item>
+		<item>#FF80AB</item>
+		<item>#8B0000</item>
+		<item>#4A148C</item>
+	</string-array>
+	<string-array name="pod_volumen_nombres">
+		<item>Como en el reproductor (el refuerzo general)</item>
+		<item>Sin refuerzo</item>
+		<item>+3 dB</item>
+		<item>+6 dB</item>
+		<item>+9 dB</item>
+		<item>+12 dB</item>
+		<item>+15 dB</item>
+	</string-array>
+	<string-array name="el_modelos_nombres">
+		<item>Multilingual v2: la mejor para libros (1 crédito por carácter)</item>
+		<item>Flash v2.5: la mitad de créditos y más rápida, algo menos natural</item>
+	</string-array>
+	<string-array name="el_modelos_valores" translatable="false">
+		<item>eleven_multilingual_v2</item>
+		<item>eleven_flash_v2_5</item>
 	</string-array>
 </resources>

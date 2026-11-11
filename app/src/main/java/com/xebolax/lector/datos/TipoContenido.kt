@@ -32,7 +32,7 @@ enum class TipoContenido(val nombre: Int, val plural: Int, val icono: Int) {
 		var ambiguosComo: TipoContenido = LIBRO
 
 		/** Formatos que casi siempre son libros. */
-		private val DE_LIBRO = setOf(Formato.EPUB.name, Formato.MOBI.name, Formato.FB2.name, Formato.COMIC.name, Formato.DAISY.name)
+		private val DE_LIBRO = setOf(Formato.EPUB.name, Formato.MOBI.name, Formato.FB2.name, Formato.COMIC.name, Formato.DAISY.name, Formato.BRAILLE.name)
 		/** Formatos que casi siempre son documentos. */
 		private val DE_DOCUMENTO = setOf(Formato.PPTX.name, Formato.XLSX.name)
 

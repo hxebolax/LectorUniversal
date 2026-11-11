@@ -35,8 +35,10 @@ data class OpcionesLectura(
 	val dividirParrafos: Int = 0,
 	/** Escribir "[Imagen: ...]" para las imágenes con descripción. */
 	val leerImagenes: Boolean = true,
+	/** Libros en braille: pasarlos a texto (si no, se muestran sus puntos tal cual). */
+	val brailleComoTexto: Boolean = true,
 ) {
-	fun firma() = "t$tablasConEncabezados p$pdfUnirLineas l$txtLineaAParrafo d$dividirParrafos i$leerImagenes"
+	fun firma() = "t$tablasConEncabezados p$pdfUnirLineas l$txtLineaAParrafo d$dividirParrafos i$leerImagenes b$brailleComoTexto"
 }
 
 class ContextoLectura(

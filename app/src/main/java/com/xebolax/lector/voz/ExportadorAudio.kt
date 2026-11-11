@@ -123,7 +123,7 @@ class ExportadorAudio(private val c: Context) {
 		val p = Preferencias(c)
 		val listo = CompletableDeferred<Boolean>()
 		val tts = withContext(Dispatchers.Main) {
-			TextToSpeech(c, { listo.complete(it == TextToSpeech.SUCCESS) }, p.motorVoz.ifBlank { null })
+			TextToSpeech(c, { listo.complete(it == TextToSpeech.SUCCESS) }, p.motorVoz.ifBlank { null }?.takeUnless { ElevenLabs.esMotor(it) })
 		}
 		if (!listo.await()) {
 			tts.shutdown()

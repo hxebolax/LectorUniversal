@@ -29,6 +29,11 @@ class ConversorHtml(
 	private val opciones: OpcionesLectura,
 	/** Idioma del documento: los bloques en otro idioma lo indican (para la voz). */
 	private val idiomaDocumento: String = c.idioma,
+	/**
+	 * ¿Es de adorno una imagen sin descripción? (la mide y cuenta quien tiene
+	 * el libro: pequeñas o repetidas, como separadores y viñetas, no se leen).
+	 */
+	private val imagenDeAdorno: (String) -> Boolean = { false },
 ) {
 
 	private class Lista(val ordenada: Boolean, var contador: Int, var primero: Boolean = true)
@@ -259,7 +264,7 @@ class ConversorHtml(
 		val recurso = recursoImagen(e)
 		if (alt.isEmpty()) {
 			// Sin descripción: solo las imágenes sueltas (ilustraciones), no adornos dentro del texto
-			if (recurso == null || texto.isNotBlank() || esAdorno(e)) return
+			if (recurso == null || texto.isNotBlank() || esAdorno(e) || imagenDeAdorno(recurso)) return
 			anadirImagen(null, recurso)
 			return
 		}
@@ -389,6 +394,13 @@ class ConversorHtml(
 		for (img in celda.select("img")) {
 			val alt = img.attr("alt")
 			if (alt.isNotBlank()) img.after(TextNode(" [Imagen: $alt] "))
+		}
+		// Fórmulas dentro de la celda: dichas con palabras, como fuera de las tablas (no sus símbolos sueltos)
+		for (m in celda.select("math")) {
+			val alt = m.attr("alttext").ifBlank { runCatching { Matematicas.hablar(m) }.getOrDefault("") }.ifBlank {
+				m.selectFirst("annotation[encoding*=TeX], annotation")?.text().orEmpty()
+			}.ifBlank { m.text() }
+			m.replaceWith(TextNode(if (alt.isBlank()) " " else " [Fórmula: ${alt.trim()}] "))
 		}
 		partes.append(celda.text())
 		return ESPACIOS.replace(partes.toString(), " ").trim()

@@ -86,6 +86,7 @@ class CompartidosActivity : AppCompatActivity() {
 		atender(intent)
 	}
 
+	/** Lo que llega de otra app (el texto seleccionado, «Leer con Lector Universal», se queda siempre aquí). */
 	private fun esRecibido(i: Intent?) = i?.action in setOf(Intent.ACTION_VIEW, Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)
 
 	// --- Lo que llega de otras apps ---------------------------------------------------------
@@ -103,6 +104,15 @@ class CompartidosActivity : AppCompatActivity() {
 					flujo != null -> recibirArchivo(flujo)
 					texto != null && Compartidos.enlaceDe(texto) != null -> recibirWeb(Compartidos.enlaceDe(texto)!!)
 					!texto.isNullOrBlank() -> recibirTexto(texto, asunto)
+				}
+			}
+			// Texto seleccionado en otra app: se guarda y se lee en voz alta al momento
+			Intent.ACTION_PROCESS_TEXT -> {
+				val texto = i.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
+				if (!texto.isNullOrBlank()) lifecycleScope.launch {
+					val id = Compartidos.guardarTexto(this@CompartidosActivity, texto, null)
+					b.paginas.setCurrentItem(0, false)
+					Compartidos.abrir(this@CompartidosActivity, id, leer = true)
 				}
 			}
 			Intent.ACTION_SEND_MULTIPLE -> {
@@ -171,6 +181,7 @@ class CompartidosActivity : AppCompatActivity() {
 
 	override fun onCreateOptionsMenu(menu: Menu): Boolean {
 		menu.add(Menu.NONE, 1, Menu.NONE, R.string.comp_anadir).setIcon(R.drawable.ic_anadir).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+		menu.add(Menu.NONE, 4, Menu.NONE, R.string.seguido_compartidos)
 		menu.add(Menu.NONE, 2, Menu.NONE, R.string.comp_borrar_leidos)
 		menu.add(Menu.NONE, 3, Menu.NONE, R.string.comp_borrar_todo)
 		return true
@@ -187,6 +198,8 @@ class CompartidosActivity : AppCompatActivity() {
 				getString(R.string.leer_portapapeles) to { leerPortapapeles() },
 				getString(R.string.comp_escribir_texto) to { escribirTexto() },
 			))
+			// Leer seguido lo pendiente, del más antiguo al más nuevo
+			4 -> com.xebolax.lector.voz.ListaLectura.empezar(this, BaseDatos.obtener(this).compartidos().filter { it.estado != Estado.TERMINADO }.reversed())
 			2 -> {
 				val db = BaseDatos.obtener(this)
 				val leidos = db.compartidos().filter { it.estado == Estado.TERMINADO }

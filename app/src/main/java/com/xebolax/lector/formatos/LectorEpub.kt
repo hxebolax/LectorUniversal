@@ -115,6 +115,29 @@ object LectorEpub : LectorFormato {
 			.filter { it.tipo.contains("html") || it.tipo.contains("xml") || it.ruta.lowercase().endsWith("htm") || it.ruta.lowercase().endsWith("html") }
 		if (orden.isEmpty()) throw ExcepcionFormato("El EPUB no tiene capítulos que leer.")
 
+		// --- Imágenes de adorno (idea de Paperback): sin descripción, una imagen
+		// pequeña (menos de 150 píxeles de lado) o que se repite (separadores,
+		// viñetas en cada capítulo) no se lee como «Imagen sin descripción»
+		val usos = HashMap<String, Int>()
+		if (ctx.opciones.leerImagenes) for (elemento in orden) {
+			val ruta = z.buscar(elemento.ruta) ?: continue
+			val html = Textos.decodificar(z.bytes(ruta) ?: continue, "utf-8")
+			for (m in IMAGENES.findAll(html)) {
+				val destino = Contenedor.resolver(elemento.ruta, m.groupValues[1].trim())
+				if (destino.isNotBlank()) usos[destino] = (usos[destino] ?: 0) + 1
+			}
+		}
+		val medidas = HashMap<String, Boolean>()
+		val deAdorno: (String) -> Boolean = { recurso ->
+			medidas.getOrPut(recurso) {
+				if ((usos[recurso] ?: 0) >= 3) return@getOrPut true
+				val datos = z.buscar(recurso)?.let { z.bytes(it) } ?: return@getOrPut false
+				val o = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+				android.graphics.BitmapFactory.decodeByteArray(datos, 0, datos.size, o)
+				o.outWidth > 0 && o.outHeight > 0 && minOf(o.outWidth, o.outHeight) < 150
+			}
+		}
+
 		// --- Capítulos
 		for ((i, elemento) in orden.withIndex()) {
 			ctx.comprobar()
@@ -130,7 +153,7 @@ object LectorEpub : LectorFormato {
 			c.ancla(elemento.ruta)
 			c.ancla(ruta)
 			val idioma = documento.getAllElements().firstOrNull { local(it) == "html" }?.let { it.attr("xml:lang").ifBlank { it.attr("lang") } }
-			ConversorHtml(c, elemento.ruta, ctx.opciones, c.idioma.ifBlank { idioma.orEmpty() }).convertir(cuerpo)
+			ConversorHtml(c, elemento.ruta, ctx.opciones, c.idioma.ifBlank { idioma.orEmpty() }, deAdorno).convertir(cuerpo)
 		}
 
 		// --- Índice y páginas
@@ -215,4 +238,7 @@ object LectorEpub : LectorFormato {
 	}
 
 	private fun normalizar(t: String) = t.lowercase().filter { it.isLetterOrDigit() }
+
+	/** src o xlink:href de las imágenes (para contar cuántas veces sale cada una). */
+	private val IMAGENES = Regex("""<(?:img|image)\b[^>]*?\s(?:src|xlink:href)\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
 }

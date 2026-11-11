@@ -8,6 +8,11 @@
 		android:entryValues="@array/tema_lectura_valores"
 		android:defaultValue="app"
 		app:useSimpleSummaryProvider="true" />
+	<!-- Colores a tu gusto: solo se ven con ese tema -->
+	<Preference android:key="color_texto" android:title="@string/aj_color_texto" />
+	<Preference android:key="color_fondo" android:title="@string/aj_color_fondo" />
+	<Preference android:key="color_enlace" android:title="@string/aj_color_enlace" />
+	<Preference android:key="color_resaltado" android:title="@string/aj_color_resaltado" />
 	<com.xebolax.lector.ui.DeslizadorAjuste
 		android:key="tamano_letra"
 		android:title="@string/aj_tamano_letra"
@@ -22,6 +27,8 @@
 		android:entryValues="@array/fuentes_valores"
 		android:defaultValue="sistema"
 		app:useSimpleSummaryProvider="true" />
+	<!-- Solo con «Una letra tuya» -->
+	<Preference android:key="letra_propia" android:title="@string/aj_letra_propia" />
 	<SwitchPreferenceCompat
 		android:key="negrita"
 		android:title="@string/aj_negrita"

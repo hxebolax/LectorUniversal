@@ -28,6 +28,8 @@ class LectorApp : Application() {
 
 	override fun onCreate() {
 		super.onCreate()
+		// Si la app se cierra de golpe, el error se guarda solo en el móvil (nunca se envía solo)
+		com.xebolax.lector.datos.RegistroFallos.iniciar(this)
 		// Al cerrar un diálogo o volver a una pantalla, el foco de TalkBack vuelve a donde estaba
 		registerActivityLifecycleCallbacks(com.xebolax.lector.ui.MemoriaFoco)
 		Preferencias(this).migrar()
@@ -39,6 +41,8 @@ class LectorApp : Application() {
 		com.xebolax.lector.datos.Pais.iniciar(this)
 		LectorVoz.iniciar(this)
 		ControlAudio.iniciar(this)
+		// Pausar al encender la pantalla o al desbloquear (si se elige en Ajustes)
+		com.xebolax.lector.audio.PantallaEncendida.iniciar(this)
 		// Estadísticas: tiempo escuchando podcasts, noticias y radio
 		com.xebolax.lector.datos.Actividad.empezar(this)
 		// El widget dice el libro y si está leyendo

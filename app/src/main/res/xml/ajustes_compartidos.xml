@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Compartidos: lo que llega de otras apps o de internet -->
+<!-- Pestaña Compartidos de Ajustes: lo que llega de otras apps o de internet -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:app="http://schemas.android.com/apk/res-auto">
 	<ListPreference
@@ -27,4 +27,8 @@
 		android:key="comp_explicacion"
 		android:selectable="false"
 		android:summary="@string/aj_comp_borrar_leidos_desc" />
+	<Preference
+		android:key="ir_acciones_compartidos"
+		android:title="@string/aj_acciones_compartidos"
+		android:summary="@string/aj_acciones_compartidos_desc" />
 </PreferenceScreen>

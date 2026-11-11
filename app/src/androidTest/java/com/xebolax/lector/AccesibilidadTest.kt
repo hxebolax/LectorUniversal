@@ -210,10 +210,12 @@ class AccesibilidadTest {
 		}
 
 		// Ajustes, con sus pestañas abajo: cada pestaña y, en General y Biblioteca, cada apartado
-		val pestanasAjustes = listOf(R.string.aj_pestana_general, R.string.aj_pestana_biblioteca, R.string.aj_pestana_podcasts, R.string.aj_pestana_noticias, R.string.aj_pestana_radio)
-		for (p in pestanasAjustes) {
-			abrir(intent(com.xebolax.lector.ui.AjustesActivity::class.java), 2500)
-			tocar(es.getString(p), app.getString(p))
+		// (se abre cada una directamente: en pantallas estrechas alguna puede ir dentro de «Más»)
+		val pestanasAjustes = listOf("GENERAL" to R.string.aj_pestana_general, "BIBLIOTECA" to R.string.aj_pestana_biblioteca, "COMPARTIDOS" to R.string.aj_pestana_compartidos,
+			"PODCASTS" to R.string.aj_pestana_podcasts, "NOTICIAS" to R.string.aj_pestana_noticias, "RADIO" to R.string.aj_pestana_radio)
+		fun ajustesEn(clave: String) = intent(com.xebolax.lector.ui.AjustesActivity::class.java).putExtra(com.xebolax.lector.ui.AjustesActivity.EXTRA_APARTADO, clave)
+		for ((clave, p) in pestanasAjustes) {
+			abrir(ajustesEn(clave), 2500)
 			esperar(1500)
 			revisar("Ajustes: pestaña ${es.getString(p)}", 60)
 			if (p != R.string.aj_pestana_general && p != R.string.aj_pestana_biblioteca) continue
@@ -236,8 +238,7 @@ class AccesibilidadTest {
 				}
 			}
 			for (apartado in apartados) {
-				abrir(intent(com.xebolax.lector.ui.AjustesActivity::class.java), 2500)
-				tocar(es.getString(p), app.getString(p))
+				abrir(ajustesEn(clave), 2500)
 				esperar(1200)
 				tocar(apartado)
 				revisar("Ajustes: $apartado", 60)

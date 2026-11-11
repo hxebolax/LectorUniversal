@@ -22,6 +22,7 @@
 		<item>Black on white (high contrast)</item>
 		<item>White on black</item>
 		<item>Black screen (saves battery, for listening)</item>
+		<item>Your own colors</item>
 	</string-array>
 
 	<string-array name="fuentes_nombres">
@@ -31,6 +32,10 @@
 		<item>Monospace</item>
 		<item>Condensed</item>
 		<item>Light</item>
+		<item>Atkinson Hyperlegible (very legible, for low vision)</item>
+		<item>OpenDyslexic (for dyslexia)</item>
+		<item>Lexend (more fluent reading)</item>
+		<item>A font of your own (TTF or OTF file)</item>
 	</string-array>
 
 	<string-array name="orientacion_nombres">
@@ -293,5 +298,46 @@
 		<item>Own server only</item>
 		<item>GitHub only</item>
 		<item>A custom address</item>
+	</string-array>
+	<string-array name="al_encender_voz_nombres">
+		<item>Keep reading</item>
+		<item>Pause reading when the screen turns on</item>
+		<item>Pause reading when the phone is unlocked</item>
+	</string-array>
+	<string-array name="al_encender_audio_nombres">
+		<item>Keep playing</item>
+		<item>Pause when the screen turns on</item>
+		<item>Pause when the phone is unlocked</item>
+	</string-array>
+	<string-array name="colores_nombres">
+		<item>Black</item>
+		<item>White</item>
+		<item>Yellow</item>
+		<item>Cream</item>
+		<item>Sepia</item>
+		<item>Very dark gray</item>
+		<item>Light gray</item>
+		<item>Navy blue</item>
+		<item>Light blue</item>
+		<item>Cyan</item>
+		<item>Green</item>
+		<item>Dark green</item>
+		<item>Orange</item>
+		<item>Pink</item>
+		<item>Dark red</item>
+		<item>Purple</item>
+	</string-array>
+	<string-array name="pod_volumen_nombres">
+		<item>As in the player (the general boost)</item>
+		<item>No boost</item>
+		<item>+3 dB</item>
+		<item>+6 dB</item>
+		<item>+9 dB</item>
+		<item>+12 dB</item>
+		<item>+15 dB</item>
+	</string-array>
+	<string-array name="el_modelos_nombres">
+		<item>Multilingual v2: best for books (1 credit per character)</item>
+		<item>Flash v2.5: half the credits and faster, a little less natural</item>
 	</string-array>
 </resources>

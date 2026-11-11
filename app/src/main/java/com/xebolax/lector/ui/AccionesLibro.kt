@@ -244,6 +244,8 @@ object AccionesLibro {
 		val db = BaseDatos.obtener(a)
 		return listOf(
 			a.getString(R.string.abrir) to alAbrir,
+			// Sus documentos, uno tras otro en voz alta
+			a.getString(R.string.seguido_carpeta) to { com.xebolax.lector.voz.ListaLectura.empezar(a, db.deCarpeta(c.id)) },
 			a.getString(R.string.renombrar) to {
 				a.pedirTexto(a.getString(R.string.renombrar), a.getString(R.string.nombre), c.nombre) { nombre ->
 					if (nombre.isNotBlank()) {

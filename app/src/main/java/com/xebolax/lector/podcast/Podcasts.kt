@@ -52,16 +52,61 @@ object Podcasts {
 
 	// --- Descubrir -----------------------------------------------------------------------
 
-	/** Busca podcasts en Apple Podcasts (sin cuenta). */
+	/**
+	 * Busca podcasts (sin cuenta) en Apple Podcasts y en dos directorios abiertos,
+	 * fyyd y gpodder.net: primero los de Apple y detrás los que solo están en los
+	 * otros (sin repetir el mismo RSS). Si uno falla, valen los demás.
+	 */
 	suspend fun buscar(texto: String): List<Sugerencia> = withContext(Dispatchers.IO) {
+		val apple = async { runCatching { buscarApple(texto) } }
+		val fyyd = async { runCatching { buscarFyyd(texto) } }
+		val gpodder = async { runCatching { buscarGpodder(texto) } }
+		val todas = listOf(apple.await(), fyyd.await(), gpodder.await())
+		// Ninguno ha respondido: el error del primero (sin red, por ejemplo)
+		if (todas.all { it.isFailure }) throw todas.first().exceptionOrNull()!!
+		val vistas = HashSet<String>()
+		todas.flatMap { it.getOrDefault(emptyList()) }.filter { vistas.add(clave(it.url)) }
+	}
+
+	/** El mismo RSS aunque cambie http/https, «www.» o la barra final. */
+	private fun clave(url: String) = url.lowercase(java.util.Locale.ROOT).substringAfter("://").removePrefix("www.").trimEnd('/')
+
+	/** Un id para los que no vienen de Apple (negativo: no se confunde con los de Apple). */
+	private fun idDe(url: String) = -((clave(url).hashCode().toLong() and 0x7fffffff) + 1)
+
+	private fun buscarApple(texto: String): List<Sugerencia> {
 		val pais = pais()
 		val url = "https://itunes.apple.com/search?media=podcast&limit=50&country=$pais&term=" + URLEncoder.encode(texto, "UTF-8")
 		val r = JSONObject(RssLector.descargarTexto(url)).optJSONArray("results") ?: JSONArray()
-		(0 until r.length()).mapNotNull { i ->
+		return (0 until r.length()).mapNotNull { i ->
 			val o = r.optJSONObject(i) ?: return@mapNotNull null
 			val feed = o.optString("feedUrl")
 			if (feed.isBlank()) return@mapNotNull null
 			Sugerencia(o.optLong("collectionId"), o.optString("collectionName"), o.optString("artistName"), feed, "", o.optInt("trackCount"), o.optString("primaryGenreName"))
+		}
+	}
+
+	/** fyyd.de: directorio abierto, sin clave (en el idioma de la app). */
+	private fun buscarFyyd(texto: String): List<Sugerencia> {
+		val idioma = java.util.Locale.getDefault().language
+		val url = "https://api.fyyd.de/0.2/search/podcast?count=25&language=$idioma&title=" + URLEncoder.encode(texto, "UTF-8")
+		val r = JSONObject(RssLector.descargarTexto(url)).optJSONArray("data") ?: JSONArray()
+		return (0 until r.length()).mapNotNull { i ->
+			val o = r.optJSONObject(i) ?: return@mapNotNull null
+			val feed = o.optString("xmlURL")
+			if (feed.isBlank()) return@mapNotNull null
+			Sugerencia(idDe(feed), o.optString("title"), o.optString("author"), feed, o.optString("description").take(400), o.optInt("episode_count"), "")
+		}
+	}
+
+	/** gpodder.net: el directorio de la sincronización de podcasts, sin cuenta. */
+	private fun buscarGpodder(texto: String): List<Sugerencia> {
+		val r = JSONArray(RssLector.descargarTexto("https://gpodder.net/search.json?q=" + URLEncoder.encode(texto, "UTF-8")))
+		return (0 until minOf(r.length(), 25)).mapNotNull { i ->
+			val o = r.optJSONObject(i) ?: return@mapNotNull null
+			val feed = o.optString("url")
+			if (feed.isBlank()) return@mapNotNull null
+			Sugerencia(idDe(feed), o.optString("title"), o.optString("author"), feed, o.optString("description").take(400), 0, "")
 		}
 	}
 
@@ -335,6 +380,7 @@ object Podcasts {
 			velocidad = p?.velocidad?.takeIf { it > 0 } ?: prefs(c).getString("pod_velocidad_lista", "0")?.toIntOrNull()?.takeIf { it > 0 },
 			saltarInicio = p?.saltarInicio ?: 0,
 			saltarFinal = p?.saltarFinal ?: 0,
+			refuerzo = p?.volumen?.takeIf { it >= 0 },
 			alGuardar = { ms, dur ->
 				db.guardarPosicion(e.id, ms, dur)
 				// Casi al final: ya cuenta como escuchado

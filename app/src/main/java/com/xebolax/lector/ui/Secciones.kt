@@ -140,7 +140,7 @@ fun AppCompatActivity.ponerMenuLateral(contenido: View, barra: MaterialToolbar, 
 			destino == seccion -> inicio()
 			destino != null -> irASeccion(destino, desde = seccion)
 			id == R.id.lateral_estadisticas -> startActivity(Intent(this, EstadisticasActivity::class.java))
-			id == R.id.lateral_ajustes -> startActivity(Intent(this, AjustesActivity::class.java))
+			id == R.id.lateral_ajustes -> AjustesActivity.abrir(this, seccion)
 			id == R.id.lateral_manual -> AccionesLibro.abrirManual(this)
 			id == R.id.lateral_acerca -> acercaDe(actualizaciones)
 		}

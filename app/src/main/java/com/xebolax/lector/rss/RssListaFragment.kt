@@ -510,6 +510,12 @@ class RssListaFragment : Fragment() {
 			db.marcarLeidos(debajo)
 			a.conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, debajo.size, debajo.size)) { db.marcarLeidos(debajo, false) }
 		}
+		// Y los de encima (lo ya pasado al bajar por la lista)
+		val encima = filas.take(posicion).mapNotNull { (it as? Fila.DeArticulo)?.articulo?.takeIf { x -> !x.leido }?.id }
+		if (encima.isNotEmpty()) lista += getString(R.string.rss_marcar_encima) to {
+			db.marcarLeidos(encima)
+			a.conDeshacer(resources.getQuantityString(R.plurals.rss_marcados_leidos, encima.size, encima.size)) { db.marcarLeidos(encima, false) }
+		}
 		if (modo != Modo.FUENTES || fuente == null) lista += getString(R.string.rss_ir_fuente) to { actividad?.irAFuente(art.fuente) }
 		return lista
 	}

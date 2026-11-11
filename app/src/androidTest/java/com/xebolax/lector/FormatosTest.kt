@@ -108,6 +108,16 @@ class FormatosTest {
 	@Test fun xlsx() { texto("vencejo.xlsx", 2) }
 	@Test fun ods() { texto("vencejo.ods", 2) }
 	@Test fun pdf() { texto("vencejo.pdf", 2) }
+	/** Braille de la ONCE (BRA) y PEF: pasados a texto, con títulos y páginas. */
+	@Test fun braille() {
+		for (nombre in listOf("vencejo.bra", "vencejo.pef")) {
+			val d = texto(nombre)
+			conEncabezados(d, nombre)
+			val todo = d.bloques.joinToString(" ") { it.texto }
+			assertTrue("$nombre mal pasado a texto: ${todo.take(200)}", "El vencejo común" in todo && "¿Lo has visto alguna vez? ¡Es muy rápido!" in todo && "2.000.000" in todo)
+			assertTrue("$nombre sin páginas", d.paginas.isNotEmpty())
+		}
+	}
 	@Test fun chm() = texto("7-zip.chm", 20).let { assertTrue("chm sin índice", it.indice.size > 5) }
 
 	@Test

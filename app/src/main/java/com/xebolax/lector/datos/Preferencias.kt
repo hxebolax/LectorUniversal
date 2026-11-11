@@ -76,6 +76,7 @@ class Preferencias(private val contexto: Context) {
 			txtLineaAParrafo = p.getBoolean("txt_linea_parrafo", false),
 			dividirParrafos = texto("dividir_parrafos", "0").toIntOrNull() ?: 0,
 			leerImagenes = p.getBoolean("leer_imagenes", true),
+			brailleComoTexto = p.getBoolean("braille_texto", true),
 		)
 
 	// --- Voz

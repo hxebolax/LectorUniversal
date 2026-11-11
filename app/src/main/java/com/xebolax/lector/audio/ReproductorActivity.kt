@@ -540,9 +540,17 @@ class ReproductorActivity : AppCompatActivity() {
 
 	private fun irATiempo() {
 		val l = libro ?: return
-		pedirTexto(getString(R.string.ir_a_tiempo), getString(R.string.tiempo_ayuda), teclado = com.xebolax.lector.ui.Teclado.TIEMPO) { texto ->
-			val ms = textoATiempo(texto) ?: return@pedirTexto avisar(getString(R.string.tiempo_no_valido))
-			if (l.duracionTotal > 0) {
+		// Dónde se está y cuánto dura (del libro entero si se sabe; si no, de la pista)
+		val (pistaActual, msActual) = ControlAudio.posicion()
+		val entero = l.duracionTotal > 0
+		val actual = if (entero) l.pistas.take(pistaActual).sumOf { it.duracionMs } + msActual else msActual
+		val total = if (entero) l.duracionTotal else ControlAudio.duracionPista()
+		val titulo = if (total > 0) getString(R.string.ir_a_tiempo_donde, tiempoCorto(actual), tiempoCorto(total)) else getString(R.string.ir_a_tiempo)
+		// Teclado normal: hacen falta «+», «-», «:» y «%»
+		pedirTexto(titulo, getString(R.string.tiempo_ayuda_saltos), teclado = com.xebolax.lector.ui.Teclado.TEXTO) { texto ->
+			val ms = textoATiempo(texto, actual, total) ?: return@pedirTexto avisar(getString(R.string.tiempo_no_valido))
+			if (total > 0 && ms > total) return@pedirTexto avisar(getString(R.string.tiempo_pasa_del_final, tiempoHablado(total)))
+			if (entero) {
 				// Tiempo del libro entero: se busca la pista
 				var resto = ms
 				var pista = 0

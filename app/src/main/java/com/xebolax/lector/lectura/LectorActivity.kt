@@ -257,6 +257,9 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		cargarMarcadores()
 		cargarSubrayados()
 		// Elementos que tiene el documento (en segundo plano: en libros enormes tarda un poco)
+		// Por qué se navega en este libro: el último que usaste en él (si no, el general)
+		runCatching { org.json.JSONObject(l.ajustes).optString("navegacion") }.getOrNull()?.takeIf { it.isNotEmpty() }
+			?.let { n -> runCatching { Elemento.valueOf(n) }.getOrNull() }?.let { elemento = it }
 		lifecycleScope.launch {
 			elementosDisponibles = withContext(Dispatchers.Default) {
 				Elemento.entries.filter { it == Elemento.PARRAFO || it == Elemento.MARCADOR || it == Elemento.BUSQUEDA || nav.contar(it) > 0 }
@@ -548,7 +551,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		val lista = elementosDisponibles
 		val i = lista.indexOf(elemento).coerceAtLeast(0)
 		elemento = lista[(i + paso + lista.size) % lista.size]
-		p.p.edit().putString("elemento_navegacion", elemento.name).apply()
+		guardarElemento()
 		actualizarSelector()
 		avisar(getString(elemento.nombre), mostrar = false)
 	}
@@ -557,8 +560,20 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		val lista = elementosDisponibles
 		elegirUno(getString(R.string.navegar_por), lista.map { getString(it.nombre) }, lista.indexOf(elemento)) { i ->
 			elemento = lista[i]
-			p.p.edit().putString("elemento_navegacion", elemento.name).apply()
+			guardarElemento()
 			actualizarSelector()
+		}
+	}
+
+	/** La unidad de navegación elegida: la de este libro y la general (la de partida en los libros nuevos). */
+	private fun guardarElemento() {
+		p.p.edit().putString("elemento_navegacion", elemento.name).apply()
+		val id = idLibro
+		if (id <= 0) return
+		val nombre = elemento.name
+		lifecycleScope.launch(Dispatchers.IO) {
+			val ajustes = runCatching { org.json.JSONObject(db.libro(id)?.ajustes.orEmpty()) }.getOrElse { org.json.JSONObject() }
+			db.guardarAjustesLibro(id, ajustes.put("navegacion", nombre))
 		}
 	}
 

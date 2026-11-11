@@ -186,6 +186,8 @@ object RssLector {
 				val texto = paginaYoutube("https://www.youtube.com" + ruta.split('/').take(2).joinToString("/")) ?: return null
 				idCanal(texto)?.let { "https://www.youtube.com/feeds/videos.xml?channel_id=$it" }
 			}
+			// Un grupo de groups.io: su RSS
+			GruposIo.fuenteDeGrupo(url.toString()) != null -> GruposIo.fuenteDeGrupo(url.toString())
 			host == "reddit.com" && (ruta.startsWith("/r/") || ruta.startsWith("/user/") || ruta.startsWith("/u/")) -> "https://www.reddit.com$ruta/.rss"
 			host == "bsky.app" && ruta.startsWith("/profile/") -> "https://bsky.app${ruta.substringBefore("/post")}/rss"
 			ruta.matches(Regex("""/@[\w.]+""")) && !host.endsWith("youtube.com") && !host.endsWith("medium.com") -> "https://$host$ruta.rss"

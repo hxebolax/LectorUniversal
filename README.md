@@ -50,7 +50,7 @@ Las **estadísticas** (menú lateral) son de todas las secciones: tiempo leyendo
 
 #### Biblioteca
 
-- **Formatos**: EPUB 2 y 3, PDF (también escaneados, con reconocimiento de texto sin internet), Word (DOCX y DOC antiguo), OpenDocument (ODT, ODS, ODP), RTF, texto, HTML, Markdown, FictionBook (FB2), Kindle (MOBI, AZW, AZW3, PRC, PDB), CHM, PowerPoint, Excel, CSV, cómics (CBZ), ZIP, **DAISY 2.02 y 3** y audiolibros **M4B y MP3** con capítulos.
+- **Formatos**: EPUB 2 y 3, PDF (también escaneados, con reconocimiento de texto sin internet), Word (DOCX y DOC antiguo), OpenDocument (ODT, ODS, ODP), RTF, texto, HTML, Markdown, FictionBook (FB2), Kindle (MOBI, AZW, AZW3, PRC, PDB), CHM, PowerPoint, Excel, CSV, cómics (CBZ), ZIP, **DAISY 2.02 y 3**, **libros en braille** (BRA y BAN de la ONCE, BRF y PEF, pasados a texto) y audiolibros **M4B y MP3** con capítulos.
 - Pestañas Leyendo, Biblioteca (con carpetas), Marcadores y Catálogos (OPDS y bibliotecas web como Tiflolibros o la Biblioteca Digital de la ONCE).
 - **Tipos**: Libros, Documentos, Audiolibros, Páginas web y los tipos propios que crees, cada uno en su pestaña arriba de la Biblioteca y con sus carpetas. Las pestañas se ven siempre enteras (las que no caben van a «Más») y se ordenan, ocultan o crean en Ajustes.
 - Escanear documentos con la cámara con guía de voz y, opcionalmente, buscar todos los libros del dispositivo estén donde estén.
@@ -61,6 +61,9 @@ Las **estadísticas** (menú lateral) son de todas las secciones: tiempo leyendo
 - Navegación como en un lector de pantalla de escritorio: por encabezados (y por niveles), párrafos, páginas, listas, tablas, enlaces, imágenes, notas y marcadores.
 - **Lectura en voz alta** con cualquier motor de voz instalado, que sigue con la pantalla apagada y responde a los botones de los auriculares; cambia de voz según el idioma de cada párrafo; diccionario de pronunciación; temporizador.
 - **Voz propia de cada libro** (motor, voz, velocidad, tono, idiomas y pausas) y **voz de las noticias**; lo que no se cambia sigue a la voz general de Ajustes.
+- **Voces de ElevenLabs** opcionales, con tu propia clave de API: lo leído se guarda para no gastar créditos al volver atrás y, si falla, sigue con la voz del móvil.
+- **Leer con Lector Universal** desde el texto seleccionado en cualquier app, y **lectura seguida** de lo pendiente de Compartidos o de una carpeta.
+- Para baja visión y dislexia: letras Atkinson Hyperlegible, OpenDyslexic y Lexend (o una tuya) y colores a tu gusto con su contraste.
 - Fórmulas matemáticas leídas en voz alta, tablas con encabezados («Columna: valor») y descripción de imágenes.
 - **Inteligencia artificial** opcional: la del propio móvil (Gemini Nano), una descargable que funciona sin internet (Gemma) o tus propias claves, para resumir, explicar, traducir o describir imágenes.
 
@@ -127,6 +130,8 @@ Después **se actualiza sola**: al abrirse busca versiones nuevas, muestra qué 
 - Sin publicidad, sin estadísticas de uso y sin cuentas propias. La telemetría que traen las bibliotecas de ML Kit (Google Data Transport) está desactivada: sus eventos se descartan en el propio móvil.
 - Los libros, las posiciones, las notas y los ajustes se quedan en el móvil. Solo salen de él si configuras tu propia sincronización (WebDAV, una cuenta de noticias o de podcasts), usas una IA en la nube con tu clave, guardas una copia de seguridad donde tú elijas, o con la copia de seguridad de Android en tu cuenta de Google.
 - Las claves y contraseñas se guardan aparte del resto de ajustes y no van en la copia de seguridad de Android, salvo que lo actives.
+- Si la app se cierra de golpe, el error se guarda solo en el móvil; al abrirla te ofrece verlo y enviarlo tú. Nunca se envía nada solo.
+- Con ElevenLabs (opcional), lo que se lee se envía a ElevenLabs con tu clave; con las voces del móvil no sale nada.
 - Los permisos se piden al usar cada función (cámara para escanear, avisos para el despertador…) y la app sigue funcionando si los deniegas.
 
 ---
@@ -267,7 +272,9 @@ Las sugerencias, los avisos de errores y las mejoras son bienvenidos: abre una [
 - ML Kit (reconocimiento de texto e idioma, IA del móvil) y LiteRT-LM, de Google
 - Directorio de emisoras: [radio-browser.info](https://www.radio-browser.info/), comunitario y libre
 - Sonidos de marcador y nota: [Paperback](https://github.com/trypsynth/paperback), de Quin Gillespie (MIT)
-- Ideas de funciones: Paperback, AntennaPod, RadioDroid, Feeder, Read You, Readrops, Capy Reader y BlindRSS. Su código no se ha copiado: las secciones de Podcasts, Noticias y Radio están escritas desde cero.
+- Ideas de funciones: Paperback, AntennaPod, RadioDroid, Feeder, Read You, Readrops, Capy Reader y BlindRSS (la búsqueda de podcasts en fyyd y gpodder.net, los grupos de groups.io y el registro local de fallos). Su código no se ha copiado: las secciones de Podcasts, Noticias y Radio están escritas desde cero.
+- Letras [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/) (Braille Institute), [OpenDyslexic](https://opendyslexic.org/) (Abbie Gonzalez) y [Lexend](https://www.lexend.com/), con la licencia SIL Open Font License 1.1 (sus textos van en `assets/licencias`)
+- Lectura de libros braille: tablas propias escritas a partir de la signografía básica de la Comisión Braille Española; idea de Paperback
 - Iconos: Material Symbols (Apache 2.0)
 
 Las bibliotecas de terceros conservan sus propias licencias; todas las libres de esta lista son compatibles con la GPL-3.0.

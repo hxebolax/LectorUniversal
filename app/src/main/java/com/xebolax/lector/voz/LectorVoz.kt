@@ -20,6 +20,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.SilenceMediaSource
@@ -63,6 +64,11 @@ import java.util.concurrent.CopyOnWriteArrayList
  * pronunciación, pausa entre párrafos, saltar notas, temporizador (minutos o
  * fin del capítulo, con bajada de volumen y "agitar para prolongar") y
  * guardado de la posición.
+ *
+ * Con el motor «ElevenLabs» (voces en la nube con la clave del usuario) el
+ * audio de cada trozo lo genera ElevenLabs en vez del motor del móvil; la
+ * velocidad y el tono los pone el reproductor. Si ElevenLabs falla, se dice
+ * por qué y se sigue con la voz del móvil (o se para, según Ajustes).
  */
 @SuppressLint("StaticFieldLeak")
 object LectorVoz {
@@ -124,6 +130,14 @@ object LectorVoz {
 	/** El documento es una noticia (perfil de voz de las noticias y «Fin del artículo»). */
 	private var esNoticia = false
 	private var vozElegida: Voice? = null
+	/** ElevenLabs falló en esta lectura: se sigue con la voz del móvil hasta que el usuario vuelva a pulsar Reproducir. */
+	@Volatile private var nubeFallida = false
+	/** Ya se ha dicho por qué falló ElevenLabs (una vez por lectura). */
+	private var nubeAvisada = false
+
+	/** ¿Lee ElevenLabs? (motor elegido, con clave y sin haber fallado en esta lectura). */
+	private val nube: Boolean
+		get() = ElevenLabs.esMotor(perfil.motorEfectivo(Preferencias(app))) && !nubeFallida && ElevenLabs.configurada(app)
 
 	/** Frase pedida al motor y aún no puesta en el reproductor. */
 	private class Segmento(val gen: Int, val b: Int, val f: Int, val archivo: File, val nuevoBloque: Boolean) {
@@ -175,7 +189,7 @@ object LectorVoz {
 		val j = jugador ?: return
 		val primero = cola.firstOrNull()
 		if (!debeSonar() || j.isPlaying || primero == null || primero.estado != PEDIDO ||
-			SystemClock.elapsedRealtime() - primero.pedido < 4000) {
+			SystemClock.elapsedRealtime() - primero.pedido < (if (nube) 45_000 else 4000)) {
 			if (j.isPlaying) atascos = 0
 			return
 		}
@@ -424,7 +438,7 @@ object LectorVoz {
 	private fun carpeta() = File(app.cacheDir, "voz").apply { mkdirs() }
 
 	private fun motor(): TextToSpeech {
-		val deseado = perfil.motorEfectivo(Preferencias(app)).ifBlank { null }
+		val deseado = perfil.motorEfectivo(Preferencias(app)).ifBlank { null }?.takeUnless { ElevenLabs.esMotor(it) }
 		tts?.let { if (motorActual == deseado) return it }
 		tts?.shutdown()
 		listo = false
@@ -469,10 +483,18 @@ object LectorVoz {
 		val t = tts ?: return
 		if (!listo) return
 		val p = Preferencias(app)
-		t.setSpeechRate(perfil.velocidadEfectiva(p) / 100f)
-		t.setPitch(perfil.tonoEfectivo(p) / 100f)
+		if (nube) {
+			// ElevenLabs: el audio llega a velocidad normal y la velocidad y el tono los pone el reproductor
+			t.setSpeechRate(1f)
+			t.setPitch(1f)
+			jugador().playbackParameters = PlaybackParameters(perfil.velocidadEfectiva(p) / 100f, perfil.tonoEfectivo(p) / 100f)
+		} else {
+			t.setSpeechRate(perfil.velocidadEfectiva(p) / 100f)
+			t.setPitch(perfil.tonoEfectivo(p) / 100f)
+			jugador().playbackParameters = PlaybackParameters.DEFAULT
+		}
 		val nombre = perfil.vozEfectiva(p)
-		vozElegida = if (nombre.isNotBlank()) runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull() else null
+		vozElegida = if (nombre.isNotBlank() && !ElevenLabs.esVozSuya(nombre)) runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull() else null
 		if (vozElegida != null) t.voice = vozElegida
 		else {
 			val idioma = documento?.idioma?.takeIf { it.isNotBlank() }?.let { Locale.forLanguageTag(it) } ?: Locale.getDefault()
@@ -495,8 +517,10 @@ object LectorVoz {
 		alObtener(lista)
 	}
 
+	/** Los motores instalados y, si hay clave, ElevenLabs. */
 	fun motores(alObtener: (List<Pair<String, String>>) -> Unit) = conMotor {
-		alObtener(tts?.engines?.map { it.name to it.label }.orEmpty())
+		val nubes = if (ElevenLabs.configurada(app)) listOf(ElevenLabs.MOTOR to app.getString(R.string.el_motor)) else emptyList()
+		alObtener(tts?.engines?.map { it.name to it.label }.orEmpty() + nubes)
 	}
 
 	private fun conMotor(bloque: () -> Unit) {
@@ -515,6 +539,8 @@ object LectorVoz {
 
 	/** Cambió el motor en Ajustes. */
 	fun reiniciarMotor() {
+		nubeFallida = false
+		nubeAvisada = false
 		val estaba = leyendo
 		tts?.shutdown()
 		tts = null
@@ -540,6 +566,8 @@ object LectorVoz {
 	/** noticia: es un artículo de Noticias (se lee con la voz de las noticias). */
 	fun cargar(doc: Documento, idLibro: Long, tituloLibro: String, desde: Int, caracter: Int = 0, noticia: Boolean = false) {
 		if (documento !== doc || libro != idLibro) {
+			// Otro libro que no es el siguiente de la lectura seguida: la lista se olvida
+			ListaLectura.alCargar(idLibro)
 			if (leyendo) pausar()
 			// Quien abra la lectura dice cómo volver a ella (si no, se vuelve al libro por su id)
 			volver = null
@@ -639,7 +667,16 @@ object LectorVoz {
 		// Solo suena una cosa: si sonaba un audiolibro, un episodio o la radio, se pausa
 		if (com.xebolax.lector.audio.ControlAudio.reproduciendo) com.xebolax.lector.audio.ControlAudio.pausar()
 		com.xebolax.lector.audio.Sonando.ultima = com.xebolax.lector.audio.Sonando.Fuente.VOZ
-		if (!leyendo) pedirFoco()
+		if (!leyendo) {
+			pedirFoco()
+			// Reproducir otra vez: si ElevenLabs había fallado, se vuelve a probar
+			if (nubeFallida) {
+				nubeFallida = false
+				nubeAvisada = false
+				rehacer = true
+				aplicarAjustes()
+			}
+		}
 		leyendo = true
 		inicioSesion = SystemClock.elapsedRealtime()
 		bloqueAlEmpezar = bloque
@@ -779,6 +816,12 @@ object LectorVoz {
 		} else {
 			Preferencias(app).p.edit().putInt("velocidad_voz", v).apply()
 		}
+		// ElevenLabs: la velocidad la pone el reproductor, al momento y sin volver a pedir el audio
+		if (nube) {
+			jugador?.playbackParameters = PlaybackParameters(v / 100f, perfil.tonoEfectivo(Preferencias(app)) / 100f)
+			avisar()
+			return
+		}
 		tts?.setSpeechRate(v / 100f)
 		rehacer = true
 		if (leyendo) hablar()
@@ -836,7 +879,16 @@ object LectorVoz {
 		val bloqueDoc = doc.bloques.getOrNull(b) ?: return emptyList()
 		if (bloqueDoc.tipo == TipoBloque.SEPARADOR) return emptyList()
 		if (bloqueDoc.tipo == TipoBloque.NOTA && Preferencias(app).saltarNotas) return emptyList()
-		return Segmentador.frases(bloqueDoc.texto)
+		val frases = Segmentador.frases(bloqueDoc.texto)
+		if (!nube) return frases
+		// ElevenLabs: el párrafo entero (o trozos de frases completas) en cada petición: menos peticiones y mejor entonación
+		val trozos = mutableListOf<IntRange>()
+		for (r in frases) {
+			val ultimo = trozos.lastOrNull()
+			if (ultimo != null && r.last - ultimo.first < ElevenLabs.TROZO) trozos[trozos.size - 1] = ultimo.first..r.last
+			else trozos += r
+		}
+		return trozos
 	}
 
 	private fun siguienteBloqueLegible(desde: Int): Int {
@@ -860,6 +912,12 @@ object LectorVoz {
 		j.stop()
 		j.clearMediaItems()
 		borrarArchivos()
+		// Los trozos dependen del motor (frases con el del móvil, párrafos con ElevenLabs): se vuelven a calcular
+		if (frases.isNotEmpty()) {
+			val inicio = frases.getOrNull(frase)?.first ?: 0
+			frases = frasesDe(bloque)
+			frase = frases.indexOfLast { it.first <= inicio }.coerceAtLeast(0)
+		}
 		if (frases.isEmpty()) {
 			val s = siguienteBloqueLegible(bloque)
 			if (s >= (documento?.bloques?.size ?: 0)) {
@@ -916,6 +974,18 @@ object LectorVoz {
 			cola.addLast(segmento)
 			// Otro idioma en el párrafo: voz de ese idioma; encabezados algo más agudos
 			val idioma = bloqueDoc.idioma ?: idiomasDetectados[b]
+			if (nube && texto.isNotBlank()) {
+				val gen = generacion
+				val id = segmento.id
+				val anterior = lista.getOrNull(f - 1)?.let { bloqueDoc.texto.substring(it.first, it.last + 1) }.orEmpty()
+				val siguiente = lista.getOrNull(f + 1)?.let { bloqueDoc.texto.substring(it.first, it.last + 1) }.orEmpty()
+				val dicho = texto
+				ElevenLabs.sintetizar(app, texto, perfil.vozEfectiva(p), idioma ?: doc.idioma, anterior, siguiente, segmento.archivo,
+					{ gen == generacion && !nubeFallida }) { e -> principal.post { if (e == null) generada(id, true) else falloNube(id, e, dicho) } }
+				ultimaPedida = b to f
+				pedidas++
+				continue
+			}
 			val cambiaIdioma = idioma != null && perfil.segunIdiomaEfectivo(p) && vozElegida?.locale?.language != Locale.forLanguageTag(idioma).language
 			if (cambiaIdioma) runCatching { t.language = Locale.forLanguageTag(idioma!!) }
 			val destacar = bloqueDoc.tipo == TipoBloque.ENCABEZADO && p.destacarEncabezados
@@ -934,6 +1004,41 @@ object LectorVoz {
 		}
 		alimentar()
 	}
+
+	/**
+	 * ElevenLabs no ha podido generar un trozo: se dice por qué (una vez) y se
+	 * sigue con la voz del móvil, o se para si así se eligió en Ajustes.
+	 */
+	private fun falloNube(id: String, e: Throwable, texto: String) {
+		val s = cola.firstOrNull { it.id == id } ?: return
+		Log.w(ETIQUETA, "ElevenLabs: ${e.message}")
+		val yaFallida = nubeFallida
+		nubeFallida = true
+		val t = tts
+		val seguir = ElevenLabs.seguirConMovil(app) && t != null && listo
+		if (!yaFallida && !nubeAvisada) {
+			nubeAvisada = true
+			val aviso = ElevenLabs.mensaje(app, e) + " " + app.getString(if (seguir) R.string.el_sigo_con_movil else R.string.el_lectura_parada)
+			t?.speak(aviso, TextToSpeech.QUEUE_ADD, null, "aviso_elevenlabs")
+			ultimoAvisoNube = aviso
+		}
+		if (!seguir) {
+			s.estado = FALLIDO
+			pausar()
+			return
+		}
+		// Este trozo y los siguientes, con la voz del móvil
+		if (!yaFallida) aplicarAjustes()
+		val r = t!!.synthesizeToFile(texto, Bundle(), s.archivo, s.id)
+		if (r != TextToSpeech.SUCCESS) {
+			s.estado = FALLIDO
+			alimentar()
+		}
+	}
+
+	/** Lo último que dijo la lectura sobre ElevenLabs (se ve en Ajustes). */
+	var ultimoAvisoNube = ""
+		private set
 
 	/** El motor terminó de generar una frase. */
 	private fun generada(id: String?, ok: Boolean) {
@@ -1034,7 +1139,10 @@ object LectorVoz {
 			libro <= 0 -> R.string.fin_documento
 			else -> R.string.fin_del_libro
 		}
-		if (doc.bloques.isNotEmpty()) tts?.speak(app.getString(fin), TextToSpeech.QUEUE_FLUSH, null, "fin")
+		// Lectura seguida: «Siguiente: título» y empieza el siguiente
+		val siguiente = ListaLectura.alTerminar(app, libro)
+		val texto = if (siguiente != null) app.getString(fin) + " " + app.getString(R.string.seguido_siguiente, siguiente) else app.getString(fin)
+		if (doc.bloques.isNotEmpty() || siguiente != null) tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "fin")
 	}
 
 	private fun borrarArchivo(id: String) {

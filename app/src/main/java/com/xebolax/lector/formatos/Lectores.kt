@@ -28,6 +28,7 @@ object Lectores {
 		Formato.PDF -> LectorPdf
 		Formato.MOBI -> LectorMobi
 		Formato.CHM -> LectorChm
+		Formato.BRAILLE -> LectorBraille
 		Formato.DAISY -> LectorDaisy
 		Formato.AUDIO -> LectorAudio
 		Formato.LISTA -> LectorListaAudio

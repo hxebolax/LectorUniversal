@@ -322,12 +322,34 @@ fun tiempoCorto(ms: Long): String {
 /** Convierte "12", "12:30" o "1:02:30" en milisegundos (minutos si es un solo número). */
 fun textoATiempo(texto: String): Long? {
 	val partes = texto.trim().split(":", ".", ",", "h", "m").filter { it.isNotBlank() }.map { it.trim().toLongOrNull() ?: return null }
+	// Minutos o segundos de 60 o más detrás de otra parte («1:75») son una errata, no un tiempo
+	if (partes.size > 1 && partes.drop(1).any { it >= 60 }) return null
+	if (partes.any { it < 0 }) return null
 	return when (partes.size) {
 		1 -> partes[0] * 60_000
 		2 -> (partes[0] * 60 + partes[1]) * 1000
 		3 -> (partes[0] * 3600 + partes[1] * 60 + partes[2]) * 1000
 		else -> null
 	}
+}
+
+/**
+ * «Ir a un tiempo» de un audio: un tiempo («12», «12:30», «1:02:30»), un salto
+ * desde donde se está («+5:00», «-1:30») o un porcentaje de todo («50 %»).
+ * [actual] y [total] son del audio entero (total 0 si no se sabe). Devuelve
+ * null si no se entiende; puede pasar de [total] (quien llama lo avisa).
+ */
+fun textoATiempo(texto: String, actual: Long, total: Long): Long? {
+	val t = texto.trim().replace(" ", "")
+	if (t.endsWith("%")) {
+		val p = t.dropLast(1).replace(',', '.').toDoubleOrNull() ?: return null
+		if (total <= 0 || p < 0 || p > 100) return null
+		return (total * p / 100).toLong()
+	}
+	val signo = when (t.firstOrNull()) { '+' -> 1; '-', '−' -> -1; else -> 0 }
+	if (signo == 0) return textoATiempo(t)
+	val salto = textoATiempo(t.drop(1)) ?: return null
+	return (actual + signo * salto).coerceAtLeast(0)
 }
 
 fun tamanoLegible(bytes: Long): String = when {

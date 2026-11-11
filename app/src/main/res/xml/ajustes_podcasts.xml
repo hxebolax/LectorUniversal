@@ -10,6 +10,9 @@
 	<ListPreference android:key="pod_marcar_escuchado" android:title="@string/aj_pod_marcar" android:entries="@array/pod_marcar_nombres" android:entryValues="@array/pod_marcar_valores" android:defaultValue="30" app:useSimpleSummaryProvider="true" />
 	<ListPreference android:key="pod_velocidad_lista" android:title="@string/aj_pod_velocidad" android:entries="@array/pod_velocidad_nombres" android:entryValues="@array/pod_velocidad_valores" android:defaultValue="0" app:useSimpleSummaryProvider="true" />
 	<ListPreference android:key="rss_frecuencia" android:title="@string/aj_rss_frecuencia" android:entries="@array/rss_frecuencia_nombres" android:entryValues="@array/rss_frecuencia_valores" android:defaultValue="180" app:useSimpleSummaryProvider="true" />
+	<!-- El mismo ajuste que en Audiolibros y DAISY: vale para audiolibros y podcasts -->
+	<ListPreference android:key="audio_al_encender" android:title="@string/aj_al_encender" android:entries="@array/al_encender_audio_nombres" android:entryValues="@array/al_encender_valores" android:defaultValue="seguir" app:useSimpleSummaryProvider="true" />
+	<Preference android:key="audio_al_encender_explicacion" android:selectable="false" android:summary="@string/aj_al_encender_audio_desc" />
 	<PreferenceCategory android:title="@string/aj_pod_sinc">
 		<Preference android:key="pod_sinc_aviso" android:selectable="false" android:summary="@string/aj_pod_sinc_desc" />
 		<ListPreference android:key="pod_sinc_tipo" android:title="@string/aj_sinc_servicio" android:entries="@array/pod_sinc_nombres" android:entryValues="@array/pod_sinc_valores" android:defaultValue="ninguno" app:useSimpleSummaryProvider="true" />

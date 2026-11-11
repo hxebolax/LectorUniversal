@@ -53,4 +53,8 @@
 			android:key="comprobar_ahora"
 			android:title="@string/buscar_actualizaciones" />
 	</PreferenceCategory>
+	<Preference
+		android:key="informar_problema"
+		android:title="@string/aj_informar_problema"
+		android:summary="@string/aj_informar_problema_desc" />
 </PreferenceScreen>

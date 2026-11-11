@@ -110,6 +110,8 @@ object ControlAudio {
 		val despertador: Boolean = false,
 		/** Sección en cuyas estadísticas cuenta el tiempo (vacío: radio si es en directo, si no podcasts). */
 		val seccion: String = "",
+		/** Refuerzo de volumen propio en dB (el de su podcast); null = el general del reproductor. */
+		val refuerzo: Int? = null,
 	) {
 		val seccionActividad: String
 			get() = seccion.ifEmpty { if (directo) com.xebolax.lector.datos.Actividad.RADIO else com.xebolax.lector.datos.Actividad.PODCASTS }
@@ -630,7 +632,8 @@ object ControlAudio {
 
 	fun aplicarRefuerzo() {
 		val j = jugador ?: return
-		val ganancia = Preferencias(app).refuerzoVolumen
+		// El del podcast si tiene uno propio; si no, el general
+		val ganancia = externo?.refuerzo ?: Preferencias(app).refuerzoVolumen
 		runCatching {
 			refuerzo?.release()
 			refuerzo = null

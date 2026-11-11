@@ -346,6 +346,10 @@ class PodcastActivity : AppCompatActivity() {
 		listOf(velocidad, inicio, final).forEach { it.inputType = android.text.InputType.TYPE_CLASS_NUMBER }
 		var autoDescargar = p.autoDescargar.coerceIn(0, 2)
 		var nuevosVan = p.nuevos.coerceIn(0, 3)
+		// Volumen propio: como en el reproductor, sin refuerzo o +3 a +15 dB (para los podcasts que se oyen muy bajos)
+		val volumenes = listOf(-1, 0, 3, 6, 9, 12, 15)
+		var volumen = volumenes.indexOf(p.volumen).coerceAtLeast(0)
+		val botonVolumen = botonOpcion(R.string.pod_volumen, R.array.pod_volumen_nombres, { volumen }) { volumen = it }
 		val descargar = botonOpcion(R.string.pod_auto_descargar, R.array.pod_auto_descargar_nombres, { autoDescargar }) { autoDescargar = it }
 		val nuevos = botonOpcion(R.string.pod_nuevos_van, R.array.pod_nuevos_podcast_nombres, { nuevosVan }) { nuevosVan = it }
 		// Carpeta: un botón que dice la actual y abre la lista (con «Nueva carpeta…» para crear una)
@@ -367,7 +371,7 @@ class PodcastActivity : AppCompatActivity() {
 			orientation = android.widget.LinearLayout.VERTICAL
 			val m = dp(this@PodcastActivity, 20)
 			setPadding(m, m / 2, m, 0)
-			listOf(cNombre, botonCarpeta, antiguos, cIncluir, cExcluir, cMinimo, cUsuario, cClave, cVelocidad, cInicio, cFinal, descargar, nuevos, avisos, pausado).forEach { addView(it) }
+			listOf(cNombre, botonCarpeta, antiguos, cIncluir, cExcluir, cMinimo, cUsuario, cClave, cVelocidad, botonVolumen, cInicio, cFinal, descargar, nuevos, avisos, pausado).forEach { addView(it) }
 		}
 		MaterialAlertDialogBuilder(this)
 			.setTitle(R.string.pod_ajustes_podcast)
@@ -383,6 +387,7 @@ class PodcastActivity : AppCompatActivity() {
 					usuario = usuario.text.toString().trim(),
 					clave = clave.text.toString(),
 					velocidad = velocidad.text.toString().toIntOrNull()?.coerceIn(0, 400) ?: 0,
+					volumen = volumenes[volumen],
 					saltarInicio = inicio.text.toString().toIntOrNull()?.coerceIn(0, 600) ?: 0,
 					saltarFinal = final.text.toString().toIntOrNull()?.coerceIn(0, 600) ?: 0,
 					autoDescargar = autoDescargar,

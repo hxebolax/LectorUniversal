@@ -24,6 +24,8 @@ enum class Formato(val nombre: String, val extensiones: List<String>, val audio:
 	PPTX("PowerPoint", listOf("pptx", "pptm", "odp", "fodp")),
 	XLSX("Hoja de cálculo", listOf("xlsx", "xlsm", "ods", "fods")),
 	CHM("Ayuda CHM", listOf("chm")),
+	/** Libros en braille: BRA y BAN de la ONCE, BRF y PEF. */
+	BRAILLE("Braille", listOf("bra", "ban", "brf", "pef")),
 	DAISY("DAISY", listOf("opf", "ncc", "daisy")),
 	AUDIO("Audio", listOf("m4b", "m4a", "mp3", "aac", "ogg", "oga", "opus", "flac", "wav", "wma", "mka", "mp4", "3gp", "amr", "awb"), audio = true),
 	LISTA("Lista de reproducción", listOf("m3u", "m3u8", "pls", "cue"), audio = true),
@@ -76,6 +78,7 @@ enum class Formato(val nombre: String, val extensiones: List<String>, val audio:
 				empieza("PK") -> mirarZip(fuente)
 				inicio.startsWith("#EXTM3U") -> LISTA
 				inicio.contains("<FictionBook", ignoreCase = true) -> FB2
+				inicio.contains("<pef", ignoreCase = true) && inicio.contains("daisy.org/ns/2008/pef") -> BRAILLE
 				inicio.contains("<html", ignoreCase = true) || inicio.contains("<!DOCTYPE html", ignoreCase = true) -> HTML
 				inicio.contains("<dtbook", ignoreCase = true) -> DAISY
 				else -> null

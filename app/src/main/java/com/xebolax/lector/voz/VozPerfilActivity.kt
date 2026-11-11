@@ -165,11 +165,8 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 				idioma?.value = filtroIdioma
 				idioma?.summary = idioma?.entry
 				val visibles = voces.filter { filtroIdioma.isEmpty() || it.locale.language == filtroIdioma || it.name == almacen.perfil.voz }
-				val general = voces.firstOrNull { it.name == p.voz }?.let { "${it.locale.getDisplayName(Locale.getDefault())} · ${it.name}" } ?: getString(R.string.voz_por_defecto)
-				voz?.entries = (listOf(getString(R.string.como_en_ajustes_x, general)) + visibles.map { v ->
-					val calidad = if (v.isNetworkConnectionRequired) getString(R.string.voz_en_linea) else getString(R.string.voz_local)
-					"${v.locale.getDisplayName(Locale.getDefault())} · ${v.name} · $calidad"
-				}).toTypedArray()
+				val general = voces.firstOrNull { it.name == p.voz }?.let { VocesMotor.etiqueta(c, it) } ?: getString(R.string.voz_por_defecto)
+				voz?.entries = (listOf(getString(R.string.como_en_ajustes_x, general)) + visibles.map { v -> VocesMotor.etiqueta(c, v) }).toTypedArray()
 				voz?.entryValues = (listOf("") + visibles.map { it.name }).toTypedArray()
 				voz?.value = almacen.perfil.voz.orEmpty()
 				voz?.summary = voz?.entry

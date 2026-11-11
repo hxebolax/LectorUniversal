@@ -39,6 +39,8 @@ data class Podcast(
 	val duracionMin: Int = 0,
 	/** Sus episodios, del más antiguo al más nuevo (series que se escuchan en orden). */
 	val antiguosPrimero: Boolean = false,
+	/** Refuerzo de volumen propio en dB (-1 = el general del reproductor; 0 = sin refuerzo). */
+	val volumen: Int = -1,
 	/** Usuario y contraseña del feed (podcasts privados o de mecenazgo). */
 	val usuario: String = "",
 	val clave: String = "",
@@ -88,7 +90,7 @@ data class Episodio(
 }
 
 /** Base de datos de los podcasts (aparte de la biblioteca y de las noticias). */
-class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "podcasts.db", null, 4) {
+class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "podcasts.db", null, 5) {
 
 	private val app: Context = c.applicationContext
 
@@ -166,6 +168,7 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 		db.execSQL("CREATE INDEX episodios_podcast ON episodios(podcast, estado)")
 		crearCarpetas(db)
 		version4(db)
+		version5(db)
 	}
 
 	/** Versión 4: filtro de episodios, orden de episodios y credenciales por podcast; fallos de descarga. */
@@ -176,6 +179,11 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 			if (!tieneColumna(db, "podcasts", col)) db.execSQL("ALTER TABLE podcasts ADD COLUMN $col $tipo")
 		}
 		if (!tieneColumna(db, "episodios", "fallos")) db.execSQL("ALTER TABLE episodios ADD COLUMN fallos INTEGER NOT NULL DEFAULT 0")
+	}
+
+	/** Volumen propio de cada podcast: refuerzo en dB (-1 = el general del reproductor). */
+	private fun version5(db: SQLiteDatabase) {
+		if (!tieneColumna(db, "podcasts", "volumen")) db.execSQL("ALTER TABLE podcasts ADD COLUMN volumen INTEGER NOT NULL DEFAULT -1")
 	}
 
 	private fun tieneColumna(db: SQLiteDatabase, tabla: String, columna: String): Boolean =
@@ -196,6 +204,7 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 		if (antes < 2) db.execSQL("ALTER TABLE episodios ADD COLUMN sinc INTEGER NOT NULL DEFAULT 0")
 		if (antes < 3) crearCarpetas(db)
 		if (antes < 4) version4(db)
+		if (antes < 5) version5(db)
 	}
 
 	// --- Carpetas ------------------------------------------------------------------------
@@ -344,6 +353,7 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 		filtroExcluir = getString(getColumnIndexOrThrow("filtro_excluir")),
 		duracionMin = getInt(getColumnIndexOrThrow("duracion_min")),
 		antiguosPrimero = getInt(getColumnIndexOrThrow("antiguos_primero")) == 1,
+		volumen = getInt(getColumnIndexOrThrow("volumen")),
 		usuario = getString(getColumnIndexOrThrow("usuario")),
 		// La contraseña de un podcast privado está con las demás claves (Secretos)
 		clave = getString(getColumnIndexOrThrow("clave")).ifEmpty { com.xebolax.lector.datos.Secretos.leer(app, com.xebolax.lector.datos.Secretos.dePodcast(getString(getColumnIndexOrThrow("url")))) },
@@ -401,6 +411,7 @@ class PodcastsBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "p
 			put("filtro_excluir", p.filtroExcluir)
 			put("duracion_min", p.duracionMin)
 			put("antiguos_primero", if (p.antiguosPrimero) 1 else 0)
+			put("volumen", p.volumen)
 			put("usuario", p.usuario)
 			put("clave", "")
 			put("velocidad", p.velocidad)

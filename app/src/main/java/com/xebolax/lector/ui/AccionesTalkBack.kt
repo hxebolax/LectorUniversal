@@ -64,7 +64,7 @@ object AccionesTalkBack {
 			o("tipo", R.string.cambiar_tipo), o("voz_libro", R.string.voz_de_este_libro),
 		)
 		ZonaAcciones.CARPETA -> listOf(
-			e("abrir", R.string.abrir), e("renombrar", R.string.renombrar), e("subcarpeta", R.string.nueva_subcarpeta),
+			e("abrir", R.string.abrir), o("seguido", R.string.seguido_carpeta), e("renombrar", R.string.renombrar), e("subcarpeta", R.string.nueva_subcarpeta),
 			e("mover", R.string.mover_carpeta), e("borrar", R.string.borrar_carpeta), o("tipo", R.string.cambiar_tipo_carpeta),
 		)
 		ZonaAcciones.COMPARTIDO -> listOf(
@@ -90,7 +90,7 @@ object AccionesTalkBack {
 			e("favorito", R.string.rss_anadir_favorito, R.string.rss_quitar_favorito), e("mas_tarde", R.string.rss_mas_tarde, R.string.rss_quitar_mas_tarde),
 			e("completo", R.string.rss_descargar_completo), e("navegador", R.string.abrir_navegador), e("compartir", R.string.compartir),
 			e("biblioteca", R.string.rss_guardar_biblioteca, R.string.rss_abrir_en_biblioteca), e("papelera", R.string.rss_a_la_papelera),
-			e("debajo", R.string.rss_marcar_debajo), e("ir_fuente", R.string.rss_ir_fuente),
+			e("debajo", R.string.rss_marcar_debajo), e("encima", R.string.rss_marcar_encima), e("ir_fuente", R.string.rss_ir_fuente),
 		)
 		ZonaAcciones.FUENTE -> listOf(
 			e("opciones", R.string.rss_opciones_fuente), o("abrir", R.string.abrir), o("actualizar", R.string.rss_actualizar),

@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.preference.PreferenceManager
 import com.xebolax.lector.datos.BaseDatos
+import com.xebolax.lector.R
 import com.xebolax.lector.datos.Preferencias
 import org.json.JSONObject
 import java.util.Locale
@@ -125,31 +126,93 @@ object VocesMotor {
 		}, 6000)
 	}
 
-	/** Voces instaladas de ese motor, ordenadas por idioma. */
-	fun voces(c: Context, motor: String, alObtener: (List<Voice>) -> Unit) = conMotor(c, motor) { t ->
-		val lista = runCatching { t?.voices?.toList() }.getOrNull().orEmpty()
-			.filter { it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true }
-			.sortedWith(compareBy({ it.locale.getDisplayName(Locale.getDefault()) }, { it.name }))
-		runCatching { t?.shutdown() }
-		alObtener(lista)
+	/** Marca de las voces de ElevenLabs (su nombre y descripción van en las «features» de la Voice). */
+	private const val NUBE = "elevenlabs:"
+
+	/** Cómo se dice una voz en las listas: «Español (España) · nombre · sin conexión», o «Nombre, descripción · ElevenLabs». */
+	fun etiqueta(c: Context, v: Voice): String {
+		v.features?.firstOrNull { it.startsWith(NUBE) }?.let { return it.removePrefix(NUBE) + " · " + c.getString(R.string.el_nombre) }
+		val calidad = if (v.isNetworkConnectionRequired) c.getString(R.string.voz_en_linea) else c.getString(R.string.voz_local)
+		return "${v.locale.getDisplayName(Locale.getDefault())} · ${v.name} · $calidad"
+	}
+
+	/** Voces de ese motor, ordenadas por idioma (con ElevenLabs, las de la cuenta del usuario). */
+	fun voces(c: Context, motor: String, alObtener: (List<Voice>) -> Unit) {
+		if (ElevenLabs.esMotor(motor)) {
+			val app = c.applicationContext
+			Thread {
+				val lista = runCatching { ElevenLabs.voces(app) }.getOrDefault(emptyList()).map { v ->
+					// Hablan muchos idiomas: se ponen en el de la app para que salgan con el filtro de idioma
+					val nombre = if (v.descripcion.isBlank()) v.nombre else "${v.nombre}, ${v.descripcion}"
+					Voice(v.id, Locale(Locale.getDefault().language), Voice.QUALITY_VERY_HIGH, Voice.LATENCY_NORMAL, true, setOf(NUBE + nombre))
+				}
+				principal.post { alObtener(lista) }
+			}.start()
+			return
+		}
+		vocesDelMotor(c, motor, alObtener)
+	}
+
+	private fun vocesDelMotor(c: Context, motor: String, alObtener: (List<Voice>) -> Unit) = conMotor(c, motor) { t ->
+		// Pedir las voces es una llamada al motor que puede tardar (un motor ocupado o actualizándose):
+		// fuera del hilo principal, para que la pantalla nunca se quede colgada
+		Thread {
+			val lista = runCatching { t?.voices?.toList() }.getOrNull().orEmpty()
+				.filter { it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true }
+				.sortedWith(compareBy({ it.locale.getDisplayName(Locale.getDefault()) }, { it.name }))
+			runCatching { t?.shutdown() }
+			principal.post { alObtener(lista) }
+		}.start()
 	}
 
 	/** Dice el texto con ese perfil (lo que no tenga, como en Ajustes). */
 	fun probar(c: Context, perfil: PerfilVoz, texto: String) {
 		val p = Preferencias(c)
+		if (ElevenLabs.esMotor(perfil.motorEfectivo(p))) return probarNube(c, perfil, texto)
 		conMotor(c, perfil.motorEfectivo(p)) { t ->
 			t ?: return@conMotor
 			t.setSpeechRate(perfil.velocidadEfectiva(p) / 100f)
 			t.setPitch(perfil.tonoEfectivo(p) / 100f)
 			val nombre = perfil.vozEfectiva(p)
-			runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull()?.let { t.voice = it }
 			t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
 				override fun onStart(id: String?) {}
 				override fun onDone(id: String?) { principal.post { runCatching { t.shutdown() } } }
 				@Deprecated("Deprecated in Java")
 				override fun onError(id: String?) { principal.post { runCatching { t.shutdown() } } }
 			})
-			t.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba_perfil")
+			// Buscar la voz también es una llamada al motor: fuera del hilo principal
+			Thread {
+				if (nombre.isNotBlank()) runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull()?.let { runCatching { t.voice = it } }
+				t.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba_perfil")
+			}.start()
+		}
+	}
+
+	/** Prueba con ElevenLabs (a la velocidad y el tono elegidos); si falla, la voz del móvil dice por qué. */
+	private fun probarNube(c: Context, perfil: PerfilVoz, texto: String) {
+		val app = c.applicationContext
+		val p = Preferencias(app)
+		ElevenLabs.probar(app, texto, perfil.vozEfectiva(p)) { archivo, error ->
+			principal.post {
+				if (archivo != null) runCatching {
+					android.media.MediaPlayer().apply {
+						setDataSource(archivo.path)
+						prepare()
+						playbackParams = playbackParams.setSpeed(perfil.velocidadEfectiva(p) / 100f).setPitch(perfil.tonoEfectivo(p) / 100f)
+						setOnCompletionListener { it.release() }
+						start()
+					}
+				} else conMotor(app, "") { t ->
+					t ?: return@conMotor
+					t.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+						override fun onStart(id: String?) {}
+						override fun onDone(id: String?) { principal.post { runCatching { t.shutdown() } } }
+						@Deprecated("Deprecated in Java")
+						override fun onError(id: String?) { principal.post { runCatching { t.shutdown() } } }
+					})
+					t.speak(ElevenLabs.mensaje(app, error ?: Exception()), TextToSpeech.QUEUE_FLUSH, null, "error_nube")
+				}
+			}
 		}
 	}
 }

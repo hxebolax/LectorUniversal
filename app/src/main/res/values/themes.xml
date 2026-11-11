@@ -13,7 +13,7 @@
 		<item name="colorSurfaceVariant">@color/superficie_variante</item>
 		<item name="colorOnSurfaceVariant">@color/sobre_superficie_variante</item>
 		<item name="android:windowLightStatusBar" tools:targetApi="m">?attr/isLightTheme</item>
-		<item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+		<item name="preferenceTheme">@style/TemaAjustes</item>
 	</style>
 
 	<!-- Botones con área táctil cómoda (mínimo 48 dp) -->
@@ -76,5 +76,49 @@
 		<item name="android:insetTop">0dp</item>
 		<item name="android:insetBottom">0dp</item>
 		<item name="iconSize">36dp</item>
+	</style>
+	<!-- Pestañas de abajo de Ajustes (Pestanas con abajo = true): icono y nombre, compactas como las de las secciones -->
+	<style name="TemaPestanasAbajo" parent="">
+		<item name="tabStyle">@style/PestanasAbajo</item>
+	</style>
+	<!-- El mismo tamaño que las etiquetas de abajo de Material, sin espacio extra entre letras (así caben las seis) -->
+	<style name="TextoPestanaAbajo" parent="TextAppearance.Material3.LabelMedium">
+		<item name="android:letterSpacing">0</item>
+	</style>
+	<style name="PestanasAbajo" parent="Widget.Material3.TabLayout">
+		<item name="tabMinWidth">48dp</item>
+		<item name="tabPaddingStart">2dp</item>
+		<item name="tabPaddingEnd">2dp</item>
+		<item name="tabInlineLabel">false</item>
+		<item name="tabTextAppearance">@style/TextoPestanaAbajo</item>
+		<item name="tabIndicatorGravity">top</item>
+		<item name="android:background">?attr/colorSurfaceContainer</item>
+	</style>
+	<!-- Ajustes: los títulos largos ocupan las líneas que hagan falta (nunca se cortan con «..») -->
+	<style name="TemaAjustes" parent="PreferenceThemeOverlay">
+		<item name="preferenceStyle">@style/Ajuste</item>
+		<item name="switchPreferenceCompatStyle">@style/Ajuste.Interruptor</item>
+		<item name="checkBoxPreferenceStyle">@style/Ajuste.Casilla</item>
+		<item name="dialogPreferenceStyle">@style/Ajuste.Dialogo</item>
+		<item name="editTextPreferenceStyle">@style/Ajuste.Texto</item>
+		<item name="seekBarPreferenceStyle">@style/Ajuste.Deslizador</item>
+	</style>
+	<style name="Ajuste" parent="Preference.Material">
+		<item name="singleLineTitle">false</item>
+	</style>
+	<style name="Ajuste.Interruptor" parent="Preference.SwitchPreferenceCompat.Material">
+		<item name="singleLineTitle">false</item>
+	</style>
+	<style name="Ajuste.Casilla" parent="Preference.CheckBoxPreference.Material">
+		<item name="singleLineTitle">false</item>
+	</style>
+	<style name="Ajuste.Dialogo" parent="Preference.DialogPreference.Material">
+		<item name="singleLineTitle">false</item>
+	</style>
+	<style name="Ajuste.Texto" parent="Preference.DialogPreference.EditTextPreference.Material">
+		<item name="singleLineTitle">false</item>
+	</style>
+	<style name="Ajuste.Deslizador" parent="Preference.SeekBarPreference.Material">
+		<item name="singleLineTitle">false</item>
 	</style>
 </resources>

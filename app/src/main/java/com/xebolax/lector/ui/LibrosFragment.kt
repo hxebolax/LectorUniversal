@@ -77,7 +77,7 @@ class LibrosFragment : Fragment() {
 	private var titulo: TextView? = null
 	private var campoBusqueda: TextInputEditText? = null
 	private var botonSeleccion: MaterialButton? = null
-	private var pestanasTipo: PestanasArriba? = null
+	private var pestanasTipo: Pestanas? = null
 	/** Libros seleccionados (acciones para varios a la vez). */
 	private val seleccionados = linkedSetOf<Long>()
 	private var carga: Job? = null
@@ -152,7 +152,7 @@ class LibrosFragment : Fragment() {
 			tipoActual = visibles.first()
 			carpetaActual = null
 		}
-		p.poner(visibles.map { it to Tipos.nombre(c, it) }, tipoActual) { elegirTipo(it) }
+		p.ponerNombres(visibles.map { it to Tipos.nombre(c, it) }, tipoActual) { elegirTipo(it) }
 	}
 
 	override fun onStop() {
@@ -189,7 +189,7 @@ class LibrosFragment : Fragment() {
 		b.cabecera.addView(fila)
 
 		// Qué se ve: todo, libros, documentos, audiolibros, páginas web o un tipo propio (pestañas de arriba)
-		pestanasTipo = PestanasArriba(c)
+		pestanasTipo = Pestanas(c)
 		b.cabecera.addView(pestanasTipo, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		ponerPestanasTipo()
 

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ElevenLabs: voces en la nube con la clave de API del usuario (opcional) -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<Preference
+		android:key="el_explicacion"
+		android:selectable="false"
+		android:summary="@string/el_explicacion" />
+	<EditTextPreference
+		android:key="elevenlabs_clave"
+		android:title="@string/el_clave"
+		android:dialogMessage="@string/el_clave_dialogo" />
+	<Preference
+		android:key="el_abrir_web"
+		android:title="@string/el_abrir_web"
+		android:summary="@string/el_abrir_web_desc" />
+	<Preference
+		android:key="el_comprobar"
+		android:title="@string/el_comprobar" />
+	<ListPreference
+		android:key="el_modelo"
+		android:title="@string/el_modelo"
+		android:entries="@array/el_modelos_nombres"
+		android:entryValues="@array/el_modelos_valores"
+		android:defaultValue="eleven_multilingual_v2"
+		app:useSimpleSummaryProvider="true" />
+	<SwitchPreferenceCompat
+		android:key="el_al_fallar"
+		android:title="@string/el_al_fallar"
+		android:summary="@string/el_al_fallar_desc"
+		android:defaultValue="true" />
+	<Preference
+		android:key="el_cache"
+		android:title="@string/el_cache" />
+	<Preference
+		android:key="el_privacidad"
+		android:selectable="false"
+		android:summary="@string/el_privacidad" />
+</PreferenceScreen>

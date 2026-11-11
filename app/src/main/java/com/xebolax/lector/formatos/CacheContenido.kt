@@ -31,7 +31,7 @@ import java.util.zip.GZIPOutputStream
 object CacheContenido {
 
 	/** Súbela cuando cambie cualquier lector de formato o el modelo. */
-	const val VERSION = 3
+	const val VERSION = 4
 	private const val MAGICO = 0x4C55_4331 // "LUC1"
 	private const val MAXIMO_BYTES = 400L * 1024 * 1024
 

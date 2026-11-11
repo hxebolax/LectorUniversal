@@ -29,7 +29,7 @@ object Secretos {
 	const val OPCION_COPIA_ANDROID = "copia_android_claves"
 
 	/** Claves de los ajustes que son secretos (antes estaban en los ajustes normales). */
-	val CLAVES_AJUSTES = listOf("ia_clave_gemini", "ia_clave_openai", "ia_clave_claude", "sinc_clave", "rss_sinc_clave", "pod_sinc_clave")
+	val CLAVES_AJUSTES = listOf("ia_clave_gemini", "ia_clave_openai", "ia_clave_claude", "sinc_clave", "rss_sinc_clave", "pod_sinc_clave", "elevenlabs_clave")
 
 	/** Contraseña de un catálogo (por su dirección). */
 	fun deCatalogo(url: String) = "catalogo:$url"

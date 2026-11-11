@@ -168,6 +168,18 @@
 				<data android:mimeType="text/*" />
 			</intent-filter>
 		</activity>
+		<!-- «Leer con Lector Universal» en el menú del texto seleccionado de cualquier app: se guarda en Compartidos y se lee en voz alta -->
+		<activity-alias
+			android:name=".compartidos.LeerSeleccion"
+			android:exported="true"
+			android:label="@string/leer_con_lector"
+			android:targetActivity=".compartidos.CompartidosActivity">
+			<intent-filter>
+				<action android:name="android.intent.action.PROCESS_TEXT" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<data android:mimeType="text/plain" />
+			</intent-filter>
+		</activity-alias>
 
 		<activity
 			android:name=".lectura.LectorActivity"

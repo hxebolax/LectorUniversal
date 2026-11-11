@@ -30,38 +30,58 @@ import java.util.Locale
 
 /**
  * Ajustes, con pestañas abajo como las secciones: General (lo que afecta a
- * toda la app), Biblioteca (lectura, voz, tipos, documentos y Compartidos),
- * Podcasts, Noticias y Radio. Cada pestaña tiene sus apartados; cada
- * apartado es una pantalla con su título (TalkBack la anuncia). Atrás en un
- * apartado vuelve a su pestaña; en otra pestaña, a General; y en General, sale.
+ * toda la app) y una por sección, en el orden de las secciones (Ajustes,
+ * Portada y secciones): Biblioteca (lectura, voz, tipos y documentos),
+ * Compartidos, Podcasts, Noticias y Radio. Las pestañas se ven siempre
+ * enteras; si no caben todas, las últimas van a «Más» (ver [Pestanas]).
+ * Cada pestaña tiene sus apartados; cada apartado es una pantalla con su
+ * título (TalkBack la anuncia). Desde el menú lateral de una sección se abre
+ * en la pestaña de esa sección. Atrás en un apartado vuelve a su pestaña; en
+ * otra pestaña, a la pestaña con la que se abrió; y en esa, sale.
  */
 class AjustesActivity : AppCompatActivity() {
 
 	companion object {
-		/** Abrir directamente un apartado (rss, podcasts, radio, copias...). */
+		/** Abrir directamente una pestaña (GENERAL, BIBLIOTECA, COMPARTIDOS, PODCASTS, NOTICIAS, RADIO; o rss, podcasts, radio) o un apartado (copias). */
 		const val EXTRA_APARTADO = "apartado"
 		private const val ESTADO_PESTANA = "pestana"
+		private const val ESTADO_INICIAL = "inicial"
+
+		/** Ajustes en la pestaña de una sección (desde su menú lateral). */
+		fun abrir(c: android.content.Context, seccion: Seccion? = null) {
+			val i = Intent(c, AjustesActivity::class.java)
+			val p = Pestana.entries.firstOrNull { it.name == seccion?.name }
+			if (p != null) i.putExtra(EXTRA_APARTADO, p.name)
+			c.startActivity(i)
+		}
 	}
 
 	/** Las pestañas: xml de su pantalla, nombre, icono y título de la barra. */
 	private enum class Pestana(val xml: String, val nombre: Int, val icono: Int, val titulo: Int) {
 		GENERAL("tab_general", R.string.aj_pestana_general, R.drawable.ic_ajustes, R.string.ajustes_general_titulo),
 		BIBLIOTECA("tab_biblioteca", R.string.aj_pestana_biblioteca, R.drawable.ic_biblioteca, R.string.ajustes_biblioteca_titulo),
+		COMPARTIDOS("compartidos", R.string.aj_pestana_compartidos, R.drawable.ic_compartido, R.string.ajustes_compartidos_titulo),
 		PODCASTS("podcasts", R.string.aj_pestana_podcasts, R.drawable.ic_voz, R.string.ajustes_podcasts_titulo),
 		NOTICIAS("rss", R.string.aj_pestana_noticias, R.drawable.ic_rss, R.string.ajustes_noticias_titulo),
 		RADIO("radio", R.string.aj_pestana_radio, R.drawable.ic_radio, R.string.ajustes_radio_titulo),
 	}
 
 	private lateinit var b: ActivityAjustesBinding
+	private lateinit var pestanas: Pestanas
 	val actualizaciones = GestorActualizaciones(this)
 	private var pestana = Pestana.GENERAL
+	/** La pestaña con la que se abrió (Atrás vuelve a ella y, desde ella, sale). */
+	private var inicial = Pestana.GENERAL
 
-	/** Atrás: de un apartado a su pestaña, de otra pestaña a General y, desde General, salir. */
+	/** Atrás: de un apartado a su pestaña, de otra pestaña a la inicial y, desde la inicial, salir. */
 	private val atras = object : androidx.activity.OnBackPressedCallback(true) {
 		override fun handleOnBackPressed() {
 			when {
 				supportFragmentManager.backStackEntryCount > 0 -> supportFragmentManager.popBackStack()
-				pestana != Pestana.GENERAL -> b.pestanas.selectedItemId = Pestana.GENERAL.ordinal
+				pestana != inicial -> {
+					pestanas.elegir(inicial.name)
+					mostrarPestana(inicial)
+				}
 				else -> finish()
 			}
 		}
@@ -73,22 +93,30 @@ class AjustesActivity : AppCompatActivity() {
 		setContentView(b.root)
 		configurarBarra(b.barra, getString(R.string.ajustes))
 		onBackPressedDispatcher.addCallback(this, atras)
-		b.pestanas.visibility = android.view.View.VISIBLE
-		b.pestanas.menu.clear()
-		Pestana.entries.forEach { b.pestanas.menu.add(android.view.Menu.NONE, it.ordinal, it.ordinal, it.nombre).setIcon(it.icono) }
-		pestana = savedInstanceState?.getInt(ESTADO_PESTANA, 0)?.let { Pestana.entries.getOrNull(it) } ?: when (intent.getStringExtra(EXTRA_APARTADO)) {
+		val pedida = when (val e = intent.getStringExtra(EXTRA_APARTADO)) {
 			"rss" -> Pestana.NOTICIAS
 			"podcasts" -> Pestana.PODCASTS
 			"radio" -> Pestana.RADIO
-			else -> Pestana.GENERAL
+			"compartidos" -> Pestana.COMPARTIDOS
+			else -> Pestana.entries.firstOrNull { it.name == e } ?: Pestana.GENERAL
 		}
-		b.pestanas.selectedItemId = pestana.ordinal
-		b.pestanas.setOnItemSelectedListener { item ->
-			Pestana.entries.getOrNull(item.itemId)?.let { mostrarPestana(it) }
-			true
+		inicial = savedInstanceState?.getInt(ESTADO_INICIAL, -1)?.let { Pestana.entries.getOrNull(it) } ?: pedida
+		pestana = savedInstanceState?.getInt(ESTADO_PESTANA, -1)?.let { Pestana.entries.getOrNull(it) } ?: pedida
+		// General y luego las secciones en su orden (el que se elige en Portada y secciones)
+		val orden = listOf(Pestana.GENERAL) + OrdenSecciones.orden(this).mapNotNull { s -> Pestana.entries.firstOrNull { it.name == s.name } }
+		pestanas = Pestanas(this, abajo = true)
+		b.pestanas.addView(pestanas, android.view.ViewGroup.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT))
+		pestanas.poner(orden.map { Pestanas.Pestana(it.name, getString(it.nombre), it.icono) }, pestana.name) { clave ->
+			Pestana.entries.firstOrNull { it.name == clave }?.let { mostrarPestana(it) }
 		}
 		// Tocar la pestaña en la que se está vuelve a su pantalla principal
-		b.pestanas.setOnItemReselectedListener { mostrarPestana(pestana) }
+		pestanas.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+			override fun onTabSelected(t: com.google.android.material.tabs.TabLayout.Tab) {}
+			override fun onTabUnselected(t: com.google.android.material.tabs.TabLayout.Tab) {}
+			override fun onTabReselected(t: com.google.android.material.tabs.TabLayout.Tab) {
+				if (t.tag == pestana.name && supportFragmentManager.backStackEntryCount > 0) mostrarPestana(pestana)
+			}
+		})
 		if (savedInstanceState == null) {
 			mostrarPestana(pestana)
 			if (intent.getStringExtra(EXTRA_APARTADO) == "copias") abrirApartado("copias", getString(R.string.aj_copias))
@@ -99,6 +127,7 @@ class AjustesActivity : AppCompatActivity() {
 	override fun onSaveInstanceState(estado: Bundle) {
 		super.onSaveInstanceState(estado)
 		estado.putInt(ESTADO_PESTANA, pestana.ordinal)
+		estado.putInt(ESTADO_INICIAL, inicial.ordinal)
 	}
 
 	private fun ponerTitulo() {
@@ -156,6 +185,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			"rss" -> R.xml.ajustes_rss
 			"podcasts" -> R.xml.ajustes_podcasts
 			"radio" -> R.xml.ajustes_radio
+			"elevenlabs" -> R.xml.ajustes_elevenlabs
 			else -> R.xml.ajustes_raiz
 		}
 		setPreferencesFromResource(recurso, raiz)
@@ -173,6 +203,8 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			"voz" -> configurarVoz()
 			"documentos" -> configurarDocumentos()
 			"biblioteca" -> configurarBiblioteca()
+			"aspecto" -> configurarAspecto()
+			"elevenlabs" -> configurarElevenLabs()
 			"ia" -> configurarIA()
 			"rss", "podcasts" -> {
 				for (clave in listOf("rss_frecuencia", "rss_solo_wifi")) {
@@ -190,6 +222,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		alPulsar("ir_orden_secciones") { startActivity(Intent(requireContext(), SeccionesActivity::class.java)) }
 		// Navegación: las acciones de cada párrafo se eligen (y ordenan) en Acciones de TalkBack
 		alPulsar("ir_acciones_parrafo") { AccionesTalkBackActivity.abrir(requireContext(), ZonaAcciones.PARRAFO) }
+		alPulsar("ir_acciones_compartidos") { AccionesTalkBackActivity.abrir(requireContext(), ZonaAcciones.COMPARTIDO) }
 		// Está en Voz y en Audiolibros: se aplica a los dos reproductores
 		findPreference<Preference>("talkback_al_hablar")?.setOnPreferenceChangeListener { _, _ ->
 			view?.post {
@@ -226,6 +259,188 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				(activity as? AjustesActivity)?.abrirApartado(xml, pref.title.toString())
 				true
 			}
+		}
+	}
+
+	// --- Aspecto del texto: colores a tu gusto y una letra tuya ---------------------------------
+
+	private val elegirLetra = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+		uri ?: return@registerForActivityResult
+		val c = requireContext().applicationContext
+		val a = activity as? AppCompatActivity ?: return@registerForActivityResult
+		a.lifecycleScope.launch {
+			val nombre = withContext(Dispatchers.IO) {
+				runCatching {
+					val destino = com.xebolax.lector.lectura.Apariencia.archivoLetraPropia(c)
+					destino.parentFile?.mkdirs()
+					val temporal = java.io.File(destino.parentFile, "nueva")
+					c.contentResolver.openInputStream(uri)!!.use { e -> temporal.outputStream().use { e.copyTo(it) } }
+					// TrueType, OpenType o colección: lo dicen sus primeros bytes; y Android tiene que poder cargarla
+					val cabecera = temporal.inputStream().use { val b = ByteArray(4); it.read(b); b }
+					val valida = cabecera.contentEquals(byteArrayOf(0, 1, 0, 0)) || String(cabecera, Charsets.ISO_8859_1) in setOf("OTTO", "true", "ttcf")
+					if (!valida || runCatching { android.graphics.Typeface.createFromFile(temporal) }.isFailure) {
+						temporal.delete()
+						null
+					} else {
+						temporal.renameTo(destino.also { it.delete() })
+						com.xebolax.lector.formatos.Fuente.nombreDe(c, uri)
+					}
+				}.getOrNull()
+			}
+			if (nombre == null) return@launch a.avisar(getString(R.string.aj_letra_no_valida))
+			PreferenceManager.getDefaultSharedPreferences(c).edit().putString("letra_propia_nombre", nombre).putString("fuente", "propia").apply()
+			findPreference<ListPreference>("fuente")?.value = "propia"
+			resumenesAspecto()
+			a.avisar(getString(R.string.aj_letra_lista, nombre))
+		}
+	}
+
+	private fun configurarAspecto() {
+		val tema = findPreference<ListPreference>("tema_lectura")
+		val fuente = findPreference<ListPreference>("fuente")
+		tema?.setOnPreferenceChangeListener { _, _ ->
+			view?.post { resumenesAspecto() }
+			true
+		}
+		fuente?.setOnPreferenceChangeListener { _, nuevo ->
+			// Una letra tuya y aún no hay archivo: se elige ya
+			if (nuevo == "propia" && !com.xebolax.lector.lectura.Apariencia.archivoLetraPropia(requireContext()).exists()) {
+				view?.post { abrirLetra() }
+			}
+			view?.post { resumenesAspecto() }
+			true
+		}
+		alPulsar("letra_propia") { abrirLetra() }
+		for (clave in com.xebolax.lector.lectura.Apariencia.COLORES_PROPIOS.keys) alPulsar(clave) { elegirColor(clave) }
+		resumenesAspecto()
+	}
+
+	private fun abrirLetra() {
+		try {
+			elegirLetra.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/vnd.ms-opentype", "application/octet-stream", "*/*"))
+		} catch (_: ActivityNotFoundException) {
+			(activity as? AppCompatActivity)?.avisar(getString(R.string.no_disponible))
+		}
+	}
+
+	/** Qué color es (su nombre o su código) y, para el texto, los enlaces y el resaltado, el contraste. */
+	private fun resumenesAspecto() {
+		val c = context ?: return
+		val prefs = PreferenceManager.getDefaultSharedPreferences(c)
+		val propio = findPreference<ListPreference>("tema_lectura")?.value == "propio"
+		val nombres = resources.getStringArray(R.array.colores_nombres)
+		val valores = resources.getStringArray(R.array.colores_valores)
+		fun nombre(color: Int): String {
+			val codigo = String.format("#%06X", color and 0xFFFFFF)
+			return valores.indexOfFirst { it.equals(codigo, true) }.takeIf { it >= 0 }?.let { nombres[it] } ?: codigo
+		}
+		fun contraste(a: Int, b: Int): String {
+			val r = com.xebolax.lector.lectura.Apariencia.contraste(a, b)
+			val texto = String.format(Locale.getDefault(), "%.1f", r)
+			return getString(if (r >= 4.5) R.string.aj_contraste_bueno else R.string.aj_contraste_bajo, texto)
+		}
+		val fondo = com.xebolax.lector.lectura.Apariencia.colorPropio(c, "color_fondo")
+		val texto = com.xebolax.lector.lectura.Apariencia.colorPropio(c, "color_texto")
+		for (clave in com.xebolax.lector.lectura.Apariencia.COLORES_PROPIOS.keys) {
+			val pref = findPreference<Preference>(clave) ?: continue
+			pref.isVisible = propio
+			val color = com.xebolax.lector.lectura.Apariencia.colorPropio(c, clave)
+			pref.summary = when (clave) {
+				"color_fondo" -> getString(R.string.aj_contraste_x, nombre(color), contraste(texto, fondo))
+				// El texto se lee sobre el resaltado: su contraste es con el texto
+				"color_resaltado" -> "${nombre(color)}; ${contraste(texto, color)}"
+				else -> getString(R.string.aj_contraste_x, nombre(color), contraste(color, fondo))
+			}
+		}
+		findPreference<Preference>("letra_propia")?.apply {
+			isVisible = findPreference<ListPreference>("fuente")?.value == "propia"
+			val puesta = prefs.getString("letra_propia_nombre", "").orEmpty()
+			summary = if (com.xebolax.lector.lectura.Apariencia.archivoLetraPropia(c).exists() && puesta.isNotEmpty()) getString(R.string.aj_letra_propia_puesta, puesta)
+			else getString(R.string.aj_letra_propia_ninguna)
+		}
+	}
+
+	/** Un color con nombre de la lista u otro escribiendo su código. */
+	private fun elegirColor(clave: String) {
+		val c = requireContext()
+		val nombres = resources.getStringArray(R.array.colores_nombres)
+		val valores = resources.getStringArray(R.array.colores_valores)
+		val actual = com.xebolax.lector.lectura.Apariencia.colorPropio(c, clave)
+		val codigo = String.format("#%06X", actual and 0xFFFFFF)
+		val titulo = findPreference<Preference>(clave)?.title?.toString().orEmpty()
+		fun guardar(color: Int) {
+			PreferenceManager.getDefaultSharedPreferences(c).edit().putInt(clave, color or 0xFF000000.toInt()).apply()
+			resumenesAspecto()
+		}
+		c.elegirUno(titulo, nombres.toList() + getString(R.string.aj_color_otro), valores.indexOfFirst { it.equals(codigo, true) }) { i ->
+			if (i < valores.size) guardar(android.graphics.Color.parseColor(valores[i]))
+			else c.pedirTexto(getString(R.string.aj_color_otro), getString(R.string.aj_color_codigo), codigo) { t ->
+				val limpio = t.trim().removePrefix("#")
+				val color = if (Regex("[0-9A-Fa-f]{6}").matches(limpio)) android.graphics.Color.parseColor("#$limpio") else null
+				if (color == null) (activity as? AppCompatActivity)?.avisar(getString(R.string.aj_color_no_valido)) else guardar(color)
+			}
+		}
+	}
+
+	// --- ElevenLabs: voces en la nube con la clave del usuario ------------------------------------
+
+	private fun configurarElevenLabs() {
+		val c = requireContext()
+		val el = com.xebolax.lector.voz.ElevenLabs
+		findPreference<androidx.preference.EditTextPreference>(el.CLAVE)?.apply {
+			setOnBindEditTextListener {
+				it.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+				it.setSelection(it.text.length)
+			}
+			summaryProvider = Preference.SummaryProvider<androidx.preference.EditTextPreference> { p ->
+				getString(if (p.text.isNullOrBlank()) R.string.el_clave_desc else R.string.aj_ia_clave_puesta)
+			}
+			setOnPreferenceChangeListener { _, _ ->
+				// Otra cuenta: la voz recordada puede no existir en ella
+				PreferenceManager.getDefaultSharedPreferences(c).edit().remove("el_voz_defecto").apply()
+				true
+			}
+		}
+		findPreference<ListPreference>("el_modelo")?.setOnPreferenceChangeListener { _, _ ->
+			view?.post { LectorVoz.ajustesCambiados() }
+			true
+		}
+		fun cache() {
+			val ocupa = el.tamanoCache(c)
+			findPreference<Preference>("el_cache")?.summary = if (ocupa > 0) getString(R.string.el_cache_ocupa, tamanoLegible(ocupa)) else getString(R.string.el_cache_vacia)
+		}
+		cache()
+		alPulsar("el_cache") {
+			el.vaciarCache(c)
+			cache()
+			(activity as? AppCompatActivity)?.avisar(getString(R.string.el_cache_vaciada))
+		}
+		LectorVoz.ultimoAvisoNube.takeIf { it.isNotBlank() }?.let { findPreference<Preference>("el_comprobar")?.summary = it }
+		alPulsar("el_comprobar") {
+			val a = activity as? AppCompatActivity ?: return@alPulsar
+			if (!el.configurada(a)) return@alPulsar a.avisar(getString(R.string.el_error_clave))
+			lifecycleScope.launch {
+				val texto = try {
+					a.conEspera(getString(R.string.el_comprobar), getString(R.string.el_comprobando)) {
+						withContext(Dispatchers.IO) {
+							val cuenta = el.cuenta(a)
+							val voces = runCatching { el.voces(a).size }.getOrDefault(0)
+							val quedan = (cuenta.limite - cuenta.usados).coerceAtLeast(0)
+							val renueva = if (cuenta.renueva > 0) android.text.format.DateFormat.getDateFormat(a).format(java.util.Date(cuenta.renueva * 1000)) else "—"
+							getString(R.string.el_cuenta, cuenta.plan, quedan, cuenta.limite, renueva, voces)
+						}
+					}
+				} catch (e: kotlinx.coroutines.CancellationException) {
+					throw e
+				} catch (e: Exception) {
+					el.mensaje(a, e)
+				}
+				findPreference<Preference>("el_comprobar")?.summary = texto
+				a.mensaje(getString(R.string.el_comprobar), texto)
+			}
+		}
+		alPulsar("el_abrir_web") {
+			runCatching { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://elevenlabs.io/app/settings/api-keys"))) }
 		}
 	}
 
@@ -337,6 +552,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			true
 		}
 		alPulsar("comprobar_ahora") { (activity as? AjustesActivity)?.actualizaciones?.comprobarAMano() }
+		alPulsar("informar_problema") { activity?.let { com.xebolax.lector.datos.RegistroFallos.informar(it) } }
 		// Ahorro de batería: en muchos móviles corta la lectura con la pantalla apagada
 		findPreference<Preference>("optimizacion_bateria")?.let { pref ->
 			actualizarBateria(pref)
@@ -432,10 +648,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				val filtro = idioma?.value.orEmpty()
 				idioma?.summary = if (filtro.isEmpty()) getString(R.string.todos_los_idiomas) else Locale(filtro).displayLanguage
 				val visibles = voces.filter { filtro.isEmpty() || it.locale.language == filtro }
-				voz?.entries = (listOf(getString(R.string.voz_por_defecto)) + visibles.map { v ->
-					val calidad = if (v.isNetworkConnectionRequired) getString(R.string.voz_en_linea) else getString(R.string.voz_local)
-					"${v.locale.getDisplayName(Locale.getDefault())} · ${v.name} · $calidad"
-				}).toTypedArray()
+				voz?.entries = (listOf(getString(R.string.voz_por_defecto)) + visibles.map { v -> com.xebolax.lector.voz.VocesMotor.etiqueta(requireContext(), v) }).toTypedArray()
 				voz?.entryValues = (listOf("") + visibles.map { it.name }).toTypedArray()
 				voz?.let { it.summary = it.entry ?: getString(R.string.voz_por_defecto) }
 			}
@@ -477,6 +690,12 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			com.xebolax.lector.voz.VocesMotor.probar(requireContext(), com.xebolax.lector.voz.PerfilVoz(), getString(R.string.frase_prueba))
 		}
 		alPulsar("ir_pronunciacion") { startActivity(Intent(requireContext(), PronunciacionActivity::class.java)) }
+		findPreference<Preference>("ir_elevenlabs")?.let { pref ->
+			pref.setOnPreferenceClickListener {
+				(activity as? AjustesActivity)?.abrirApartado("elevenlabs", pref.title.toString())
+				true
+			}
+		}
 		alPulsar("ajustes_sistema_voz") {
 			try {
 				startActivity(Intent("com.android.settings.TTS_SETTINGS"))
@@ -499,7 +718,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			true
 		}
 		// Cambiar cómo se convierten los documentos: se olvida el que está en memoria
-		for (clave in listOf("tablas_encabezados", "leer_imagenes", "dividir_parrafos", "pdf_unir_lineas", "txt_linea_parrafo")) {
+		for (clave in listOf("tablas_encabezados", "leer_imagenes", "dividir_parrafos", "pdf_unir_lineas", "txt_linea_parrafo", "braille_texto")) {
 			findPreference<Preference>(clave)?.setOnPreferenceChangeListener { _, _ ->
 				Abiertos.olvidar()
 				true

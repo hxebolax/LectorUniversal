@@ -107,6 +107,8 @@ class PortadaActivity : AppCompatActivity() {
 		if (savedInstanceState == null) {
 			actualizaciones.alIniciar()
 			TareasInicio.alAbrir(this)
+			// ¿Se cerró la app por un fallo la última vez? Ofrecer enviarlo (lo envías tú)
+			com.xebolax.lector.datos.RegistroFallos.ofrecerSiHay(this)
 			if (Build.VERSION.SDK_INT >= 33) permisoNotificaciones.launch(android.Manifest.permission.POST_NOTIFICATIONS)
 			// Abrir el último libro al iniciar (Ajustes)
 			if (Preferencias(this).abrirUltimo && intent?.action == Intent.ACTION_MAIN) {
