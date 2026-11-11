@@ -32,6 +32,11 @@
 		android:title="@string/aj_braille_texto"
 		android:summary="@string/aj_braille_texto_desc"
 		android:defaultValue="true" />
+	<SwitchPreferenceCompat
+		android:key="epub_con_audio"
+		android:title="@string/aj_epub_con_audio"
+		android:summary="@string/aj_epub_con_audio_desc"
+		android:defaultValue="true" />
 	<Preference
 		android:key="vaciar_cache"
 		android:title="@string/aj_vaciar_cache" />

@@ -143,6 +143,20 @@ class FormatosTest {
 		assertTrue("Tildes mal decodificadas", l.capitulos.any { it.titulo == "Capítulo uno" })
 	}
 
+	/** EPUB 3 con narración sincronizada: audio con su texto, frases sincronizadas e índice. */
+	@Test
+	fun epubNarrado() {
+		val c = abrir("vencejo_narrado.epub")
+		assertTrue("debería abrirse con su audio", c is Contenido.Audio)
+		val l = (c as Contenido.Audio).libro
+		assertEquals("El vencejo narrado", l.titulo)
+		assertEquals("Voz de prueba", l.narrador)
+		assertTrue("sin texto", l.texto != null && l.texto!!.bloques.any { it.texto.contains("Solo se posa para criar") })
+		assertTrue("pocas frases (${l.frases.size})", l.frases.size >= 6)
+		assertTrue("frases sin bloque", l.frases.all { it.bloque >= 0 })
+		assertEquals(2, l.capitulos.size)
+	}
+
 	@Test
 	fun m4bConCapitulos() {
 		val l = (abrir("prueba.m4b") as Contenido.Audio).libro

@@ -2253,6 +2253,8 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	<string name="aj_frecuencia_minutos">Minutos entre actualizaciones</string>
 	<string name="aj_frecuencia_minutos_desc">Cada cuántos minutos, de 5 en adelante (por ejemplo 20 o 90). Con el ahorro de batería, Android puede retrasarlo un poco.</string>
 	<string name="aj_frecuencia_cada">Cada %1$d minutos</string>
+	<string name="aj_epub_con_audio">EPUB con narración: usar su audio</string>
+	<string name="aj_epub_con_audio_desc">Los EPUB 3 con narración sincronizada (texto y audio humano, Media Overlays) se abren en el reproductor y el texto sigue a la voz, como un DAISY. Si lo quitas, se abren como texto para leerlos con TalkBack o con la voz de la app.</string>
 	<string name="leer_con_lector">Leer con Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: leer</string>
 	<string name="comp_web_o_texto">Una página web o un texto (en Compartidos)</string>

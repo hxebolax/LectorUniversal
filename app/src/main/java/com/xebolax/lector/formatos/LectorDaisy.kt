@@ -94,6 +94,16 @@ object LectorDaisy : LectorFormato {
 		throw ExcepcionFormato("No se ha encontrado un libro DAISY: falta el archivo ncc.html o el paquete .opf.")
 	}
 
+	/**
+	 * EPUB 3 con narración sincronizada (Media Overlays): texto y audio
+	 * humano a la vez, como un DAISY de texto y audio (los dos usan SMIL). El
+	 * contenedor es el EPUB ya extraído (el audio tiene que estar en archivos).
+	 */
+	fun epubNarrado(contenedor: Contenedor, ctx: ContextoLectura, nombre: String, rutaOpf: String): Contenido {
+		val entradas = contenedor.entradas().filterNot { it.startsWith("__MACOSX") }
+		return Montaje(contenedor, ctx, nombre, entradas).epub3(rutaOpf)
+	}
+
 	// --- Tiempos -----------------------------------------------------------------
 
 	private val MEDIDA = Regex("""^(\d+(?:\.\d*)?|\.\d+)\s*(ms|s|min|h)?$""", RegexOption.IGNORE_CASE)
@@ -402,6 +412,69 @@ object LectorDaisy : LectorFormato {
 			return montar(ordenSmil, navegacion, dtbooks)
 		}
 
+		/** EPUB 3: el orden de lectura (spine) con el SMIL de cada capítulo (media-overlay) y su índice (nav o NCX). */
+		fun epub3(rutaOpf: String): Contenido {
+			version = "EPUB 3"
+			ctx.progreso(2)
+			val opf = xml(z, rutaOpf) ?: throw ExcepcionFormato("El paquete .opf del EPUB no se puede leer.")
+			val todos = opf.getAllElements()
+			for (e in todos) {
+				when (local(e)) {
+					"title" -> if (titulo.isEmpty()) titulo = e.text().trim()
+					"creator" -> e.text().trim().takeIf { it.isNotEmpty() }?.let { autor = if (autor.isEmpty()) it else "$autor, $it" }
+					"publisher" -> if (editorial.isEmpty()) editorial = e.text().trim()
+					"date" -> if (fecha.isEmpty()) fecha = e.text().trim()
+					"language" -> if (idioma.isEmpty()) idioma = e.text().trim()
+					"meta" -> when (e.attr("property").trim()) {
+						"media:narrator" -> if (narrador.isEmpty()) narrador = e.text().trim()
+						"media:duration" -> if (!e.hasAttr("refines")) duracionDeclarada = tiempo(e.text()) ?: 0L
+					}
+				}
+			}
+			class Item(val ruta: String, val tipo: String, val narracion: String, val propiedades: String)
+			val items = LinkedHashMap<String, Item>()
+			for (e in todos.filter { local(it) == "item" }) {
+				val href = e.attr("href")
+				if (href.isBlank()) continue
+				items[e.attr("id")] = Item(destino(rutaOpf, href), e.attr("media-type").lowercase(), e.attr("media-overlay"), e.attr("properties"))
+			}
+			val ordenSmil = ArrayList<String>()
+			val textos = ArrayList<String>()
+			for (e in todos.filter { local(it) == "itemref" }) {
+				val item = items[e.attr("idref")] ?: continue
+				textos += item.ruta
+				items[item.narracion]?.let { ordenSmil += it.ruta }
+			}
+			val navegacion = ArrayList<Entrada>()
+			val nav = items.values.firstOrNull { it.propiedades.split(' ').contains("nav") }
+			if (nav != null) html(z, nav.ruta)?.let { leerNav(it, nav.ruta, navegacion) }
+			if (navegacion.isEmpty()) {
+				items.values.firstOrNull { it.tipo.contains("ncx") }?.let { n -> xml(z, n.ruta)?.let { leerNcx(it, n.ruta, navegacion) } }
+			}
+			return montar(ordenSmil, navegacion, textos)
+		}
+
+		/** Índice de un EPUB 3 (nav toc: listas anidadas) y su lista de páginas (nav page-list). */
+		private fun leerNav(doc: Document, rutaNav: String, navegacion: MutableList<Entrada>) {
+			fun tipo(e: Element) = e.attr("epub:type").ifEmpty { e.attr("type") }.ifEmpty { e.attr("role").substringAfter("doc-") }
+			fun recorrer(lista: Element, nivel: Int) {
+				for (li in lista.children().filter { it.normalName() == "li" }) {
+					val a = li.children().firstOrNull { it.normalName() == "a" || it.normalName() == "span" }
+					val href = a?.attr("href").orEmpty()
+					if (href.isNotBlank()) navegacion += Entrada(Textos.unirEspacios(a!!.text()).trim().ifEmpty { "(sin título)" }, nivel.coerceIn(1, 6), destino(rutaNav, href))
+					li.children().firstOrNull { it.normalName() == "ol" || it.normalName() == "ul" }?.let { recorrer(it, nivel + 1) }
+				}
+			}
+			for (n in doc.select("nav")) {
+				val t = tipo(n)
+				val lista = n.children().firstOrNull { it.normalName() == "ol" || it.normalName() == "ul" } ?: continue
+				when {
+					t.contains("toc") -> recorrer(lista, 1)
+					t.contains("page-list") -> for (a in lista.select("a[href]")) navegacion += Entrada(Textos.unirEspacios(a.text()).trim(), 0, destino(rutaNav, a.attr("href")))
+				}
+			}
+		}
+
 		private fun leerNcx(ncx: Document, rutaNcx: String, navegacion: MutableList<Entrada>) {
 			fun etiqueta(e: Element) = e.children().firstOrNull { local(it) == "navlabel" }?.let { Textos.unirEspacios(it.text()).trim() }.orEmpty()
 			fun src(e: Element) = e.children().firstOrNull { local(it) == "content" }?.attr("src")?.trim().orEmpty()
@@ -579,7 +652,7 @@ object LectorDaisy : LectorFormato {
 				"Editorial" to editorial,
 				"Fecha" to fecha,
 				"Idioma" to idioma,
-				"Tipo DAISY" to "DAISY $version, $tipoLegible" + (if (tipo.isNotBlank()) " ($tipo)" else ""),
+				"Tipo DAISY" to (if (version.startsWith("EPUB")) "$version con narración, $tipoLegible" else "DAISY $version, $tipoLegible") + (if (tipo.isNotBlank()) " ($tipo)" else ""),
 			)
 			ctx.progreso(92)
 

@@ -77,6 +77,7 @@ class Preferencias(private val contexto: Context) {
 			dividirParrafos = texto("dividir_parrafos", "0").toIntOrNull() ?: 0,
 			leerImagenes = p.getBoolean("leer_imagenes", true),
 			brailleComoTexto = p.getBoolean("braille_texto", true),
+			epubConAudio = p.getBoolean("epub_con_audio", true),
 		)
 
 	// --- Voz

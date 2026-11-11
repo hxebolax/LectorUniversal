@@ -28,9 +28,25 @@ object LectorEpub : LectorFormato {
 				throw ExcepcionFormato("No es un EPUB válido: falta el archivo del paquete (OPF).")
 			}
 			comprobarDrm(z)
+			// EPUB 3 con narración sincronizada: con su audio, como un DAISY de texto y audio (si se quiere así en Ajustes)
+			if (ctx.opciones.epubConAudio) rutaNarrada(z)?.let { opf ->
+				val carpeta = LectorDaisy.extraerZip(fuente, ctx, "epub")
+				return ContenedorDirectorio(carpeta).use { LectorDaisy.epubNarrado(it, ctx, fuente.nombre.substringBeforeLast('.'), opf) }
+			}
 			return Contenido.Texto(leerContenedor(z, ctx).construir())
 		}
 	}
+
+	/** El OPF si el EPUB trae narración sincronizada (algún capítulo con media-overlay y audio); si no, null. */
+	private fun rutaNarrada(z: Contenedor): String? = runCatching {
+		val rutaOpf = z.buscar("META-INF/container.xml")?.let { cont ->
+			buscarTodos(xml(z, cont), "rootfile").firstOrNull { it.hasAttr("full-path") }?.attr("full-path")
+		}?.let { z.buscar(it) } ?: z.entradas().firstOrNull { it.lowercase().endsWith(".opf") } ?: return null
+		val items = buscarTodos(xml(z, rutaOpf), "item")
+		val conNarracion = items.any { it.attr("media-overlay").isNotBlank() }
+		val conAudio = items.any { it.attr("media-type").startsWith("audio/") }
+		if (conNarracion && conAudio) rutaOpf else null
+	}.getOrNull()
 
 	private fun comprobarDrm(z: Contenedor) {
 		val ruta = z.buscar("META-INF/encryption.xml") ?: return

@@ -754,7 +754,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			true
 		}
 		// Cambiar cómo se convierten los documentos: se olvida el que está en memoria
-		for (clave in listOf("tablas_encabezados", "leer_imagenes", "dividir_parrafos", "pdf_unir_lineas", "txt_linea_parrafo", "braille_texto")) {
+		for (clave in listOf("tablas_encabezados", "leer_imagenes", "dividir_parrafos", "pdf_unir_lineas", "txt_linea_parrafo", "braille_texto", "epub_con_audio")) {
 			findPreference<Preference>(clave)?.setOnPreferenceChangeListener { _, _ ->
 				Abiertos.olvidar()
 				true

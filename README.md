@@ -50,7 +50,7 @@ Las **estadísticas** (menú lateral) son de todas las secciones: tiempo leyendo
 
 #### Biblioteca
 
-- **Formatos**: EPUB 2 y 3, PDF (también escaneados, con reconocimiento de texto sin internet), Word (DOCX y DOC antiguo), OpenDocument (ODT, ODS, ODP), RTF, texto, HTML, Markdown, FictionBook (FB2), Kindle (MOBI, AZW, AZW3, PRC, PDB), CHM, PowerPoint, Excel, CSV, cómics (CBZ), ZIP, **DAISY 2.02 y 3**, **libros en braille** (BRA y BAN de la ONCE, BRF y PEF, pasados a texto) y audiolibros **M4B y MP3** con capítulos.
+- **Formatos**: EPUB 2 y 3, PDF (también escaneados, con reconocimiento de texto sin internet), Word (DOCX y DOC antiguo), OpenDocument (ODT, ODS, ODP), RTF, texto, HTML, Markdown, FictionBook (FB2), Kindle (MOBI, AZW, AZW3, PRC, PDB), CHM, PowerPoint, Excel, CSV, cómics (CBZ), ZIP, **DAISY 2.02 y 3**, **EPUB 3 con narración sincronizada**, **libros en braille** (BRA y BAN de la ONCE, BRF y PEF, pasados a texto) y audiolibros **M4B y MP3** con capítulos.
 - Pestañas Leyendo, Biblioteca (con carpetas), Marcadores y Catálogos (OPDS y bibliotecas web como Tiflolibros o la Biblioteca Digital de la ONCE).
 - **Tipos**: Libros, Documentos, Audiolibros, Páginas web y los tipos propios que crees, cada uno en su pestaña arriba de la Biblioteca y con sus carpetas. Las pestañas se ven siempre enteras (las que no caben van a «Más») y se ordenan, ocultan o crean en Ajustes.
 - Escanear documentos con la cámara con guía de voz y, opcionalmente, buscar todos los libros del dispositivo estén donde estén.

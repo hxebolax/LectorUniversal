@@ -37,8 +37,10 @@ data class OpcionesLectura(
 	val leerImagenes: Boolean = true,
 	/** Libros en braille: pasarlos a texto (si no, se muestran sus puntos tal cual). */
 	val brailleComoTexto: Boolean = true,
+	/** EPUB 3 con narración sincronizada: abrirlo con su audio (si no, solo el texto). */
+	val epubConAudio: Boolean = true,
 ) {
-	fun firma() = "t$tablasConEncabezados p$pdfUnirLineas l$txtLineaAParrafo d$dividirParrafos i$leerImagenes b$brailleComoTexto"
+	fun firma() = "t$tablasConEncabezados p$pdfUnirLineas l$txtLineaAParrafo d$dividirParrafos i$leerImagenes b$brailleComoTexto e$epubConAudio"
 }
 
 class ContextoLectura(
