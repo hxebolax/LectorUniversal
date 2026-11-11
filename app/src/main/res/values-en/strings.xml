@@ -993,7 +993,7 @@
 	<string name="aj_rss_desc">Refresh, notifications, full articles and how long they are kept</string>
 	<string name="aj_podcasts">Podcasts</string>
 	<string name="aj_podcasts_desc">Downloads, queue, speed and new episodes</string>
-	<string name="aj_rss_frecuencia">Refresh news and podcasts</string>
+	<string name="aj_rss_frecuencia">Refresh the news</string>
 	<string name="aj_rss_solo_wifi">Refresh only on Wi-Fi</string>
 	<string name="aj_rss_avisos">Notify of new articles</string>
 	<string name="aj_rss_avisos_desc">For feeds with notifications turned on (in Edit feed)</string>
@@ -2228,6 +2228,10 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 	<string name="voz_de_biblioteca_nombre">the Library</string>
 	<string name="voz_de_compartidos_nombre">Shared</string>
 	<string name="como_en_x">As in %1$s (%2$s)</string>
+	<string name="aj_pod_frecuencia">Refresh podcasts</string>
+	<string name="aj_frecuencia_minutos">Minutes between refreshes</string>
+	<string name="aj_frecuencia_minutos_desc">How many minutes, 5 or more (for example 20 or 90). With battery saving, Android may delay it a little.</string>
+	<string name="aj_frecuencia_cada">Every %1$d minutes</string>
 	<string name="leer_con_lector">Read with Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: read</string>
 	<string name="comp_web_o_texto">A web page or a text (in Shared)</string>

@@ -189,11 +189,18 @@
 	</string-array>
 	<string-array name="rss_frecuencia_nombres">
 		<item>Manually only</item>
+		<item>Every 5 minutes</item>
+		<item>Every 10 minutes</item>
+		<item>Every 15 minutes</item>
+		<item>Every 30 minutes</item>
+		<item>Every 45 minutes</item>
 		<item>Every hour</item>
+		<item>Every 2 hours</item>
 		<item>Every 3 hours</item>
 		<item>Every 6 hours</item>
 		<item>Every 12 hours</item>
 		<item>Once a day</item>
+		<item>Custom (type the minutes)</item>
 	</string-array>
 	<string-array name="rss_dias_nombres">
 		<item>One week</item>

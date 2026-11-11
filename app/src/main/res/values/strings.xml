@@ -1004,7 +1004,7 @@
 	<string name="aj_rss_desc">Actualización, avisos, artículos completos y cuánto tiempo se guardan</string>
 	<string name="aj_podcasts">Podcasts</string>
 	<string name="aj_podcasts_desc">Descargas, cola, velocidad y episodios nuevos</string>
-	<string name="aj_rss_frecuencia">Actualizar noticias y podcasts</string>
+	<string name="aj_rss_frecuencia">Actualizar las noticias</string>
 	<string name="aj_rss_solo_wifi">Actualizar solo con wifi</string>
 	<string name="aj_rss_avisos">Avisar de artículos nuevos</string>
 	<string name="aj_rss_avisos_desc">De las fuentes que tengan los avisos activados (en Editar fuente)</string>
@@ -2249,6 +2249,10 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	<string name="voz_de_biblioteca_nombre">la Biblioteca</string>
 	<string name="voz_de_compartidos_nombre">Compartidos</string>
 	<string name="como_en_x">Como en %1$s (%2$s)</string>
+	<string name="aj_pod_frecuencia">Actualizar los podcasts</string>
+	<string name="aj_frecuencia_minutos">Minutos entre actualizaciones</string>
+	<string name="aj_frecuencia_minutos_desc">Cada cuántos minutos, de 5 en adelante (por ejemplo 20 o 90). Con el ahorro de batería, Android puede retrasarlo un poco.</string>
+	<string name="aj_frecuencia_cada">Cada %1$d minutos</string>
 	<string name="leer_con_lector">Leer con Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: leer</string>
 	<string name="comp_web_o_texto">Una página web o un texto (en Compartidos)</string>

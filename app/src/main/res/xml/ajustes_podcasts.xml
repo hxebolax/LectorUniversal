@@ -9,7 +9,9 @@
 	<SwitchPreferenceCompat android:key="pod_seguir_cola" android:title="@string/aj_pod_seguir" android:defaultValue="true" />
 	<ListPreference android:key="pod_marcar_escuchado" android:title="@string/aj_pod_marcar" android:entries="@array/pod_marcar_nombres" android:entryValues="@array/pod_marcar_valores" android:defaultValue="30" app:useSimpleSummaryProvider="true" />
 	<ListPreference android:key="pod_velocidad_lista" android:title="@string/aj_pod_velocidad" android:entries="@array/pod_velocidad_nombres" android:entryValues="@array/pod_velocidad_valores" android:defaultValue="0" app:useSimpleSummaryProvider="true" />
-	<ListPreference android:key="rss_frecuencia" android:title="@string/aj_rss_frecuencia" android:entries="@array/rss_frecuencia_nombres" android:entryValues="@array/rss_frecuencia_valores" android:defaultValue="180" app:useSimpleSummaryProvider="true" />
+	<ListPreference android:key="pod_frecuencia" android:title="@string/aj_pod_frecuencia" android:entries="@array/rss_frecuencia_nombres" android:entryValues="@array/rss_frecuencia_valores" app:useSimpleSummaryProvider="true" />
+	<!-- Solo con «Personalizada» -->
+	<EditTextPreference android:key="pod_frecuencia_minutos" android:title="@string/aj_frecuencia_minutos" android:dialogMessage="@string/aj_frecuencia_minutos_desc" />
 	<!-- El mismo ajuste que en Audiolibros y DAISY: vale para audiolibros y podcasts -->
 	<ListPreference android:key="audio_al_encender" android:title="@string/aj_al_encender" android:entries="@array/al_encender_audio_nombres" android:entryValues="@array/al_encender_valores" android:defaultValue="seguir" app:useSimpleSummaryProvider="true" />
 	<Preference android:key="audio_al_encender_explicacion" android:selectable="false" android:summary="@string/aj_al_encender_audio_desc" />

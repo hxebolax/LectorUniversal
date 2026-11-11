@@ -207,12 +207,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			"elevenlabs" -> configurarElevenLabs()
 			"ia" -> configurarIA()
 			"rss", "podcasts" -> {
-				for (clave in listOf("rss_frecuencia", "rss_solo_wifi")) {
-					findPreference<Preference>(clave)?.setOnPreferenceChangeListener { _, _ ->
-						view?.post { com.xebolax.lector.rss.RssTrabajo.programar(requireContext()) }
-						true
-					}
-				}
+				configurarFrecuencia(if (xml == "rss") "rss" else "pod")
 				configurarCuenta(if (xml == "rss") "rss" else "pod")
 				if (xml == "rss") alPulsar("rss_medios") { mediosSuscritos() }
 				if (xml == "rss") alPulsar("ir_voz_noticias") { com.xebolax.lector.voz.VozPerfilActivity.abrirNoticias(requireContext()) }
@@ -239,6 +234,50 @@ class AjustesFragment : PreferenceFragmentCompat() {
 	override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
 		super.onViewCreated(view, savedInstanceState)
 		titulo?.let { androidx.core.view.ViewCompat.setAccessibilityPaneTitle(view, it) }
+	}
+
+	/**
+	 * Frecuencia de actualización de Noticias (rss) o de Podcasts (pod), cada una
+	 * la suya. «Personalizada» muestra el campo de minutos (5 como mínimo).
+	 */
+	private fun configurarFrecuencia(pre: String) {
+		val lista = findPreference<ListPreference>("${pre}_frecuencia")
+		val minutos = findPreference<androidx.preference.EditTextPreference>("${pre}_frecuencia_minutos")
+		// Podcasts sin elegir aún: la que tenían las dos juntas
+		if (pre == "pod" && lista?.value == null) lista?.value = PreferenceManager.getDefaultSharedPreferences(requireContext()).getString("rss_frecuencia", "180")
+		fun reprogramar() = view?.post { com.xebolax.lector.rss.RssTrabajo.programar(requireContext()) }
+		fun mostrar(valor: String?) {
+			minutos?.isVisible = valor == "-1"
+		}
+		mostrar(lista?.value)
+		lista?.setOnPreferenceChangeListener { _, nuevo ->
+			mostrar(nuevo as String)
+			// Personalizada sin minutos aún: se piden ya
+			if (nuevo == "-1" && minutos?.text.isNullOrBlank()) view?.post { minutos?.performClick() }
+			reprogramar()
+			true
+		}
+		minutos?.apply {
+			setOnBindEditTextListener { it.inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+			summaryProvider = Preference.SummaryProvider<androidx.preference.EditTextPreference> { p ->
+				val m = p.text?.trim()?.toLongOrNull()
+				if (m == null) getString(R.string.aj_frecuencia_minutos_desc) else getString(R.string.aj_frecuencia_cada, m.coerceAtLeast(com.xebolax.lector.rss.RssTrabajo.MINIMO).toInt())
+			}
+			setOnPreferenceChangeListener { _, nuevo ->
+				val m = (nuevo as String).trim().toLongOrNull()
+				if (m == null || m < com.xebolax.lector.rss.RssTrabajo.MINIMO) {
+					(activity as? AppCompatActivity)?.avisar(getString(R.string.aj_frecuencia_minutos_desc))
+					false
+				} else {
+					reprogramar()
+					true
+				}
+			}
+		}
+		if (pre == "rss") findPreference<Preference>("rss_solo_wifi")?.setOnPreferenceChangeListener { _, _ ->
+			reprogramar()
+			true
+		}
 	}
 
 	private fun alPulsar(clave: String, accion: () -> Unit) {

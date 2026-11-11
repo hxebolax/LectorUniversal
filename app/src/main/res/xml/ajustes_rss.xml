@@ -3,6 +3,8 @@
 	xmlns:app="http://schemas.android.com/apk/res-auto">
 	<Preference android:key="ir_voz_noticias" android:title="@string/voz_noticias_titulo" android:summary="@string/aj_voz_noticias_desc" />
 	<ListPreference android:key="rss_frecuencia" android:title="@string/aj_rss_frecuencia" android:entries="@array/rss_frecuencia_nombres" android:entryValues="@array/rss_frecuencia_valores" android:defaultValue="180" app:useSimpleSummaryProvider="true" />
+	<!-- Solo con «Personalizada» -->
+	<EditTextPreference android:key="rss_frecuencia_minutos" android:title="@string/aj_frecuencia_minutos" android:dialogMessage="@string/aj_frecuencia_minutos_desc" />
 	<SwitchPreferenceCompat android:key="rss_solo_wifi" android:title="@string/aj_rss_solo_wifi" android:defaultValue="false" />
 	<SwitchPreferenceCompat android:key="rss_avisos" android:title="@string/aj_rss_avisos" android:summary="@string/aj_rss_avisos_desc" android:defaultValue="true" />
 	<SwitchPreferenceCompat android:key="rss_marcar_al_abrir" android:title="@string/aj_rss_marcar" android:defaultValue="true" />
