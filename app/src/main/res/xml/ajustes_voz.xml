@@ -15,10 +15,6 @@
 		android:entryValues="@array/volumen_talkback_valores"
 		android:defaultValue="25"
 		app:useSimpleSummaryProvider="true" />
-	<Preference
-		android:key="ir_elevenlabs"
-		android:title="@string/el_titulo"
-		android:summary="@string/el_titulo_desc" />
 	<ListPreference
 		android:key="motor_voz"
 		android:title="@string/aj_motor_voz"

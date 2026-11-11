@@ -2,7 +2,7 @@
 <!-- Ajustes, pestaña Biblioteca: libros, documentos, audiolibros, y lectura (Compartidos tiene su pestaña) -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
 	<Preference android:key="ir_pestanas" android:title="@string/aj_pestanas_biblioteca" android:summary="@string/aj_pestanas_biblioteca_desc" />
-	<Preference android:key="ir_voz" android:title="@string/aj_lectura_voz" android:summary="@string/aj_lectura_voz_desc" />
+	<Preference android:key="ir_voz_biblioteca" android:title="@string/voz_biblioteca_titulo" android:summary="@string/aj_voz_biblioteca_desc" />
 	<Preference android:key="ir_aspecto" android:title="@string/aj_aspecto" android:summary="@string/aj_aspecto_desc" />
 	<Preference android:key="ir_navegacion" android:title="@string/aj_navegacion" android:summary="@string/aj_navegacion_desc" />
 	<Preference android:key="ir_audio" android:title="@string/aj_audio" android:summary="@string/aj_audio_desc" />

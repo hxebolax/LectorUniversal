@@ -2180,8 +2180,8 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 	<string name="el_nombre">ElevenLabs</string>
 	<string name="el_motor">ElevenLabs (cloud voices, with your key)</string>
 	<string name="el_titulo">ElevenLabs (cloud voices)</string>
-	<string name="el_titulo_desc">Optional: very natural ElevenLabs voices with your own API key. Then choose “ElevenLabs” as the engine, here or in a book’s voice.</string>
-	<string name="el_explicacion">ElevenLabs has very natural voices. To use them you need your own account at elevenlabs.io and an API key (the app has no server or key of its own). Enter the key here and choose “ElevenLabs” as the engine in Read aloud, or in the own voice of a book or of the news. Each part read uses credits from your account: the free plan gives about 10,000 characters a month (about 5 pages); what has been read is saved and going back costs nothing.</string>
+	<string name="el_titulo_desc">Optional: very natural ElevenLabs voices with your own API key. Then choose “ElevenLabs” as the engine in Read aloud (for the whole app) or in the voice of a section or a book.</string>
+	<string name="el_explicacion">ElevenLabs has very natural voices. To use them you need your own account at elevenlabs.io and an API key (the app has no server or key of its own). Enter the key here and choose “ElevenLabs” as the engine in Read aloud: it will be used in the whole app (books, Shared and news) except where you choose another voice, in the voice of a section or of a book. Each part read uses credits from your account: the free plan gives about 10,000 characters a month (about 5 pages); what has been read is saved and going back costs nothing.</string>
 	<string name="el_clave">ElevenLabs API key</string>
 	<string name="el_clave_desc">Not set. It is kept only on the phone, apart from the settings</string>
 	<string name="el_clave_dialogo">At elevenlabs.io, Developers, API Keys, create a key with Text to Speech and Voices (read) permission; to see your credits, also User (read). You can give it a monthly credit limit.</string>
@@ -2217,6 +2217,17 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 	</plurals>
 	<string name="aj_braille_texto">Braille books: turn them into text</string>
 	<string name="aj_braille_texto_desc">ONCE BRA and BAN, BRF and PEF files are read as text (uncontracted Spanish braille). If you turn it off, their dots are shown as they are.</string>
+	<string name="voz_biblioteca_titulo">Library voice</string>
+	<string name="voz_compartidos_titulo">Shared voice</string>
+	<string name="aj_voz_biblioteca_desc">Another voice, speed or pitch for books and documents; what you do not change follows the general voice</string>
+	<string name="aj_voz_compartidos_desc">Another voice, speed or pitch for what is in Shared; what you do not change follows the general voice</string>
+	<string name="voz_explicacion_biblioteca">What you leave as “As in the general voice” uses the general voice (Settings, General, Read aloud). What you change here applies to all books and documents in the Library; each book can also have its own.</string>
+	<string name="voz_explicacion_compartidos">What you leave as “As in the general voice” uses the general voice (Settings, General, Read aloud). What you change here applies to everything in Shared; each item can also have its own.</string>
+	<string name="voz_explicacion_compartido">What you leave as “As in Shared” uses the Shared voice (and what it does not change, the general voice). What you change here applies only to this item.</string>
+	<string name="voz_general_nombre">the general voice</string>
+	<string name="voz_de_biblioteca_nombre">the Library</string>
+	<string name="voz_de_compartidos_nombre">Shared</string>
+	<string name="como_en_x">As in %1$s (%2$s)</string>
 	<string name="leer_con_lector">Read with Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: read</string>
 	<string name="comp_web_o_texto">A web page or a text (in Shared)</string>
@@ -2228,11 +2239,12 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 	<string name="aj_comp_borrar_leidos_desc">What you finish reading in Shared is deleted after that time (what you moved to the library is not touched)</string>
 
 	<!-- Per-book and news voice -->
+	<string name="voz_de_esto">Its voice…</string>
 	<string name="voz_de_este_libro">Voice for this book…</string>
 	<string name="voz_libro_titulo">Voice: %1$s</string>
 	<string name="voz_noticias_titulo">News voice</string>
-	<string name="voz_explicacion_libro">Whatever you leave as “As in Settings” uses the general voice (Settings, Library, Read aloud). What you change here applies only to this book.</string>
-	<string name="voz_explicacion_noticias">Whatever you leave as “As in Settings” uses the general reading voice. What you change here applies to all news and articles.</string>
+	<string name="voz_explicacion_libro">What you leave as “As in the Library” uses the Library voice (and what it does not change, the general voice). What you change here applies only to this book.</string>
+	<string name="voz_explicacion_noticias">What you leave as “As in the general voice” uses the general voice (Settings, General, Read aloud). What you change here applies to all news and articles.</string>
 	<string name="como_en_ajustes">As in Settings</string>
 	<string name="como_en_ajustes_x">As in Settings (%1$s)</string>
 	<string name="vp_motor">Speech engine</string>
@@ -2243,15 +2255,15 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 	<string name="vp_segun_idioma">Change voice by paragraph language</string>
 	<string name="vp_pausa_parrafos">Pause between paragraphs</string>
 	<string name="vp_probar">Test the voice</string>
-	<string name="vp_restablecer">Use everything as in Settings</string>
-	<string name="vp_restablecido">Now using the voice from Settings</string>
-	<string name="vp_restablecer_pregunta">Go back to the voice from Settings for everything? The voice, speed and anything else you set here is removed.</string>
+	<string name="vp_restablecer">Remove everything of its own (use what it inherits)</string>
+	<string name="vp_restablecido">Now using the voice it inherits</string>
+	<string name="vp_restablecer_pregunta">Remove everything of its own and go back to the voice it inherits? The engine, voice, speed and anything else you set here is removed.</string>
 	<string name="vp_propia_velocidad">Own speed</string>
 	<string name="vp_propio_tono">Own pitch</string>
 	<string name="vp_propia_pausa">Own pause between paragraphs</string>
 	<string name="si">Yes</string>
 	<string name="no">No</string>
-	<string name="aj_voz_noticias_desc">Voice, speed and pitch for reading the news, different from the books</string>
+	<string name="aj_voz_noticias_desc">Another voice, speed or pitch for the news; what you do not change follows the general voice</string>
 	<string name="fin_articulo">End of the article.</string>
 	<string name="fin_documento">End of the document.</string>
 
@@ -2265,7 +2277,7 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 	<string name="aj_acciones_compartidos_desc">Which actions each shared item has and in what order</string>
 	<string name="aj_pestana_compartidos">Shared</string>
 	<string name="aj_lectura_voz">Read aloud</string>
-	<string name="aj_lectura_voz_desc">Voice, speed and pitch for books and documents, pauses, languages and pronunciation</string>
+	<string name="aj_lectura_voz_desc">The voice of the whole app (also ElevenLabs): engine, voice, speed, pitch, pauses, languages and pronunciation. Each section can have its own</string>
 	<string name="aj_compartidos_desc">Where what you share with the app goes, what to do when it arrives and when to delete what you have read</string>
 	<string name="pestana_ultima_visible">At least one tab must stay visible.</string>
 	<string name="ajustes_general_titulo">General settings</string>

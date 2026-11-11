@@ -223,6 +223,9 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		// Navegación: las acciones de cada párrafo se eligen (y ordenan) en Acciones de TalkBack
 		alPulsar("ir_acciones_parrafo") { AccionesTalkBackActivity.abrir(requireContext(), ZonaAcciones.PARRAFO) }
 		alPulsar("ir_acciones_compartidos") { AccionesTalkBackActivity.abrir(requireContext(), ZonaAcciones.COMPARTIDO) }
+		// La voz de cada sección (la general está en General, Lectura en voz alta)
+		alPulsar("ir_voz_biblioteca") { com.xebolax.lector.voz.VozPerfilActivity.abrirSeccion(requireContext(), com.xebolax.lector.voz.PerfilesVoz.BIBLIOTECA) }
+		alPulsar("ir_voz_compartidos") { com.xebolax.lector.voz.VozPerfilActivity.abrirSeccion(requireContext(), com.xebolax.lector.voz.PerfilesVoz.COMPARTIDOS) }
 		// Está en Voz y en Audiolibros: se aplica a los dos reproductores
 		findPreference<Preference>("talkback_al_hablar")?.setOnPreferenceChangeListener { _, _ ->
 			view?.post {
@@ -251,7 +254,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 		val apartados = listOf(
 			"ir_portada" to "portada", "ir_copias" to "copias", "ir_general" to "general", "ir_aspecto" to "aspecto", "ir_navegacion" to "navegacion", "ir_voz" to "voz",
 			"ir_audio" to "audio", "ir_podcasts" to "podcasts", "ir_rss" to "rss", "ir_radio" to "radio", "ir_ia" to "ia", "ir_documentos" to "documentos", "ir_biblioteca" to "biblioteca",
-			"ir_compartidos" to "compartidos",
+			"ir_compartidos" to "compartidos", "ir_elevenlabs" to "elevenlabs",
 		)
 		for ((clave, xml) in apartados) {
 			val pref = findPreference<Preference>(clave) ?: continue
@@ -690,12 +693,6 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			com.xebolax.lector.voz.VocesMotor.probar(requireContext(), com.xebolax.lector.voz.PerfilVoz(), getString(R.string.frase_prueba))
 		}
 		alPulsar("ir_pronunciacion") { startActivity(Intent(requireContext(), PronunciacionActivity::class.java)) }
-		findPreference<Preference>("ir_elevenlabs")?.let { pref ->
-			pref.setOnPreferenceClickListener {
-				(activity as? AjustesActivity)?.abrirApartado("elevenlabs", pref.title.toString())
-				true
-			}
-		}
 		alPulsar("ajustes_sistema_voz") {
 			try {
 				startActivity(Intent("com.android.settings.TTS_SETTINGS"))

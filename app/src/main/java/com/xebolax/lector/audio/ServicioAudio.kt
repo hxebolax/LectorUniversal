@@ -45,7 +45,10 @@ class ServicioAudio : MediaSessionService() {
 			.setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 		val exo = ExoPlayer.Builder(this, decodificadores)
 			// Internet con agente propio, redirecciones http↔https y reserva a http (FuenteRed)
-			.setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(FuenteRed.fabrica(this), androidx.media3.extractor.DefaultExtractorsFactory()))
+			// Grabaciones de radio y audios sin índice (MP3 sin cabecera Xing, AAC en ADTS): se salta
+			// calculando por la tasa constante; sin esto, adelantar o retroceder volvía al principio
+			.setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(FuenteRed.fabrica(this),
+				androidx.media3.extractor.DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true)))
 			// Con TalkBack hablando: pausa y sigue después (voz) o baja el volumen (música), según Ajustes
 			.setAudioAttributes(ControlAudio.atributos(this), ControlAudio.manejaFoco(this))
 			.setHandleAudioBecomingNoisy(true)

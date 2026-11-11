@@ -2201,8 +2201,8 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	<string name="el_nombre">ElevenLabs</string>
 	<string name="el_motor">ElevenLabs (voces en la nube, con tu clave)</string>
 	<string name="el_titulo">ElevenLabs (voces en la nube)</string>
-	<string name="el_titulo_desc">Opcional: voces muy naturales de ElevenLabs con tu propia clave de API. Después elige «ElevenLabs» como motor, aquí o en la voz de un libro.</string>
-	<string name="el_explicacion">ElevenLabs tiene voces muy naturales. Para usarlas necesitas una cuenta tuya en elevenlabs.io y una clave de API (la app no tiene servidor ni clave suya). Pon aquí la clave y elige «ElevenLabs» como motor en Lectura en voz alta, o en la voz propia de un libro o de las noticias. Cada trozo leído gasta créditos de tu cuenta: el plan gratuito da unos 10.000 caracteres al mes (unas 5 páginas); lo ya leído se guarda y volver atrás no gasta.</string>
+	<string name="el_titulo_desc">Opcional: voces muy naturales de ElevenLabs con tu propia clave de API. Después elige «ElevenLabs» como motor en Lectura en voz alta (para toda la app) o en la voz de una sección o de un libro.</string>
+	<string name="el_explicacion">ElevenLabs tiene voces muy naturales. Para usarlas necesitas una cuenta tuya en elevenlabs.io y una clave de API (la app no tiene servidor ni clave suya). Pon aquí la clave y elige «ElevenLabs» como motor en Lectura en voz alta: se usará en toda la app (libros, Compartidos y noticias) salvo donde elijas otra voz, en la voz de cada sección o de un libro. Cada trozo leído gasta créditos de tu cuenta: el plan gratuito da unos 10.000 caracteres al mes (unas 5 páginas); lo ya leído se guarda y volver atrás no gasta.</string>
 	<string name="el_clave">Clave de API de ElevenLabs</string>
 	<string name="el_clave_desc">Sin poner. Se guarda solo en el móvil, aparte de los ajustes</string>
 	<string name="el_clave_dialogo">En elevenlabs.io, Developers, API Keys, crea una clave con permiso de Text to Speech y Voices (leer); para ver tus créditos, también User (leer). Puedes ponerle un límite de créditos al mes.</string>
@@ -2238,6 +2238,17 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	</plurals>
 	<string name="aj_braille_texto">Libros en braille: pasarlos a texto</string>
 	<string name="aj_braille_texto_desc">Los BRA y BAN de la ONCE, BRF y PEF se leen como texto (braille español sin contracciones). Si lo quitas, se muestran sus puntos tal cual.</string>
+	<string name="voz_biblioteca_titulo">Voz de la Biblioteca</string>
+	<string name="voz_compartidos_titulo">Voz de Compartidos</string>
+	<string name="aj_voz_biblioteca_desc">Otra voz, velocidad o tono para los libros y documentos; lo que no cambies sigue a la voz general</string>
+	<string name="aj_voz_compartidos_desc">Otra voz, velocidad o tono para lo de Compartidos; lo que no cambies sigue a la voz general</string>
+	<string name="voz_explicacion_biblioteca">Lo que dejes en «Como en la voz general» usa la voz general (Ajustes, General, Lectura en voz alta). Lo que cambies aquí vale para todos los libros y documentos de la Biblioteca; cada libro puede tener además la suya.</string>
+	<string name="voz_explicacion_compartidos">Lo que dejes en «Como en la voz general» usa la voz general (Ajustes, General, Lectura en voz alta). Lo que cambies aquí vale para todo lo de Compartidos; cada elemento puede tener además la suya.</string>
+	<string name="voz_explicacion_compartido">Lo que dejes en «Como en Compartidos» usa la voz de Compartidos (y lo que esta no cambie, la voz general). Lo que cambies aquí vale solo para esto.</string>
+	<string name="voz_general_nombre">la voz general</string>
+	<string name="voz_de_biblioteca_nombre">la Biblioteca</string>
+	<string name="voz_de_compartidos_nombre">Compartidos</string>
+	<string name="como_en_x">Como en %1$s (%2$s)</string>
 	<string name="leer_con_lector">Leer con Lector Universal</string>
 	<string name="comp_leer_con_app">Lector Universal: leer</string>
 	<string name="comp_web_o_texto">Una página web o un texto (en Compartidos)</string>
@@ -2249,11 +2260,12 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	<string name="aj_comp_borrar_leidos_desc">Lo que terminas de leer en Compartidos se borra pasado ese tiempo (lo que pasaste a la biblioteca no se toca)</string>
 
 	<!-- Voz de un libro y de las noticias -->
+	<string name="voz_de_esto">Su voz…</string>
 	<string name="voz_de_este_libro">Voz de este libro…</string>
 	<string name="voz_libro_titulo">Voz: %1$s</string>
 	<string name="voz_noticias_titulo">Voz de las noticias</string>
-	<string name="voz_explicacion_libro">Lo que dejes en «Como en Ajustes» usa la voz general (Ajustes, Biblioteca, Lectura en voz alta). Lo que cambies aquí vale solo para este libro.</string>
-	<string name="voz_explicacion_noticias">Lo que dejes en «Como en Ajustes» usa la voz general de lectura. Lo que cambies aquí vale para todas las noticias y artículos.</string>
+	<string name="voz_explicacion_libro">Lo que dejes en «Como en la Biblioteca» usa la voz de la Biblioteca (y lo que esta no cambie, la voz general). Lo que cambies aquí vale solo para este libro.</string>
+	<string name="voz_explicacion_noticias">Lo que dejes en «Como en la voz general» usa la voz general (Ajustes, General, Lectura en voz alta). Lo que cambies aquí vale para todas las noticias y artículos.</string>
 	<string name="como_en_ajustes">Como en Ajustes</string>
 	<string name="como_en_ajustes_x">Como en Ajustes (%1$s)</string>
 	<string name="vp_motor">Motor de voz</string>
@@ -2264,15 +2276,15 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	<string name="vp_segun_idioma">Cambiar de voz según el idioma del párrafo</string>
 	<string name="vp_pausa_parrafos">Pausa entre párrafos</string>
 	<string name="vp_probar">Probar la voz</string>
-	<string name="vp_restablecer">Usar todo como en Ajustes</string>
-	<string name="vp_restablecido">Ahora usa la voz de Ajustes</string>
-	<string name="vp_restablecer_pregunta">¿Volver a usar en todo la voz de Ajustes? Se quitan la voz, la velocidad y lo demás que pusiste aquí.</string>
+	<string name="vp_restablecer">Quitar todo lo propio (usar lo heredado)</string>
+	<string name="vp_restablecido">Ahora usa la voz que hereda</string>
+	<string name="vp_restablecer_pregunta">¿Quitar todo lo propio y volver a usar la voz que hereda? Se quitan el motor, la voz, la velocidad y lo demás que pusiste aquí.</string>
 	<string name="vp_propia_velocidad">Velocidad propia</string>
 	<string name="vp_propio_tono">Tono propio</string>
 	<string name="vp_propia_pausa">Pausa propia entre párrafos</string>
 	<string name="si">Sí</string>
 	<string name="no">No</string>
-	<string name="aj_voz_noticias_desc">Voz, velocidad y tono para leer las noticias, distintos de los de los libros</string>
+	<string name="aj_voz_noticias_desc">Otra voz, velocidad o tono para las noticias; lo que no cambies sigue a la voz general</string>
 	<string name="fin_articulo">Fin del artículo.</string>
 	<string name="fin_documento">Fin del documento.</string>
 
@@ -2286,7 +2298,7 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	<string name="aj_acciones_compartidos_desc">Qué acciones salen en cada elemento compartido y en qué orden</string>
 	<string name="aj_pestana_compartidos">Compartidos</string>
 	<string name="aj_lectura_voz">Lectura en voz alta</string>
-	<string name="aj_lectura_voz_desc">Voz, velocidad y tono de los libros y documentos, pausas, idiomas y pronunciación</string>
+	<string name="aj_lectura_voz_desc">La voz de toda la app (también ElevenLabs): motor, voz, velocidad, tono, pausas, idiomas y pronunciación. Cada sección puede tener la suya</string>
 	<string name="aj_compartidos_desc">Adónde va lo que compartes con la app, qué hacer al recibirlo y cuándo borrar lo leído</string>
 	<string name="pestana_ultima_visible">Tiene que quedar al menos una pestaña a la vista.</string>
 	<string name="ajustes_general_titulo">Ajustes generales</string>

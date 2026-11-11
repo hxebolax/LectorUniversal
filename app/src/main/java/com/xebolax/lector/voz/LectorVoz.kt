@@ -559,7 +559,7 @@ object LectorVoz {
 	}
 
 	/** Prueba la voz propia de un libro o de las noticias (con un motor aparte: no toca la lectura). */
-	fun probarPerfil(idLibro: Long, texto: String) = VocesMotor.probar(app, PerfilesVoz.de(app, idLibro), texto)
+	fun probarPerfil(idLibro: Long, texto: String) = VocesMotor.probar(app, PerfilesVoz.efectivo(app, idLibro, idLibro == PerfilesVoz.NOTICIAS), texto)
 
 	// --- Control -------------------------------------------------------------
 
@@ -590,7 +590,13 @@ object LectorVoz {
 	 */
 	fun ajustesLibroCambiados(idLibro: Long) {
 		if (documento == null) return
-		if (if (idLibro == PerfilesVoz.NOTICIAS) !esNoticia else libro != idLibro || esNoticia) return
+		// ¿Afecta a lo que se lee? Su libro, o la sección a la que pertenece
+		val afecta = when (idLibro) {
+			PerfilesVoz.NOTICIAS -> esNoticia
+			PerfilesVoz.BIBLIOTECA, PerfilesVoz.COMPARTIDOS -> !esNoticia && PerfilesVoz.seccionDe(app, libro) == idLibro
+			else -> libro == idLibro && !esNoticia
+		}
+		if (!afecta) return
 		val motorAntes = perfil.motorEfectivo(Preferencias(app))
 		leerAjustesLibro()
 		// Otro motor: se arranca el nuevo y sigue leyendo desde donde iba
@@ -651,9 +657,9 @@ object LectorVoz {
 		}
 	}
 
-	/** La voz propia de lo que se lee: la del libro, la de las noticias o ninguna (la de Ajustes). */
+	/** La voz de lo que se lee: la del libro sobre la de su sección (Biblioteca o Compartidos), o la de las noticias; lo demás, la general. */
 	private fun leerAjustesLibro() {
-		perfil = PerfilesVoz.de(app, if (esNoticia) PerfilesVoz.NOTICIAS else libro)
+		perfil = PerfilesVoz.efectivo(app, libro, esNoticia)
 	}
 
 	fun leerDesde(doc: Documento, idLibro: Long, tituloLibro: String, desde: Int, caracter: Int = 0, noticia: Boolean = false) {
@@ -809,13 +815,15 @@ object LectorVoz {
 	/** Cambia la velocidad (en %); se aplica desde la frase actual. */
 	fun cambiarVelocidad(porcentaje: Int) {
 		val v = porcentaje.coerceIn(10, 600)
-		// Con velocidad propia (del libro o de las noticias) se cambia esa; si no, la de Ajustes
-		if (perfil.velocidad != null) {
-			perfil = perfil.copy(velocidad = v)
-			PerfilesVoz.guardar(app, if (esNoticia) PerfilesVoz.NOTICIAS else libro, perfil)
-		} else {
-			Preferencias(app).p.edit().putInt("velocidad_voz", v).apply()
+		// Se cambia donde está puesta: la del libro, la de su sección o, si no, la general
+		val propio = if (esNoticia) null else libro.takeIf { it > 0 }
+		val seccion = if (esNoticia) PerfilesVoz.NOTICIAS else PerfilesVoz.seccionDe(app, libro)
+		when {
+			propio != null && PerfilesVoz.de(app, propio).velocidad != null -> PerfilesVoz.guardar(app, propio, PerfilesVoz.de(app, propio).copy(velocidad = v))
+			PerfilesVoz.de(app, seccion).velocidad != null -> PerfilesVoz.guardar(app, seccion, PerfilesVoz.de(app, seccion).copy(velocidad = v))
+			else -> Preferencias(app).p.edit().putInt("velocidad_voz", v).apply()
 		}
+		perfil = perfil.copy(velocidad = if (perfil.velocidad != null) v else null)
 		// ElevenLabs: la velocidad la pone el reproductor, al momento y sin volver a pedir el audio
 		if (nube) {
 			jugador?.playbackParameters = PlaybackParameters(v / 100f, perfil.tonoEfectivo(Preferencias(app)) / 100f)

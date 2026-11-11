@@ -2,6 +2,10 @@
 <!-- Pestaña Compartidos de Ajustes: lo que llega de otras apps o de internet -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<Preference
+		android:key="ir_voz_compartidos"
+		android:title="@string/voz_compartidos_titulo"
+		android:summary="@string/aj_voz_compartidos_desc" />
 	<ListPreference
 		android:key="comp_destino"
 		android:title="@string/aj_comp_destino"

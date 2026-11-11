@@ -68,7 +68,7 @@ object AccionesTalkBack {
 			e("mover", R.string.mover_carpeta), e("borrar", R.string.borrar_carpeta), o("tipo", R.string.cambiar_tipo_carpeta),
 		)
 		ZonaAcciones.COMPARTIDO -> listOf(
-			e("abrir", R.string.abrir), e("voz", R.string.leer_en_voz_alta), e("biblioteca", R.string.comp_mover_biblioteca),
+			e("abrir", R.string.abrir), e("voz", R.string.leer_en_voz_alta), o("voz_propia", R.string.voz_de_esto), e("biblioteca", R.string.comp_mover_biblioteca),
 			e("leido", R.string.comp_marcar_leido, R.string.comp_marcar_no_leido), e("navegador", R.string.abrir_navegador),
 			e("compartir", R.string.compartir), e("borrar", R.string.borrar), o("renombrar", R.string.renombrar),
 			o("copiar", R.string.comp_copiar_enlace), o("info", R.string.informacion),

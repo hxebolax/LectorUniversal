@@ -29,6 +29,8 @@ object AccionesCompartido {
 		val web = l.origen.takeIf { it.startsWith("http") }
 		val lista = mutableListOf<Accion>(a.getString(R.string.abrir) to { Abiertos.abrirPantalla(a, l) })
 		if (!l.audio) lista += a.getString(R.string.leer_en_voz_alta) to { AccionesLibro.leerEnVozAlta(a, l) }
+		// Su propia voz (lo que no cambie sigue a la voz de Compartidos)
+		if (!l.audio) lista += a.getString(R.string.voz_de_esto) to { com.xebolax.lector.voz.VozPerfilActivity.abrirLibro(a, l.id, l.tituloVisible) }
 		lista += a.getString(R.string.comp_mover_biblioteca) to { moverABiblioteca(a, l) }
 		lista += if (l.estado == Estado.TERMINADO) a.getString(R.string.comp_marcar_no_leido) to {
 			db.cambiarEstado(l.id, Estado.NUEVO)

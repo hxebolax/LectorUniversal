@@ -13,9 +13,10 @@ import org.json.JSONObject
 import java.util.Locale
 
 /**
- * Ajustes de voz propios de un libro o de las noticias. Lo que es null usa
- * el de Ajustes (la voz general): si no se cambia nada, el libro se lee
- * como diga Ajustes, y cambiar Ajustes le afecta.
+ * Ajustes de voz propios de una sección (Biblioteca, Compartidos, Noticias) o
+ * de un libro. Lo que es null se hereda: un libro, de su sección; una
+ * sección, de la voz general (Ajustes, General). Si no se cambia nada, todo
+ * se lee con la voz general, y cambiarla les afecta.
  */
 data class PerfilVoz(
 	val motor: String? = null,
@@ -29,6 +30,20 @@ data class PerfilVoz(
 	val pausaParrafos: Int? = null,
 ) {
 	val vacio: Boolean get() = this == PerfilVoz()
+
+	/**
+	 * Este perfil encima de [base] (lo que hereda): lo propio manda y lo que no
+	 * tiene sale de la base. Si cambia de motor sin elegir voz, la de la base
+	 * (que es de otro motor) no sirve: la del motor por defecto.
+	 */
+	fun sobre(base: PerfilVoz) = PerfilVoz(
+		motor = motor ?: base.motor,
+		voz = voz ?: if (motor != null && motor != base.motor) null else base.voz,
+		velocidad = velocidad ?: base.velocidad,
+		tono = tono ?: base.tono,
+		segunIdioma = segunIdioma ?: base.segunIdioma,
+		pausaParrafos = pausaParrafos ?: base.pausaParrafos,
+	)
 
 	/** Lo escribe en el JSON (conservando lo que no es de la voz, como la velocidad del audio). */
 	fun escribir(o: JSONObject): JSONObject {
@@ -69,25 +84,48 @@ data class PerfilVoz(
 	}
 }
 
-/** Dónde se guarda cada perfil: en los ajustes propios del libro o, el de las noticias, en los ajustes. */
+/**
+ * Dónde se guarda cada perfil: el de un libro (o de algo de Compartidos), en
+ * sus ajustes propios; el de cada sección, en los ajustes de la app. Los ids
+ * negativos son las secciones.
+ */
 object PerfilesVoz {
-	/** Id de libro que representa las noticias (los artículos no tienen id). */
+	/** Ids de las secciones (los libros tienen ids positivos). */
 	const val NOTICIAS = -2L
-	private const val PREF_NOTICIAS = "voz_noticias"
+	const val COMPARTIDOS = -3L
+	const val BIBLIOTECA = -4L
+	private val PREFS = mapOf(NOTICIAS to "voz_noticias", COMPARTIDOS to "voz_compartidos", BIBLIOTECA to "voz_biblioteca")
+
+	fun esSeccion(id: Long) = id in PREFS
 
 	private fun json(texto: String?): JSONObject = runCatching { JSONObject(texto.orEmpty()) }.getOrDefault(JSONObject())
 
+	/** El perfil propio (solo lo que se ha cambiado en él). */
 	fun de(c: Context, libro: Long): PerfilVoz = when {
-		libro == NOTICIAS -> PerfilVoz.leer(json(PreferenceManager.getDefaultSharedPreferences(c).getString(PREF_NOTICIAS, "")))
+		esSeccion(libro) -> PerfilVoz.leer(json(PreferenceManager.getDefaultSharedPreferences(c).getString(PREFS[libro], "")))
 		libro > 0 -> PerfilVoz.leer(json(BaseDatos.obtener(c).libro(libro)?.ajustes))
 		else -> PerfilVoz()
 	}
 
+	/** La sección de un libro: Compartidos si está allí; si no, la Biblioteca. */
+	fun seccionDe(c: Context, libro: Long): Long =
+		if (libro > 0 && BaseDatos.obtener(c).libro(libro)?.compartido == true) COMPARTIDOS else BIBLIOTECA
+
+	/** Lo que hereda: una sección, de la voz general (nada propio); un libro, de su sección. */
+	fun base(c: Context, libro: Long): PerfilVoz = if (esSeccion(libro)) PerfilVoz() else de(c, seccionDe(c, libro))
+
+	/** La voz con la que se lee: la propia sobre la de su sección (y lo demás, la general). */
+	fun efectivo(c: Context, libro: Long, noticia: Boolean = false): PerfilVoz = when {
+		noticia -> de(c, NOTICIAS)
+		esSeccion(libro) -> de(c, libro)
+		else -> de(c, libro).sobre(de(c, seccionDe(c, libro)))
+	}
+
 	fun guardar(c: Context, libro: Long, perfil: PerfilVoz) {
 		when {
-			libro == NOTICIAS -> {
+			esSeccion(libro) -> {
 				val p = PreferenceManager.getDefaultSharedPreferences(c)
-				p.edit().putString(PREF_NOTICIAS, perfil.escribir(json(p.getString(PREF_NOTICIAS, ""))).toString()).apply()
+				p.edit().putString(PREFS[libro], perfil.escribir(json(p.getString(PREFS[libro], ""))).toString()).apply()
 			}
 			libro > 0 -> {
 				val db = BaseDatos.obtener(c)

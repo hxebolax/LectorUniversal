@@ -3,6 +3,8 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
 	<Preference android:key="ir_general" android:title="@string/aj_general" android:summary="@string/aj_general_desc" />
 	<Preference android:key="ir_portada" android:title="@string/aj_portada" android:summary="@string/aj_portada_desc" />
+	<Preference android:key="ir_voz" android:title="@string/aj_lectura_voz" android:summary="@string/aj_lectura_voz_desc" />
+	<Preference android:key="ir_elevenlabs" android:title="@string/el_titulo" android:summary="@string/el_titulo_desc" />
 	<Preference android:key="ir_acciones" android:title="@string/aj_acciones_talkback" android:summary="@string/aj_acciones_talkback_desc" />
 	<Preference android:key="ir_ia" android:title="@string/aj_ia" android:summary="@string/aj_ia_desc" />
 	<Preference android:key="ir_copias" android:title="@string/aj_copias" android:summary="@string/aj_copias_desc" />

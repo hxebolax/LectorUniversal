@@ -20,11 +20,12 @@ import com.xebolax.lector.ui.confirmar
 import java.util.Locale
 
 /**
- * Voz propia de un libro o de las noticias: motor, voz, velocidad, tono,
- * cambio de voz según el idioma y pausa entre párrafos. Todo empieza «Como en
- * Ajustes» (la voz general): solo lo que se cambia aquí es propio, y lo
- * demás sigue a Ajustes. Los cambios se aplican al momento, también si se
- * está leyendo.
+ * Voz propia de una sección (Biblioteca, Compartidos, Noticias) o de un
+ * libro: motor (también ElevenLabs), voz, velocidad, tono, cambio de voz
+ * según el idioma y pausa entre párrafos. Todo empieza «Como en…» lo que
+ * hereda (una sección, la voz general; un libro, la de su sección): solo lo
+ * que se cambia aquí es propio. Los cambios se aplican al momento, también si
+ * se está leyendo.
  */
 class VozPerfilActivity : AppCompatActivity() {
 
@@ -35,8 +36,11 @@ class VozPerfilActivity : AppCompatActivity() {
 		fun abrirLibro(c: Context, libro: Long, titulo: String) =
 			c.startActivity(Intent(c, VozPerfilActivity::class.java).putExtra(EXTRA_LIBRO, libro).putExtra(EXTRA_TITULO, titulo))
 
-		fun abrirNoticias(c: Context) =
-			c.startActivity(Intent(c, VozPerfilActivity::class.java).putExtra(EXTRA_LIBRO, PerfilesVoz.NOTICIAS))
+		fun abrirNoticias(c: Context) = abrirSeccion(c, PerfilesVoz.NOTICIAS)
+
+		/** La voz de una sección: PerfilesVoz.BIBLIOTECA, COMPARTIDOS o NOTICIAS. */
+		fun abrirSeccion(c: Context, seccion: Long) =
+			c.startActivity(Intent(c, VozPerfilActivity::class.java).putExtra(EXTRA_LIBRO, seccion))
 	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,8 +48,12 @@ class VozPerfilActivity : AppCompatActivity() {
 		val b = ActivityAjustesBinding.inflate(layoutInflater)
 		setContentView(b.root)
 		val libro = intent.getLongExtra(EXTRA_LIBRO, PerfilesVoz.NOTICIAS)
-		val titulo = if (libro == PerfilesVoz.NOTICIAS) getString(R.string.voz_noticias_titulo)
-		else getString(R.string.voz_libro_titulo, intent.getStringExtra(EXTRA_TITULO).orEmpty())
+		val titulo = when (libro) {
+			PerfilesVoz.NOTICIAS -> getString(R.string.voz_noticias_titulo)
+			PerfilesVoz.BIBLIOTECA -> getString(R.string.voz_biblioteca_titulo)
+			PerfilesVoz.COMPARTIDOS -> getString(R.string.voz_compartidos_titulo)
+			else -> getString(R.string.voz_libro_titulo, intent.getStringExtra(EXTRA_TITULO).orEmpty())
+		}
 		configurarBarra(b.barra, titulo)
 		if (savedInstanceState == null) {
 			supportFragmentManager.beginTransaction().replace(R.id.contenedor, VozPerfilFragment().apply { arguments = bundleOf(EXTRA_LIBRO to libro) }).commit()
@@ -63,6 +71,10 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 	/** Lee y guarda en el perfil (no en los ajustes generales); cada cambio se aplica a la lectura. */
 	private inner class Almacen : PreferenceDataStore() {
 		var perfil = PerfilesVoz.de(requireContext(), libro)
+		/** Lo que hereda (la voz general, o la de su sección si es un libro). */
+		val base = PerfilesVoz.base(requireContext(), libro)
+		/** Con lo heredado: lo que de verdad se usará. */
+		val efectivo get() = perfil.sobre(base)
 		private val p get() = Preferencias(requireContext())
 
 		private fun guardar(nuevo: PerfilVoz) {
@@ -100,16 +112,16 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 		override fun putBoolean(clave: String, valor: Boolean) {
 			// Al activarlo, empieza con el valor de Ajustes; al quitarlo, vuelve a seguir a Ajustes
 			when (clave) {
-				"vp_velocidad_propia" -> guardar(perfil.copy(velocidad = if (valor) p.velocidadVoz else null))
-				"vp_tono_propio" -> guardar(perfil.copy(tono = if (valor) p.tonoVoz else null))
-				"vp_pausa_propia" -> guardar(perfil.copy(pausaParrafos = if (valor) p.pausaParrafos else null))
+				"vp_velocidad_propia" -> guardar(perfil.copy(velocidad = if (valor) base.velocidadEfectiva(p) else null))
+				"vp_tono_propio" -> guardar(perfil.copy(tono = if (valor) base.tonoEfectivo(p) else null))
+				"vp_pausa_propia" -> guardar(perfil.copy(pausaParrafos = if (valor) base.pausaEfectiva(p) else null))
 			}
 		}
 
 		override fun getInt(clave: String, defecto: Int): Int = when (clave) {
-			"vp_velocidad" -> perfil.velocidadEfectiva(p)
-			"vp_tono" -> perfil.tonoEfectivo(p)
-			"vp_pausa" -> perfil.pausaEfectiva(p)
+			"vp_velocidad" -> efectivo.velocidadEfectiva(p)
+			"vp_tono" -> efectivo.tonoEfectivo(p)
+			"vp_pausa" -> efectivo.pausaEfectiva(p)
 			else -> defecto
 		}
 
@@ -127,8 +139,12 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 		almacen = Almacen()
 		preferenceManager.preferenceDataStore = almacen
 		setPreferencesFromResource(R.xml.ajustes_perfil_voz, raiz)
-		findPreference<Preference>("vp_explicacion")?.summary =
-			getString(if (libro == PerfilesVoz.NOTICIAS) R.string.voz_explicacion_noticias else R.string.voz_explicacion_libro)
+		findPreference<Preference>("vp_explicacion")?.summary = getString(when (libro) {
+			PerfilesVoz.NOTICIAS -> R.string.voz_explicacion_noticias
+			PerfilesVoz.BIBLIOTECA -> R.string.voz_explicacion_biblioteca
+			PerfilesVoz.COMPARTIDOS -> R.string.voz_explicacion_compartidos
+			else -> if (PerfilesVoz.seccionDe(requireContext(), libro) == PerfilesVoz.COMPARTIDOS) R.string.voz_explicacion_compartido else R.string.voz_explicacion_libro
+		})
 		configurar()
 	}
 
@@ -144,20 +160,28 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 		val idioma = findPreference<ListPreference>("vp_idioma")
 		val voz = findPreference<ListPreference>("vp_voz")
 		val segun = findPreference<ListPreference>("vp_segun_idioma")
+		val base = almacen.base
+		// De dónde hereda: una sección, de la voz general; un libro, de su sección
+		val deDonde = getString(when {
+			PerfilesVoz.esSeccion(libro) -> R.string.voz_general_nombre
+			PerfilesVoz.seccionDe(c, libro) == PerfilesVoz.COMPARTIDOS -> R.string.voz_de_compartidos_nombre
+			else -> R.string.voz_de_biblioteca_nombre
+		})
+		fun comoEn(valor: String) = getString(R.string.como_en_x, deDonde, valor)
 
-		// Motores: «Como en Ajustes (nombre del de Ajustes)» y los instalados
+		// Motores: «Como en … (el que hereda)», los instalados y ElevenLabs si hay clave
 		LectorVoz.motores { lista ->
 			if (!isAdded) return@motores
-			val general = lista.firstOrNull { it.first == p.motorVoz }?.second ?: getString(R.string.motor_por_defecto)
-			motor?.entries = (listOf(getString(R.string.como_en_ajustes_x, general)) + lista.map { it.second }).toTypedArray()
+			val general = lista.firstOrNull { it.first == base.motorEfectivo(p) }?.second ?: getString(R.string.motor_por_defecto)
+			motor?.entries = (listOf(comoEn(general)) + lista.map { it.second }).toTypedArray()
 			motor?.entryValues = (listOf("") + lista.map { it.first }).toTypedArray()
 			motor?.value = almacen.perfil.motor.orEmpty()
 			motor?.summary = motor?.entry
 		}
 
 		fun cargarVoces() {
-			// Las voces del motor que se usará (el propio o el de Ajustes), con un motor aparte
-			VocesMotor.voces(c, almacen.perfil.motorEfectivo(p)) { voces ->
+			// Las voces del motor que se usará (el propio o el heredado), con un motor aparte
+			VocesMotor.voces(c, almacen.efectivo.motorEfectivo(p)) { voces ->
 				if (!isAdded) return@voces
 				val idiomas = voces.map { it.locale.language }.distinct().sortedBy { Locale(it).displayLanguage }
 				idioma?.entries = (listOf(getString(R.string.todos_los_idiomas)) + idiomas.map { Locale(it).getDisplayLanguage(Locale.getDefault()).replaceFirstChar { ch -> ch.uppercase() } }).toTypedArray()
@@ -165,8 +189,10 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 				idioma?.value = filtroIdioma
 				idioma?.summary = idioma?.entry
 				val visibles = voces.filter { filtroIdioma.isEmpty() || it.locale.language == filtroIdioma || it.name == almacen.perfil.voz }
-				val general = voces.firstOrNull { it.name == p.voz }?.let { VocesMotor.etiqueta(c, it) } ?: getString(R.string.voz_por_defecto)
-				voz?.entries = (listOf(getString(R.string.como_en_ajustes_x, general)) + visibles.map { v -> VocesMotor.etiqueta(c, v) }).toTypedArray()
+				// La heredada, si es de este mismo motor
+				val heredada = if (almacen.perfil.motor == null || almacen.perfil.motor == base.motor) base.vozEfectiva(p) else ""
+				val general = voces.firstOrNull { it.name == heredada }?.let { VocesMotor.etiqueta(c, it) } ?: getString(R.string.voz_por_defecto)
+				voz?.entries = (listOf(comoEn(general)) + visibles.map { v -> VocesMotor.etiqueta(c, v) }).toTypedArray()
 				voz?.entryValues = (listOf("") + visibles.map { it.name }).toTypedArray()
 				voz?.value = almacen.perfil.voz.orEmpty()
 				voz?.summary = voz?.entry
@@ -189,8 +215,8 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 			true
 		}
 
-		val general = getString(if (p.vozSegunIdioma) R.string.si else R.string.no)
-		segun?.entries = arrayOf(getString(R.string.como_en_ajustes_x, general), getString(R.string.si), getString(R.string.no))
+		val general = getString(if (base.segunIdiomaEfectivo(p)) R.string.si else R.string.no)
+		segun?.entries = arrayOf(comoEn(general), getString(R.string.si), getString(R.string.no))
 		segun?.entryValues = arrayOf("", "si", "no")
 		segun?.value = almacen.getString("vp_segun_idioma", "")
 		segun?.summary = segun?.entry
@@ -204,7 +230,7 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 			val s = findPreference<SwitchPreferenceCompat>(interruptor) ?: continue
 			val d = findPreference<DeslizadorAjuste>(deslizador) ?: continue
 			d.isVisible = s.isChecked
-			s.summaryOff = getString(R.string.como_en_ajustes_x, d.texto(almacen.getInt(deslizador, 0)))
+			s.summaryOff = comoEn(d.texto(almacen.getInt(deslizador, 0)))
 			s.setOnPreferenceChangeListener { _, nuevo ->
 				view?.post {
 					d.value = almacen.getInt(deslizador, d.value)
@@ -215,7 +241,7 @@ class VozPerfilFragment : PreferenceFragmentCompat() {
 		}
 
 		findPreference<Preference>("vp_probar")?.setOnPreferenceClickListener {
-			VocesMotor.probar(c, almacen.perfil, getString(R.string.prueba_voz_texto))
+			VocesMotor.probar(c, almacen.efectivo, getString(R.string.prueba_voz_texto))
 			true
 		}
 		findPreference<Preference>("vp_restablecer")?.setOnPreferenceClickListener {
