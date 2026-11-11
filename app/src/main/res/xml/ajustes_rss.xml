@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<Preference android:key="ir_voz_noticias" android:title="@string/voz_noticias_titulo" android:summary="@string/aj_voz_noticias_desc" />
 	<ListPreference android:key="rss_frecuencia" android:title="@string/aj_rss_frecuencia" android:entries="@array/rss_frecuencia_nombres" android:entryValues="@array/rss_frecuencia_valores" android:defaultValue="180" app:useSimpleSummaryProvider="true" />
 	<SwitchPreferenceCompat android:key="rss_solo_wifi" android:title="@string/aj_rss_solo_wifi" android:defaultValue="false" />
 	<SwitchPreferenceCompat android:key="rss_avisos" android:title="@string/aj_rss_avisos" android:summary="@string/aj_rss_avisos_desc" android:defaultValue="true" />

@@ -28,38 +28,92 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.util.Locale
 
-/** Ajustes, en apartados. Cada apartado es una pantalla con su título (TalkBack la anuncia). */
+/**
+ * Ajustes, con pestañas abajo como las secciones: General (lo que afecta a
+ * toda la app), Biblioteca (lectura, voz, tipos, documentos y Compartidos),
+ * Podcasts, Noticias y Radio. Cada pestaña tiene sus apartados; cada
+ * apartado es una pantalla con su título (TalkBack la anuncia). Atrás en un
+ * apartado vuelve a su pestaña; en otra pestaña, a General; y en General, sale.
+ */
 class AjustesActivity : AppCompatActivity() {
 
 	companion object {
-		/** Abrir directamente un apartado (rss, podcasts, ia...). */
+		/** Abrir directamente un apartado (rss, podcasts, radio, copias...). */
 		const val EXTRA_APARTADO = "apartado"
+		private const val ESTADO_PESTANA = "pestana"
+	}
+
+	/** Las pestañas: xml de su pantalla, nombre, icono y título de la barra. */
+	private enum class Pestana(val xml: String, val nombre: Int, val icono: Int, val titulo: Int) {
+		GENERAL("tab_general", R.string.aj_pestana_general, R.drawable.ic_ajustes, R.string.ajustes_general_titulo),
+		BIBLIOTECA("tab_biblioteca", R.string.aj_pestana_biblioteca, R.drawable.ic_biblioteca, R.string.ajustes_biblioteca_titulo),
+		PODCASTS("podcasts", R.string.aj_pestana_podcasts, R.drawable.ic_voz, R.string.ajustes_podcasts_titulo),
+		NOTICIAS("rss", R.string.aj_pestana_noticias, R.drawable.ic_rss, R.string.ajustes_noticias_titulo),
+		RADIO("radio", R.string.aj_pestana_radio, R.drawable.ic_radio, R.string.ajustes_radio_titulo),
 	}
 
 	private lateinit var b: ActivityAjustesBinding
 	val actualizaciones = GestorActualizaciones(this)
+	private var pestana = Pestana.GENERAL
+
+	/** Atrás: de un apartado a su pestaña, de otra pestaña a General y, desde General, salir. */
+	private val atras = object : androidx.activity.OnBackPressedCallback(true) {
+		override fun handleOnBackPressed() {
+			when {
+				supportFragmentManager.backStackEntryCount > 0 -> supportFragmentManager.popBackStack()
+				pestana != Pestana.GENERAL -> b.pestanas.selectedItemId = Pestana.GENERAL.ordinal
+				else -> finish()
+			}
+		}
+	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		b = ActivityAjustesBinding.inflate(layoutInflater)
 		setContentView(b.root)
 		configurarBarra(b.barra, getString(R.string.ajustes))
+		onBackPressedDispatcher.addCallback(this, atras)
+		b.pestanas.visibility = android.view.View.VISIBLE
+		b.pestanas.menu.clear()
+		Pestana.entries.forEach { b.pestanas.menu.add(android.view.Menu.NONE, it.ordinal, it.ordinal, it.nombre).setIcon(it.icono) }
+		pestana = savedInstanceState?.getInt(ESTADO_PESTANA, 0)?.let { Pestana.entries.getOrNull(it) } ?: when (intent.getStringExtra(EXTRA_APARTADO)) {
+			"rss" -> Pestana.NOTICIAS
+			"podcasts" -> Pestana.PODCASTS
+			"radio" -> Pestana.RADIO
+			else -> Pestana.GENERAL
+		}
+		b.pestanas.selectedItemId = pestana.ordinal
+		b.pestanas.setOnItemSelectedListener { item ->
+			Pestana.entries.getOrNull(item.itemId)?.let { mostrarPestana(it) }
+			true
+		}
+		// Tocar la pestaña en la que se está vuelve a su pantalla principal
+		b.pestanas.setOnItemReselectedListener { mostrarPestana(pestana) }
 		if (savedInstanceState == null) {
-			supportFragmentManager.beginTransaction().replace(R.id.contenedor, AjustesFragment.nuevo("raiz", getString(R.string.ajustes))).commit()
-			when (intent.getStringExtra(EXTRA_APARTADO)) {
-				"rss" -> abrirApartado("rss", getString(R.string.aj_rss))
-				"podcasts" -> abrirApartado("podcasts", getString(R.string.aj_podcasts))
-				"radio" -> abrirApartado("radio", getString(R.string.aj_radio))
-				"copias" -> abrirApartado("copias", getString(R.string.aj_copias))
-			}
-		}
-		supportFragmentManager.addOnBackStackChangedListener {
-			val actual = supportFragmentManager.findFragmentById(R.id.contenedor) as? AjustesFragment
-			actual?.titulo?.let {
-				supportActionBar?.title = it
-				title = it
-			}
-		}
+			mostrarPestana(pestana)
+			if (intent.getStringExtra(EXTRA_APARTADO) == "copias") abrirApartado("copias", getString(R.string.aj_copias))
+		} else ponerTitulo()
+		supportFragmentManager.addOnBackStackChangedListener { ponerTitulo() }
+	}
+
+	override fun onSaveInstanceState(estado: Bundle) {
+		super.onSaveInstanceState(estado)
+		estado.putInt(ESTADO_PESTANA, pestana.ordinal)
+	}
+
+	private fun ponerTitulo() {
+		val actual = supportFragmentManager.findFragmentById(R.id.contenedor) as? AjustesFragment
+		val t = actual?.titulo ?: getString(pestana.titulo)
+		supportActionBar?.title = t
+		title = t
+	}
+
+	/** Muestra la pantalla principal de una pestaña (cierra el apartado que estuviera abierto). */
+	private fun mostrarPestana(p: Pestana) {
+		pestana = p
+		supportFragmentManager.popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+		supportFragmentManager.beginTransaction().replace(R.id.contenedor, AjustesFragment.nuevo(p.xml, getString(p.titulo))).commitNow()
+		ponerTitulo()
 	}
 
 	fun abrirApartado(xml: String, titulo: String) {
@@ -86,6 +140,9 @@ class AjustesFragment : PreferenceFragmentCompat() {
 	override fun onCreatePreferences(estado: Bundle?, raiz: String?) {
 		val xml = arguments?.getString("xml") ?: "raiz"
 		val recurso = when (xml) {
+			"tab_general" -> R.xml.ajustes_tab_general
+			"tab_biblioteca" -> R.xml.ajustes_tab_biblioteca
+			"compartidos" -> R.xml.ajustes_compartidos
 			"portada" -> R.xml.ajustes_portada
 			"copias" -> R.xml.ajustes_copias
 			"general" -> R.xml.ajustes_general
@@ -110,7 +167,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			}
 		}
 		when (xml) {
-			"raiz" -> configurarRaiz()
+			"raiz", "tab_general", "tab_biblioteca" -> configurarRaiz()
 			"general" -> configurarGeneral()
 			"copias" -> configurarCopias()
 			"voz" -> configurarVoz()
@@ -126,6 +183,7 @@ class AjustesFragment : PreferenceFragmentCompat() {
 				}
 				configurarCuenta(if (xml == "rss") "rss" else "pod")
 				if (xml == "rss") alPulsar("rss_medios") { mediosSuscritos() }
+				if (xml == "rss") alPulsar("ir_voz_noticias") { com.xebolax.lector.voz.VozPerfilActivity.abrirNoticias(requireContext()) }
 			}
 		}
 		// Portada y secciones: el orden se elige en su propia pantalla (filas que se mueven)
@@ -156,9 +214,11 @@ class AjustesFragment : PreferenceFragmentCompat() {
 
 	private fun configurarRaiz() {
 		alPulsar("ir_acciones") { AccionesTalkBackActivity.abrir(requireContext()) }
+		alPulsar("ir_pestanas") { startActivity(Intent(requireContext(), PestanasBibliotecaActivity::class.java)) }
 		val apartados = listOf(
 			"ir_portada" to "portada", "ir_copias" to "copias", "ir_general" to "general", "ir_aspecto" to "aspecto", "ir_navegacion" to "navegacion", "ir_voz" to "voz",
 			"ir_audio" to "audio", "ir_podcasts" to "podcasts", "ir_rss" to "rss", "ir_radio" to "radio", "ir_ia" to "ia", "ir_documentos" to "documentos", "ir_biblioteca" to "biblioteca",
+			"ir_compartidos" to "compartidos",
 		)
 		for ((clave, xml) in apartados) {
 			val pref = findPreference<Preference>(clave) ?: continue
@@ -363,7 +423,8 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			motor?.let { it.summary = it.entry ?: getString(R.string.motor_por_defecto) }
 		}
 		fun cargarVoces() {
-			LectorVoz.voces { voces ->
+			// Las voces del motor de Ajustes, con un motor aparte (el de la lectura puede ser otro: el propio de un libro)
+			com.xebolax.lector.voz.VocesMotor.voces(requireContext(), PreferenceManager.getDefaultSharedPreferences(requireContext()).getString("motor_voz", "").orEmpty()) { voces ->
 				if (!isAdded) return@voces
 				val idiomas = voces.map { it.locale.language }.distinct().sortedBy { Locale(it).displayLanguage }
 				idioma?.entries = (listOf(getString(R.string.todos_los_idiomas)) + idiomas.map { Locale(it).getDisplayLanguage(Locale.getDefault()).replaceFirstChar { c -> c.uppercase() } }).toTypedArray()
@@ -412,8 +473,8 @@ class AjustesFragment : PreferenceFragmentCompat() {
 			true
 		}
 		alPulsar("probar_voz") {
-			LectorVoz.aplicarAjustes()
-			LectorVoz.probar(getString(R.string.frase_prueba))
+			// La voz de Ajustes, aunque se esté leyendo un libro con voz propia
+			com.xebolax.lector.voz.VocesMotor.probar(requireContext(), com.xebolax.lector.voz.PerfilVoz(), getString(R.string.frase_prueba))
 		}
 		alPulsar("ir_pronunciacion") { startActivity(Intent(requireContext(), PronunciacionActivity::class.java)) }
 		alPulsar("ajustes_sistema_voz") {
@@ -590,6 +651,11 @@ class AjustesFragment : PreferenceFragmentCompat() {
 	}
 
 	private fun configurarBiblioteca() {
+		// Qué son los PDF, Word y textos que no dicen nada: se aplica al momento a toda la biblioteca
+		findPreference<ListPreference>("tipo_ambiguos")?.setOnPreferenceChangeListener { _, nuevo ->
+			com.xebolax.lector.datos.TipoContenido.ambiguosComo = com.xebolax.lector.datos.TipoContenido.de(nuevo as String) ?: com.xebolax.lector.datos.TipoContenido.LIBRO
+			true
+		}
 		findPreference<androidx.preference.EditTextPreference>("sinc_url")?.apply {
 			setOnBindEditTextListener { it.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI }
 			val original = summary

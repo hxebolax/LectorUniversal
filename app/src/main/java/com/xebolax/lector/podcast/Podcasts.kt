@@ -65,7 +65,8 @@ object Podcasts {
 		}
 	}
 
-	private fun pais() = java.util.Locale.getDefault().country.lowercase().ifBlank { "es" }.let { if (it.length == 2) it else "es" }
+	/** País del catálogo de Apple: el elegido en Descubrir o el del móvil (SIM, red o idioma). */
+	private fun pais() = com.xebolax.lector.datos.Pais.podcasts().lowercase(java.util.Locale.ROOT)
 
 	/** Los más escuchados (del país del móvil) de una categoría (0 = todas). La dirección del RSS se busca al suscribirse. */
 	suspend fun masEscuchados(categoria: Int): List<Sugerencia> = withContext(Dispatchers.IO) {

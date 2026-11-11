@@ -1389,8 +1389,8 @@
 	<string name="aj_rss_leer_al_abrir">Read aloud when opening an article</string>
 	<string name="aj_rss_leer_al_abrir_desc">The article starts playing as soon as it opens</string>
 	<string name="confirmar_marcar_leido_x">Mark all articles in %1$s as read?</string>
-	<string name="anadir_a_noticias">Add to News</string>
-	<string name="anadir_a_podcasts">Add to Podcasts</string>
+	<string name="anadir_a_noticias">Lector Universal: subscribe in News</string>
+	<string name="anadir_a_podcasts">Lector Universal: subscribe in Podcasts</string>
 	<string name="pod_pestana_en_curso">In progress</string>
 	<string name="pod_vacio_en_curso">You have no started, unfinished episodes.</string>
 	<string name="pod_quedan">%1$s left</string>
@@ -1558,7 +1558,7 @@
 
 	<!-- Radio y mini reproductor (1.0.8) -->
 	<string name="radio">Radio</string>
-	<string name="anadir_a_radio">Add to Radio</string>
+	<string name="anadir_a_radio">Lector Universal: add to Radio</string>
 	<string name="mini_descripcion">%1$s, %2$s</string>
 	<string name="mini_detener">Stop</string>
 	<string name="mini_en_directo">Live</string>
@@ -1728,11 +1728,11 @@
 	<string name="radio_sin_accesos">Your home screen does not allow shortcuts.</string>
 	<string name="radio_editar">Edit the station</string>
 	<string name="radio_anadir_a_mano">Add a station by hand</string>
-	<string name="radio_direccion">Stream address</string>
-	<string name="radio_direccion_ayuda">The stream address, or a .pls or .m3u playlist</string>
-	<string name="radio_direccion_mal">The address must start with http:// or https://.</string>
+	<string name="radio_direccion">Stream address or the station\'s web page</string>
+	<string name="radio_direccion_ayuda">Any of them works: the stream (MP3, AAC, Ogg, HLS…), a .pls, .m3u, .asx or .xspf playlist, or the station\'s web page (the stream is searched for in it)</string>
+	<string name="radio_direccion_mal">Type the address of the station or of its web page.</string>
 	<string name="radio_web">Website (optional)</string>
-	<string name="radio_comprobando">Checking the address…</string>
+	<string name="radio_comprobando">Checking the address and looking for the stream…</string>
 	<string name="radio_poner_al_dia">Update favourites</string>
 	<string name="radio_importar">Import stations (M3U or PLS)</string>
 	<string name="radio_exportar">Export favourites (M3U)</string>
@@ -2023,4 +2023,266 @@ First, how everything is now is saved, in case you want to undo it (Settings, Ba
 	<!-- Copias: mostrar contraseña -->
 	<string name="copia_mostrar_contrasena">Show password</string>
 	<string name="copia_mostrar_repetida">Show repeated password</string>
+
+	<!-- 1.0.11: tipos de la biblioteca, Compartidos, voz por libro y de noticias, Ajustes con pestañas, radio y libros del dispositivo -->
+	<!-- Library types -->
+	<string name="tipo_c_libro">Book</string>
+	<string name="tipo_libros">Books</string>
+	<string name="tipo_documento">Document</string>
+	<string name="tipo_documentos">Documents</string>
+	<string name="tipo_audiolibro">Audiobook</string>
+	<string name="tipo_audiolibros">Audiobooks</string>
+	<string name="tipo_c_web">Web page</string>
+	<string name="tipo_webs">Web pages</string>
+	<string name="tipo_todo">All</string>
+	<string name="tipo_automatico">Automatic, by format</string>
+	<string name="tipo_nuevo">New type</string>
+	<string name="tipo_nuevo_puntos">New type…</string>
+	<string name="cambiar_tipo">Change type…</string>
+	<string name="cambiar_tipo_carpeta">Change the folder\'s type…</string>
+	<string name="tipo_cambiado">Type: %1$s</string>
+	<plurals name="tipo_cambiado_n">
+		<item quantity="one">%1$d item is now %2$s</item>
+		<item quantity="other">%1$d items are now %2$s</item>
+	</plurals>
+	<string name="estado_leido">read</string>
+	<string name="estado_sin_leer">unread</string>
+	<plurals name="documentos">
+		<item quantity="one">%1$d document</item>
+		<item quantity="other">%1$d documents</item>
+	</plurals>
+	<plurals name="audiolibros">
+		<item quantity="one">%1$d audiobook</item>
+		<item quantity="other">%1$d audiobooks</item>
+	</plurals>
+	<plurals name="paginas_web">
+		<item quantity="one">%1$d web page</item>
+		<item quantity="other">%1$d web pages</item>
+	</plurals>
+	<string name="vacio_tipo">There is nothing in %1$s. What you add with Add books while on this tab is saved here; you can also change the type of any item with its Change type action.</string>
+	<string name="sin_resultados_tipo">Nothing to show in %1$s.</string>
+	<string name="pestana_mas">More</string>
+	<string name="pestana_mas_x">More: %1$s</string>
+	<string name="pestana_mas_otras">More tabs</string>
+	<string name="pestana_mas_titulo">More tabs</string>
+
+	<!-- Library tabs and types (Settings) -->
+	<string name="aj_pestanas_biblioteca">Library tabs and types</string>
+	<string name="aj_pestanas_biblioteca_desc">Which tabs are shown at the top of the Library, in which order, and your own types</string>
+	<string name="pestanas_explicacion">Each row is a tab at the top of the Library. Double-tap to show or hide it. To move it, use its Move up and Move down actions or long-press it. Tabs that don\'t fit on the screen go into the last tab, More.</string>
+	<string name="pestana_detalle">Position %1$d of %2$d, %3$s</string>
+	<string name="pestana_se_ve">shown</string>
+	<string name="pestana_no_se_ve">hidden</string>
+	<string name="pestana_visible">Visible tab</string>
+	<string name="pestana_movida">%1$s, position %2$d of %3$d</string>
+	<string name="pestana_ahora_visible">%1$s is shown in the Library</string>
+	<string name="pestana_ahora_oculta">%1$s is no longer shown in the Library</string>
+	<string name="pestana_mostrar">Show the tab</string>
+	<string name="pestana_ocultar">Hide the tab</string>
+	<string name="pestana_tipo_propio">your own type</string>
+	<string name="borrar_tipo">Delete the type</string>
+	<string name="confirmar_borrar_tipo">Delete the type “%1$s”? Its items go back to the type that matches their format. No book is deleted.</string>
+	<string name="tipo_borrado">Type “%1$s” deleted</string>
+	<string name="tipo_creado">Type “%1$s” created</string>
+	<string name="aj_tipo_ambiguos">PDF, Word, RTF and text files are</string>
+	<string name="aj_tipo_ambiguos_desc">When added without choosing a type. What you add on a type\'s tab or in one of its folders gets that type.</string>
+
+	<!-- Shared -->
+	<string name="compartidos">Shared</string>
+	<string name="zona_compartido">Shared: each item</string>
+	<string name="comp_pestana_pendientes">To read</string>
+	<string name="comp_pestana_leidos">Read</string>
+	<string name="comp_pestana_todo">All</string>
+	<string name="comp_buscar">Search in Shared</string>
+	<string name="comp_vacio">What you share with the app from other apps or from the browser arrives here: a link, a text or a file. Use Share in any app and choose Lector Universal: read. You can also tap Add, above.</string>
+	<string name="comp_vacio_corto">Shared is empty.</string>
+	<string name="comp_nada_pendiente">Nothing left to read.</string>
+	<string name="comp_nada_leido">You haven\'t finished reading anything from Shared yet.</string>
+	<string name="comp_anadir">Add to Shared</string>
+	<string name="comp_escribir_texto">Type or paste a text</string>
+	<string name="comp_texto">Text you want read aloud</string>
+	<string name="comp_leer">Read</string>
+	<string name="comp_borrar_leidos">Delete read items</string>
+	<string name="comp_borrar_todo">Delete everything in Shared</string>
+	<string name="comp_sin_leidos">There is nothing read to delete.</string>
+	<plurals name="comp_confirmar_borrar_leidos">
+		<item quantity="one">Delete %1$d read item from Shared?</item>
+		<item quantity="other">Delete %1$d read items from Shared?</item>
+	</plurals>
+	<plurals name="comp_confirmar_borrar_todo">
+		<item quantity="one">Delete %1$d item from Shared? What you moved to the library is not touched.</item>
+		<item quantity="other">Delete all %1$d items from Shared? What you moved to the library is not touched.</item>
+	</plurals>
+	<plurals name="comp_borrados">
+		<item quantity="one">%1$d item deleted</item>
+		<item quantity="other">%1$d items deleted</item>
+	</plurals>
+	<plurals name="comp_recibidos">
+		<item quantity="one">%1$d item saved in Shared</item>
+		<item quantity="other">%1$d items saved in Shared</item>
+	</plurals>
+	<plurals name="comp_pendientes">
+		<item quantity="one">%1$d to read</item>
+		<item quantity="other">%1$d to read</item>
+	</plurals>
+	<string name="comp_guardando">Saving in Shared…</string>
+	<string name="comp_guardado_x">Saved in Shared: %1$s</string>
+	<string name="comp_mover_biblioteca">Move to the library…</string>
+	<string name="comp_a_que_carpeta">Which library folder?</string>
+	<string name="comp_movido_biblioteca">Moved to the library: %1$s</string>
+	<string name="comp_marcar_leido">Mark as read</string>
+	<string name="comp_marcar_no_leido">Mark as unread</string>
+	<string name="comp_marcado_leido">Marked as read</string>
+	<string name="comp_marcado_no_leido">Marked as unread</string>
+	<string name="comp_copiar_enlace">Copy link</string>
+	<string name="comp_enlace_copiado">Link copied</string>
+	<string name="comp_confirmar_borrar">Delete “%1$s” from Shared?</string>
+	<string name="comp_borrado">Deleted from Shared</string>
+	<string name="comp_info_tipo">Type: %1$s</string>
+	<string name="comp_info_origen">Address: %1$s</string>
+	<string name="comp_info_recibido">Received: %1$s</string>
+	<string name="comp_leer_con_app">Lector Universal: read</string>
+	<string name="comp_web_o_texto">A web page or a text (in Shared)</string>
+	<string name="portada_compartidos_vacio">Nothing to read in Shared.</string>
+	<string name="aj_compartidos">Shared</string>
+	<string name="aj_comp_destino">What you share with the app goes to</string>
+	<string name="aj_comp_al_recibir">When something arrives</string>
+	<string name="aj_comp_borrar_leidos">Delete read items automatically</string>
+	<string name="aj_comp_borrar_leidos_desc">What you finish reading in Shared is deleted after that time (what you moved to the library is not touched)</string>
+
+	<!-- Per-book and news voice -->
+	<string name="voz_de_este_libro">Voice for this book…</string>
+	<string name="voz_libro_titulo">Voice: %1$s</string>
+	<string name="voz_noticias_titulo">News voice</string>
+	<string name="voz_explicacion_libro">Whatever you leave as “As in Settings” uses the general voice (Settings, Library, Read aloud). What you change here applies only to this book.</string>
+	<string name="voz_explicacion_noticias">Whatever you leave as “As in Settings” uses the general reading voice. What you change here applies to all news and articles.</string>
+	<string name="como_en_ajustes">As in Settings</string>
+	<string name="como_en_ajustes_x">As in Settings (%1$s)</string>
+	<string name="vp_motor">Speech engine</string>
+	<string name="vp_idioma_voces">Language of the voices in the list</string>
+	<string name="vp_voz">Voice</string>
+	<string name="vp_velocidad">Speed</string>
+	<string name="vp_tono">Pitch</string>
+	<string name="vp_segun_idioma">Change voice by paragraph language</string>
+	<string name="vp_pausa_parrafos">Pause between paragraphs</string>
+	<string name="vp_probar">Test the voice</string>
+	<string name="vp_restablecer">Use everything as in Settings</string>
+	<string name="vp_restablecido">Now using the voice from Settings</string>
+	<string name="vp_restablecer_pregunta">Go back to the voice from Settings for everything? The voice, speed and anything else you set here is removed.</string>
+	<string name="vp_propia_velocidad">Own speed</string>
+	<string name="vp_propio_tono">Own pitch</string>
+	<string name="vp_propia_pausa">Own pause between paragraphs</string>
+	<string name="si">Yes</string>
+	<string name="no">No</string>
+	<string name="aj_voz_noticias_desc">Voice, speed and pitch for reading the news, different from the books</string>
+	<string name="fin_articulo">End of the article.</string>
+	<string name="fin_documento">End of the document.</string>
+
+	<!-- Tabbed settings -->
+	<string name="aj_pestana_general">General</string>
+	<string name="aj_pestana_biblioteca">Library</string>
+	<string name="aj_pestana_podcasts">Podcasts</string>
+	<string name="aj_pestana_noticias">News</string>
+	<string name="aj_pestana_radio">Radio</string>
+	<string name="aj_lectura_voz">Read aloud</string>
+	<string name="aj_lectura_voz_desc">Voice, speed and pitch for books and documents, pauses, languages and pronunciation</string>
+	<string name="aj_compartidos_desc">Where what you share with the app goes, what to do when it arrives and when to delete what you have read</string>
+	<string name="pestana_ultima_visible">At least one tab must stay visible.</string>
+	<string name="ajustes_general_titulo">General settings</string>
+	<string name="ajustes_biblioteca_titulo">Library settings</string>
+	<string name="ajustes_podcasts_titulo">Podcast settings</string>
+	<string name="ajustes_noticias_titulo">News settings</string>
+	<string name="ajustes_radio_titulo">Radio settings</string>
+	<string-array name="comp_destino_nombres">
+		<item>Shared (recommended)</item>
+		<item>The library, as before</item>
+	</string-array>
+	<string-array name="comp_destino_valores">
+		<item>compartidos</item>
+		<item>biblioteca</item>
+	</string-array>
+	<string-array name="comp_al_recibir_nombres">
+		<item>Open it</item>
+		<item>Open it and read it aloud</item>
+		<item>Just save it</item>
+	</string-array>
+	<string-array name="comp_al_recibir_valores">
+		<item>abrir</item>
+		<item>leer</item>
+		<item>guardar</item>
+	</string-array>
+	<string-array name="comp_borrar_nombres">
+		<item>Never</item>
+		<item>The next day</item>
+		<item>After a week</item>
+		<item>After a month</item>
+	</string-array>
+	<string-array name="comp_borrar_valores">
+		<item>0</item>
+		<item>1</item>
+		<item>7</item>
+		<item>30</item>
+	</string-array>
+	<string-array name="tipo_ambiguos_nombres">
+		<item>Books</item>
+		<item>Documents</item>
+	</string-array>
+	<string-array name="tipo_ambiguos_valores">
+		<item>LIBRO</item>
+		<item>DOCUMENTO</item>
+	</string-array>
+	<!-- Radio: any station -->
+	<string name="radio_elige_sonido">That page has several streams. Which one is the station?</string>
+	<string name="radio_no_encontrada_en_web">It is a web page, but no working radio stream was found in it. Look in the page for a Listen or Live link and copy its address, or look for the station in Search.</string>
+	<string name="radio_no_comprobada">It could not be checked that it plays: %1$s Save it anyway?</string>
+	<string name="radio_guardar_igualmente">Save anyway</string>
+	<string name="radio_error_rechaza">The station refuses the connection (server error %1$d).</string>
+	<string name="radio_error_servidor">The station\'s server returned an error (%1$d). It may be down; try again later.</string>
+	<string name="radio_formato_no_compatible">This station\'s audio is in a format that cannot be played (%1$s).</string>
+	<string name="radio_motivo_ssl">the station\'s security certificate is not valid and it does not answer unencrypted either.</string>
+	<string name="radio_motivo_no_estandar">the station\'s server does not answer like a normal web server; there is usually another address for the same station that works.</string>
+	<string name="radio_motivo_formato">what is at that address does not look like audio.</string>
+	<string name="radio_motivo_lista">the playlist is empty or cannot be understood.</string>
+	<string name="radio_motivo_redirecciones">the address leads to another and that to another, without getting anywhere.</string>
+	<string name="radio_motivo_red">it could not connect (check the address and the internet connection).</string>
+	<!-- Podcast country -->
+	<string name="pod_pais">Podcast country</string>
+	<string name="pod_pais_x">Country: %1$s</string>
+	<string name="pod_pais_automatico">Your phone\'s (%1$s)</string>
+	<string name="rss_red_sin_rss">%1$s does not publish its updates as RSS, so it cannot be followed in News. You can follow YouTube channels (also by sharing any video from the channel), YouTube playlists, Mastodon and Bluesky accounts, subreddits and almost any website, blog or newspaper.</string>
+	<string name="comp_ahora_mismo">just now</string>
+	<string name="comp_que_es">What is it? (its type in the library)</string>
+	<string name="pestanas_titulo">Tabs and types</string>
+	<!-- Books on the device -->
+	<string name="disp_titulo">Books on the device</string>
+	<string name="disp_buscar_menu">Search for books on the whole device</string>
+	<string name="disp_filtrar">Filter by name or folder</string>
+	<string name="disp_buscando">Looking for books on the phone and the card…</string>
+	<string name="disp_cancelado">Search cancelled. Use Search again, in More options.</string>
+	<string name="disp_sin_permiso">To find books on the whole phone the app needs access to files. If you do not want to grant it, add books with Add files or Add a folder.</string>
+	<string name="disp_permiso_explicacion">To find your books wherever they are, Android asks you to give Lector Universal access to all files. It is only used to find and open your books and documents; the app sends nothing anywhere. It is optional: without this permission the app works the same. Tapping Grant permission opens Android settings: turn on “Allow access to manage all files” and come back with Back.</string>
+	<string name="disp_dar_permiso">Grant permission</string>
+	<string name="disp_nada">No files were found (%1$s). You can search for other formats in More options, What to search for.</string>
+	<plurals name="disp_encontrados">
+		<item quantity="one">%1$d found</item>
+		<item quantity="other">%1$d found</item>
+	</plurals>
+	<string name="disp_epub_pdf">EPUB and PDF</string>
+	<string name="disp_libros_documentos">All books and documents</string>
+	<string name="disp_todo">Books, documents and audio</string>
+	<string name="disp_que_buscar">What to search for…</string>
+	<string name="disp_buscar_otra_vez">Search again</string>
+	<string name="disp_anadir_todos">Add all to the library</string>
+	<plurals name="disp_confirmar_todos">
+		<item quantity="one">Add %1$d file to the library? Files stay where they are.</item>
+		<item quantity="other">Add %1$d files to the library? Files stay where they are.</item>
+	</plurals>
+	<string name="disp_todos_ya">They are all in your library already.</string>
+	<string name="disp_en_biblioteca">In your library</string>
+	<string name="disp_ya_abrir">Already in your library: open it</string>
+	<string name="disp_abrir_anadir">Open (and add it to the library)</string>
+	<string name="disp_anadir">Add to the library</string>
+	<string name="disp_anadir_carpeta">Add to a library folder…</string>
+	<string name="disp_anadido">Added to the library: %1$s</string>
+	<string name="disp_ruta">Device folder: %1$s</string>
 </resources>

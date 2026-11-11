@@ -40,7 +40,12 @@ class ServicioAudio : MediaSessionService() {
 		super.onCreate()
 		ControlAudio.iniciar(this)
 		val p = Preferencias(this)
-		val exo = ExoPlayer.Builder(this)
+		// Decodificadores del móvil y, de reserva, los de FFmpeg (MP2 de algunas radios HLS, AC-3…)
+		val decodificadores = androidx.media3.exoplayer.DefaultRenderersFactory(this)
+			.setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+		val exo = ExoPlayer.Builder(this, decodificadores)
+			// Internet con agente propio, redirecciones http↔https y reserva a http (FuenteRed)
+			.setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(FuenteRed.fabrica(this), androidx.media3.extractor.DefaultExtractorsFactory()))
 			// Con TalkBack hablando: pausa y sigue después (voz) o baja el volumen (música), según Ajustes
 			.setAudioAttributes(ControlAudio.atributos(this), ControlAudio.manejaFoco(this))
 			.setHandleAudioBecomingNoisy(true)

@@ -203,18 +203,8 @@ object Radio {
 	 */
 	suspend fun resolver(url: String): String = withContext(Dispatchers.IO) {
 		val limpia = url.trim()
-		val ruta = limpia.substringBefore('?').lowercase()
-		if (!(ruta.endsWith(".pls") || ruta.endsWith(".m3u") || ruta.endsWith(".asx"))) return@withContext limpia
-		runCatching {
-			val c = URL(limpia).openConnection() as HttpURLConnection
-			c.connectTimeout = 8000
-			c.readTimeout = 10000
-			c.setRequestProperty("User-Agent", "LectorUniversal/" + com.xebolax.lector.BuildConfig.VERSION_NAME)
-			val texto = c.inputStream.bufferedReader().use { it.readText().take(100_000) }
-			c.disconnect()
-			Regex("""(?im)^(?:File\d+=)?\s*(https?://\S+)""").find(texto)?.groupValues?.get(1)
-				?: Regex("""(?i)href\s*=\s*"(https?://[^"]+)"""").find(texto)?.groupValues?.get(1)
-		}.getOrNull() ?: limpia
+		// Por su contenido (listas .pls, .m3u, .asx, .xspf, aunque no lo digan en la extensión)
+		runCatching { Flujos.sondear(limpia).takeIf { !it.web }?.url }.getOrNull() ?: limpia
 	}
 
 	/** Las favoritas como lista M3U (la entienden casi todos los reproductores y apps de radio). */

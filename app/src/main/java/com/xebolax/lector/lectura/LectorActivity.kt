@@ -1243,7 +1243,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		val d = doc ?: return
 		val l = libro ?: return
 		moverActual(bloque)
-		LectorVoz.leerDesde(d, l.id, d.titulo.ifBlank { l.tituloVisible }, bloque)
+		LectorVoz.leerDesde(d, l.id, d.titulo.ifBlank { l.tituloVisible }, bloque, noticia = esNoticia)
 		// El mini reproductor y la notificación vuelven aquí (una noticia no tiene id de libro)
 		LectorVoz.volver = Intent(this, LectorActivity::class.java).putExtras(intent).apply { removeExtra(EXTRA_LEER_AL_ABRIR) }
 	}
@@ -1788,43 +1788,20 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		avisar(getString(R.string.tamano_letra_n, nuevo), mostrar = false)
 	}
 
-	/** Voz y velocidad propias de este libro (por ejemplo, una voz inglesa para un libro en inglés). */
+	/** Lo que se lee es una noticia (un artículo, varios seguidos o los titulares). */
+	private val esNoticia: Boolean
+		get() = articuloRss > 0 || intent.hasExtra(EXTRA_SEGUIDOS) || intent.hasExtra(com.xebolax.lector.rss.RssAcciones.EXTRA_LISTA)
+
+	/**
+	 * Voz propia de este libro (por ejemplo, una voz inglesa para un libro en
+	 * inglés): motor, voz, velocidad, tono, idiomas y pausas. En una noticia,
+	 * la voz de las noticias.
+	 */
 	private fun ajustesDelLibro() {
 		val l = libro ?: return
+		if (esNoticia) return com.xebolax.lector.voz.VozPerfilActivity.abrirNoticias(this)
 		if (l.id <= 0) return avisar(getString(R.string.solo_biblioteca))
-		val json = runCatching { org.json.JSONObject(db.libro(l.id)?.ajustes.orEmpty()) }.getOrDefault(org.json.JSONObject())
-		fun guardar(aviso: String) {
-			db.guardarAjustesLibro(l.id, json)
-			LectorVoz.ajustesLibroCambiados(l.id)
-			actualizarVelocidad()
-			avisar(aviso)
-		}
-		LectorVoz.voces { voces ->
-			val vozActual = voces.firstOrNull { it.name == json.optString("voz") }
-			val nombreVoz = vozActual?.let { "${it.locale.displayName} · ${it.name}" } ?: getString(R.string.la_de_ajustes)
-			val velocidad = json.optInt("velocidad", 0)
-			val nombreVelocidad = if (velocidad > 0) "$velocidad %" else getString(R.string.la_de_ajustes)
-			elegir(getString(R.string.ajustes_del_libro), listOf(
-				getString(R.string.voz_del_libro_valor, nombreVoz) to {
-					val nombres = listOf(getString(R.string.la_de_ajustes)) + voces.map { "${it.locale.displayName} · ${it.name}" }
-					elegirUno(getString(R.string.voz_del_libro), nombres, voces.indexOf(vozActual) + 1) { i ->
-						if (i == 0) json.remove("voz") else json.put("voz", voces[i - 1].name)
-						guardar(getString(R.string.voz_del_libro_valor, nombres[i]))
-					}
-				},
-				getString(R.string.velocidad_del_libro_valor, nombreVelocidad) to {
-					val valores = listOf(0) + (5..40).map { it * 10 }
-					val nombres = listOf(getString(R.string.la_de_ajustes)) + valores.drop(1).map { "$it %" }
-					elegirUno(getString(R.string.velocidad_del_libro), nombres, valores.indexOf(velocidad).coerceAtLeast(0)) { i ->
-						if (i == 0) json.remove("velocidad") else json.put("velocidad", valores[i])
-						guardar(getString(R.string.velocidad_del_libro_valor, nombres[i]))
-					}
-				},
-				getString(R.string.probar_voz) to {
-					LectorVoz.probarConLibro(l.id, getString(R.string.prueba_voz_texto))
-				},
-			))
-		}
+		com.xebolax.lector.voz.VozPerfilActivity.abrirLibro(this, l.id, l.tituloVisible)
 	}
 
 	// --- Teclado ----------------------------------------------------------------------------

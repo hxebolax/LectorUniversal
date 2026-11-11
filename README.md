@@ -40,7 +40,7 @@ Lector Universal es una app Android hecha por y para personas ciegas o con baja 
 
 ### Qué vas a encontrar
 
-La app tiene cuatro **secciones**, como cuatro apps en una. En todas, «Abrir menú» está arriba a la izquierda y las pestañas de la sección están abajo, siempre a la vista. Encima de las pestañas, un **mini reproductor** muestra lo que suena (un libro leído en voz alta, un audiolibro, un episodio o la radio) con Pausar, Detener y volver a su pantalla. Sigue ahí al cambiar de sección: puedes escuchar la radio mientras lees las noticias.
+La app tiene cinco **secciones**, como cinco apps en una: Biblioteca, Compartidos, Podcasts, Noticias y Radio. En todas, «Abrir menú» está arriba a la izquierda y las pestañas de la sección están abajo, siempre a la vista. Encima de las pestañas, un **mini reproductor** muestra lo que suena (un libro leído en voz alta, un audiolibro, un episodio o la radio) con Pausar, Detener y volver a su pantalla. Sigue ahí al cambiar de sección: puedes escuchar la radio mientras lees las noticias.
 
 #### Portada
 
@@ -52,19 +52,25 @@ Las **estadísticas** (menú lateral) son de todas las secciones: tiempo leyendo
 
 - **Formatos**: EPUB 2 y 3, PDF (también escaneados, con reconocimiento de texto sin internet), Word (DOCX y DOC antiguo), OpenDocument (ODT, ODS, ODP), RTF, texto, HTML, Markdown, FictionBook (FB2), Kindle (MOBI, AZW, AZW3, PRC, PDB), CHM, PowerPoint, Excel, CSV, cómics (CBZ), ZIP, **DAISY 2.02 y 3** y audiolibros **M4B y MP3** con capítulos.
 - Pestañas Leyendo, Biblioteca (con carpetas), Marcadores y Catálogos (OPDS y bibliotecas web como Tiflolibros o la Biblioteca Digital de la ONCE).
-- Abrir una página web como libro, leer el portapapeles y escanear documentos con la cámara con guía de voz.
+- **Tipos**: Libros, Documentos, Audiolibros, Páginas web y los tipos propios que crees, cada uno en su pestaña arriba de la Biblioteca y con sus carpetas. Las pestañas se ven siempre enteras (las que no caben van a «Más») y se ordenan, ocultan o crean en Ajustes.
+- Escanear documentos con la cámara con guía de voz y, opcionalmente, buscar todos los libros del dispositivo estén donde estén.
 - Carpetas vigiladas, colecciones, series, estadísticas de lectura y sincronización con tu propio servidor (WebDAV).
 
 #### Lectura
 
 - Navegación como en un lector de pantalla de escritorio: por encabezados (y por niveles), párrafos, páginas, listas, tablas, enlaces, imágenes, notas y marcadores.
 - **Lectura en voz alta** con cualquier motor de voz instalado, que sigue con la pantalla apagada y responde a los botones de los auriculares; cambia de voz según el idioma de cada párrafo; diccionario de pronunciación; temporizador.
+- **Voz propia de cada libro** (motor, voz, velocidad, tono, idiomas y pausas) y **voz de las noticias**; lo que no se cambia sigue a la voz general de Ajustes.
 - Fórmulas matemáticas leídas en voz alta, tablas con encabezados («Columna: valor») y descripción de imágenes.
 - **Inteligencia artificial** opcional: la del propio móvil (Gemini Nano), una descargable que funciona sin internet (Gemma) o tus propias claves, para resumir, explicar, traducir o describir imágenes.
 
 #### Reproductor de audio
 
 - Audiolibros, DAISY, podcasts y el audio de las noticias con el mismo reproductor: capítulos, niveles DAISY, páginas, frases, marcadores, velocidad del 25 al 400 % sin cambiar el tono, saltar silencios, refuerzo de volumen y temporizador con bajada de volumen.
+
+#### Compartidos
+
+- Lo que se comparte con la app desde otras apps o desde el navegador (un artículo, un texto, un archivo) llega aquí, sin mezclarse con la biblioteca, con las pestañas Pendientes, Leídos y Todo. Se pasa a la biblioteca, con su tipo y su carpeta, si se quiere conservar, y los leídos se pueden borrar solos.
 
 #### Podcasts
 
@@ -82,7 +88,8 @@ Las **estadísticas** (menú lateral) son de todas las secciones: tiempo leyendo
 - Reproductor en directo que se reconecta solo si se corta, dice la canción que suena, pasa a la emisora anterior o siguiente (también con los auriculares), temporizador, ecualizador del sistema y búsqueda de la canción en internet.
 - **Grabar** una emisora (sin perder calidad, aunque escuches otra cosa) y **grabaciones programadas**.
 - **Despertador con radio**: días de la semana, volumen que sube poco a poco, Apagar y Posponer en la pantalla de bloqueo, y alarma del móvil de reserva si no hay internet.
-- Emisoras a mano (también desde listas .pls o .m3u), importar y exportar M3U, «Añadir a Radio» desde Compartir y accesos directos en la pantalla de inicio.
+- Emisoras a mano con cualquier dirección (MP3, AAC, Ogg, Opus, FLAC, HLS, listas PLS, M3U, ASX y XSPF) o la web de la emisora, en la que se busca el sonido. Agente de usuario propio, redirecciones entre http y https, reserva sin cifrar si el certificado no vale y decodificador FFmpeg de reserva (MP2, AC-3…).
+- Importar y exportar M3U, «Lector Universal: añadir a Radio» desde Compartir y accesos directos en la pantalla de inicio.
 
 El **manual completo** está dentro de la app (menú lateral, Manual de uso) y en [`app/src/main/assets/manual-es.html`](app/src/main/assets/manual-es.html). Las novedades de cada versión están en [`NOVEDADES.txt`](NOVEDADES.txt).
 
@@ -206,13 +213,14 @@ Código en Kotlin, en `app/src/main/java/com/xebolax/lector/`, con identificador
 | `modelo/` | El documento común (bloques, índice, páginas), audiolibros, frases y textos. |
 | `formatos/` | Un lector por formato (`LectorEpub`, `LectorPdf`, `LectorDaisy`…), reconocimiento del formato, HTML → bloques y caché de libros convertidos. |
 | `lectura/` | Pantalla de lectura, navegación por elementos y controles ajustables para TalkBack. |
-| `voz/` | Lectura en voz alta (`LectorVoz`, `ServicioVoz`), pronunciación y exportar a audio. |
+| `voz/` | Lectura en voz alta (`LectorVoz`, `ServicioVoz`), voz propia de cada libro y de las noticias (`PerfilVoz`, `VozPerfilActivity`), pronunciación y exportar a audio. |
 | `audio/` | Reproductor común (`ControlAudio`, `ServicioAudio` con Media3), su pantalla y el **mini reproductor** (`Sonando`). |
-| `biblioteca/`, `datos/` | Añadir archivos y carpetas; base de datos de la biblioteca, ajustes y actividad de cada sección para las estadísticas (`Actividad`). |
+| `biblioteca/`, `datos/` | Añadir archivos y carpetas; base de datos de la biblioteca, tipos de contenido y tipos propios (`TipoContenido.kt`), país del usuario (`Pais`), ajustes y actividad de cada sección para las estadísticas (`Actividad`). |
+| `compartidos/` | Sección Compartidos: lo que llega de otras apps o de internet (`Compartidos`, `CompartidosActivity`). |
 | `catalogo/` | Catálogos OPDS y bibliotecas web. |
 | `podcast/` | Sección Podcasts (base de datos propia `podcasts.db`). |
 | `rss/` | Sección Noticias (base de datos propia `rss.db`), artículo completo y sincronización. |
-| `radio/` | Sección Radio: cliente de radio-browser.info, base de datos `radio.db`, reproductor en directo, grabación y despertador. |
+| `radio/` | Sección Radio: cliente de radio-browser.info, base de datos `radio.db`, reproductor en directo, grabación, despertador y `Flujos` (qué hay en una dirección y buscar el sonido en la web de una emisora). |
 | `copias/` | Gestor de copias de seguridad (`CopiaSeguridad`) y su cifrado (`Cifrado`: PBKDF2 + AES-256-GCM por bloques). Las claves y contraseñas, aparte, en `datos/Secretos.kt`. |
 | `ia/`, `ocr/` | Inteligencia artificial y reconocimiento de texto. |
 | `sincronizacion/`, `actualizaciones/` | Sincronización WebDAV y actualizaciones de la app (servidor propio, GitHub o una dirección personalizada). |
@@ -254,11 +262,12 @@ Las sugerencias, los avisos de errores y las mejoras son bienvenidos: abre una [
 ## Créditos y licencias de terceros
 
 - [AndroidX, Media3 y Material Components](https://developer.android.com/) (Apache 2.0)
+- Decodificador FFmpeg para Media3 de [Jellyfin](https://github.com/jellyfin/jellyfin-androidx-media) (GPL-3.0; FFmpeg, LGPL)
 - [Jsoup](https://jsoup.org/) (MIT), [CommonMark Java](https://github.com/commonmark/commonmark-java) (BSD 2), [PdfBox-Android](https://github.com/TomRoush/PdfBox-Android) (Apache 2.0)
 - ML Kit (reconocimiento de texto e idioma, IA del móvil) y LiteRT-LM, de Google
 - Directorio de emisoras: [radio-browser.info](https://www.radio-browser.info/), comunitario y libre
 - Sonidos de marcador y nota: [Paperback](https://github.com/trypsynth/paperback), de Quin Gillespie (MIT)
-- Ideas de funciones: Paperback, AntennaPod, RadioDroid, Feeder, Read You, Readrops y Capy Reader. Su código no se ha copiado: las secciones de Podcasts y Radio están escritas desde cero.
+- Ideas de funciones: Paperback, AntennaPod, RadioDroid, Feeder, Read You, Readrops, Capy Reader y BlindRSS. Su código no se ha copiado: las secciones de Podcasts, Noticias y Radio están escritas desde cero.
 - Iconos: Material Symbols (Apache 2.0)
 
 Las bibliotecas de terceros conservan sus propias licencias; todas las libres de esta lista son compatibles con la GPL-3.0.

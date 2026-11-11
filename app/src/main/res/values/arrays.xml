@@ -180,13 +180,11 @@
 
 	<string-array name="filtros_biblioteca">
 		<item>Por carpetas</item>
-		<item>Todos los libros</item>
+		<item>Todo, sin carpetas</item>
 		<item>Favoritos</item>
 		<item>Leyendo</item>
 		<item>Sin empezar</item>
 		<item>Terminados</item>
-		<item>Audiolibros</item>
-		<item>Documentos de texto</item>
 		<item>Quiero leer</item>
 		<item>Abandonados</item>
 		<item>Autores</item>

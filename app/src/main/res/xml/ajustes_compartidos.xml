@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Compartidos: lo que llega de otras apps o de internet -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference
+		android:key="comp_destino"
+		android:title="@string/aj_comp_destino"
+		android:entries="@array/comp_destino_nombres"
+		android:entryValues="@array/comp_destino_valores"
+		android:defaultValue="compartidos"
+		app:useSimpleSummaryProvider="true" />
+	<ListPreference
+		android:key="comp_al_recibir"
+		android:title="@string/aj_comp_al_recibir"
+		android:entries="@array/comp_al_recibir_nombres"
+		android:entryValues="@array/comp_al_recibir_valores"
+		android:defaultValue="abrir"
+		app:useSimpleSummaryProvider="true" />
+	<ListPreference
+		android:key="comp_borrar_leidos"
+		android:title="@string/aj_comp_borrar_leidos"
+		android:entries="@array/comp_borrar_nombres"
+		android:entryValues="@array/comp_borrar_valores"
+		android:defaultValue="0"
+		app:useSimpleSummaryProvider="true" />
+	<Preference
+		android:key="comp_explicacion"
+		android:selectable="false"
+		android:summary="@string/aj_comp_borrar_leidos_desc" />
+</PreferenceScreen>

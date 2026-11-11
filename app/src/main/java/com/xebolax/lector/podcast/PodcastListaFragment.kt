@@ -275,6 +275,8 @@ class PodcastListaFragment : Fragment() {
 				anadir(boton(getString(R.string.pod_buscar)) { a?.buscar() })
 				anadir(boton(getString(R.string.pod_buscar_episodios_todos)) { buscarEpisodios() })
 				anadir(boton(getString(Podcasts.CATEGORIAS.first { it.first == categoria }.second)) { elegirCategoria() })
+				// Los más escuchados van por país: se dice cuál y se puede cambiar
+				anadir(boton(getString(R.string.pod_pais_x, com.xebolax.lector.datos.Pais.nombre(com.xebolax.lector.datos.Pais.podcasts(requireContext())))) { elegirPais() })
 			}
 			Modo.FAVORITOS, Modo.HISTORIAL -> {
 				val (contenedor, campo) = requireContext().campoTexto(getString(R.string.pod_buscar_episodios))
@@ -344,6 +346,20 @@ class PodcastListaFragment : Fragment() {
 		construirCabecera()
 		recargar()
 		b.recycler.scrollToPosition(0)
+	}
+
+	/** País de los más escuchados y de las búsquedas: el detectado o uno elegido. */
+	private fun elegirPais() {
+		val c = requireContext()
+		val detectado = com.xebolax.lector.datos.Pais.detectado(c)
+		val paises = com.xebolax.lector.datos.Pais.todos()
+		val nombres = listOf(getString(R.string.pod_pais_automatico, com.xebolax.lector.datos.Pais.nombre(detectado))) + paises.map { it.second }
+		val elegido = androidx.preference.PreferenceManager.getDefaultSharedPreferences(c).getString("pod_pais", "").orEmpty()
+		c.elegirUno(getString(R.string.pod_pais), nombres, if (elegido.isBlank()) 0 else paises.indexOfFirst { it.first == elegido } + 1) { i ->
+			com.xebolax.lector.datos.Pais.ponerPodcasts(c, if (i == 0) "" else paises[i - 1].first)
+			construirCabecera()
+			cargarMasEscuchados()
+		}
 	}
 
 	private fun elegirCategoria() {

@@ -225,6 +225,21 @@ object ControlAudio {
 			override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
 				if (externo?.directo == true) principal.post { alCortarse(error) }
 			}
+
+			// Radio que «suena» en silencio: hay sonido, pero en un formato que ni el móvil ni FFmpeg saben leer
+			override fun onTracksChanged(pistas: androidx.media3.common.Tracks) {
+				val e = externo ?: return
+				if (!e.directo) return
+				val audio = pistas.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO }
+				if (audio.isNotEmpty() && audio.none { it.isSupported }) {
+					val mime = audio.first().getTrackFormat(0).sampleMimeType?.substringAfter('/')?.uppercase() ?: "?"
+					principal.post {
+						if (externo !== e) return@post
+						problema = app.getString(com.xebolax.lector.R.string.radio_formato_no_compatible, mime)
+						avisar()
+					}
+				}
+			}
 		})
 	}
 
@@ -239,11 +254,50 @@ object ControlAudio {
 		j.play()
 	}
 
+	/** Código HTTP del error (si el servidor respondió con uno), buscando en las causas. */
+	private fun Throwable.codigoHttp(): Int? = generateSequence(this as Throwable?) { it.cause }
+		.filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()?.responseCode
+
+	/** Errores que no se arreglan reintentando: el servidor rechaza la conexión, no existe o el formato no se puede leer. */
+	private fun Throwable.esDefinitivo(): Boolean {
+		val codigo = (this as? androidx.media3.common.PlaybackException)?.errorCode ?: return false
+		val http = codigoHttp()
+		return codigo in setOf(
+			androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+			androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+			androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+			androidx.media3.common.PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND,
+			androidx.media3.common.PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED,
+		) || (codigo == androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && http != null && http in 400..499)
+	}
+
+	/** El motivo dicho con palabras («La emisora no deja conectarse (error 403 del servidor)»). */
+	private fun Throwable.explicacion(): String {
+		val codigo = (this as? androidx.media3.common.PlaybackException)?.errorCode
+		val http = codigoHttp()
+		return when {
+			http != null && http in 400..499 -> app.getString(com.xebolax.lector.R.string.radio_error_rechaza, http)
+			http != null -> app.getString(com.xebolax.lector.R.string.radio_error_servidor, http)
+			codigo == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
+				codigo == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ||
+				codigo == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> app.getString(com.xebolax.lector.R.string.radio_formato_no_compatible, "?")
+			else -> app.getString(com.xebolax.lector.R.string.radio_sin_conexion) + " (" + app.getString(com.xebolax.lector.R.string.radio_error_codigo, errorCodeName()) + ")"
+		}
+	}
+
 	/** Se ha cortado la radio: se reconecta unas cuantas veces y, si es un despertador, suena la alarma del sistema. */
 	private fun alCortarse(error: Throwable?) {
 		val e = externo ?: return
 		if (alarmaDeReserva) return
 		val maximo = maxReintentos()
+		// Lo que no se arregla reintentando se dice ya (sin esperar a los reintentos)
+		if (error != null && error.esDefinitivo()) {
+			problema = error.explicacion()
+			principal.removeCallbacks(reintentar)
+			if (e.despertador) sonarAlarmaDeReserva()
+			avisar()
+			return
+		}
 		if (jugador?.playWhenReady == true && (maximo < 0 || reintentos < maximo)) {
 			reintentos++
 			problema = app.getString(com.xebolax.lector.R.string.radio_reconectando, reintentos)
@@ -251,8 +305,7 @@ object ControlAudio {
 			// Cada vez se espera un poco más (3, 6, 9… hasta 30 segundos)
 			principal.postDelayed(reintentar, (3_000L * reintentos).coerceAtMost(30_000L))
 		} else {
-			problema = app.getString(com.xebolax.lector.R.string.radio_sin_conexion) +
-				(error?.let { " (" + app.getString(com.xebolax.lector.R.string.radio_error_codigo, it.errorCodeName()) + ")" } ?: "")
+			problema = error?.explicacion() ?: app.getString(com.xebolax.lector.R.string.radio_sin_conexion)
 			if (e.despertador) sonarAlarmaDeReserva()
 		}
 		avisar()

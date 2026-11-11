@@ -1400,8 +1400,8 @@
 	<string name="aj_rss_leer_al_abrir">Leer en voz alta al abrir un artículo</string>
 	<string name="aj_rss_leer_al_abrir_desc">El artículo empieza a sonar en cuanto se abre</string>
 	<string name="confirmar_marcar_leido_x">¿Marcar como leídos todos los artículos de %1$s?</string>
-	<string name="anadir_a_noticias">Añadir a Noticias</string>
-	<string name="anadir_a_podcasts">Añadir a Podcasts</string>
+	<string name="anadir_a_noticias">Lector Universal: suscribirse en Noticias</string>
+	<string name="anadir_a_podcasts">Lector Universal: suscribirse en Podcasts</string>
 	<string name="pod_pestana_en_curso">En curso</string>
 	<string name="pod_vacio_en_curso">No tienes episodios empezados sin terminar.</string>
 	<string name="pod_quedan">quedan %1$s</string>
@@ -1570,7 +1570,7 @@
 
 	<!-- Radio y mini reproductor (1.0.8) -->
 	<string name="radio">Radio</string>
-	<string name="anadir_a_radio">Añadir a Radio</string>
+	<string name="anadir_a_radio">Lector Universal: añadir a Radio</string>
 	<string name="mini_descripcion">%1$s, %2$s</string>
 	<string name="mini_detener">Detener</string>
 	<string name="mini_en_directo">En directo</string>
@@ -1740,11 +1740,11 @@
 	<string name="radio_sin_accesos">Tu pantalla de inicio no permite crear accesos directos.</string>
 	<string name="radio_editar">Editar la emisora</string>
 	<string name="radio_anadir_a_mano">Añadir una emisora a mano</string>
-	<string name="radio_direccion">Dirección del sonido</string>
-	<string name="radio_direccion_ayuda">La de la emisión, o una lista .pls o .m3u</string>
-	<string name="radio_direccion_mal">La dirección tiene que empezar por http:// o https://.</string>
+	<string name="radio_direccion">Dirección del sonido o de la web de la emisora</string>
+	<string name="radio_direccion_ayuda">Vale cualquiera: la de la emisión (MP3, AAC, Ogg, HLS…), una lista .pls, .m3u, .asx o .xspf, o la página web de la emisora (se busca el sonido en ella)</string>
+	<string name="radio_direccion_mal">Escribe la dirección de la emisora o de su página web.</string>
 	<string name="radio_web">Página web (opcional)</string>
-	<string name="radio_comprobando">Comprobando la dirección…</string>
+	<string name="radio_comprobando">Comprobando la dirección y buscando el sonido…</string>
 	<string name="radio_poner_al_dia">Poner al día las favoritas</string>
 	<string name="radio_importar">Importar emisoras (M3U o PLS)</string>
 	<string name="radio_exportar">Exportar las favoritas (M3U)</string>
@@ -2035,4 +2035,277 @@ Antes se guarda cómo está todo ahora, por si quieres deshacerlo (Ajustes, Copi
 	<!-- Copias: mostrar contraseña -->
 	<string name="copia_mostrar_contrasena">Mostrar la contraseña</string>
 	<string name="copia_mostrar_repetida">Mostrar la contraseña repetida</string>
+
+	<!-- 1.0.11: tipos de la biblioteca, Compartidos, voz por libro y de noticias, Ajustes con pestañas, radio y libros del dispositivo -->
+	<!-- Tipos de la biblioteca -->
+	<string name="tipo_c_libro">Libro</string>
+	<string name="tipo_libros">Libros</string>
+	<string name="tipo_documento">Documento</string>
+	<string name="tipo_documentos">Documentos</string>
+	<string name="tipo_audiolibro">Audiolibro</string>
+	<string name="tipo_audiolibros">Audiolibros</string>
+	<string name="tipo_c_web">Página web</string>
+	<string name="tipo_webs">Páginas web</string>
+	<string name="tipo_todo">Todo</string>
+	<string name="tipo_automatico">Automático, según el formato</string>
+	<string name="tipo_nuevo">Nuevo tipo</string>
+	<string name="tipo_nuevo_puntos">Nuevo tipo…</string>
+	<string name="cambiar_tipo">Cambiar el tipo…</string>
+	<string name="cambiar_tipo_carpeta">Cambiar el tipo de la carpeta…</string>
+	<string name="tipo_cambiado">Tipo: %1$s</string>
+	<plurals name="tipo_cambiado_n">
+		<item quantity="one">%1$d elemento pasa a %2$s</item>
+		<item quantity="many">%1$d elementos pasan a %2$s</item>
+		<item quantity="other">%1$d elementos pasan a %2$s</item>
+	</plurals>
+	<string name="estado_leido">leído</string>
+	<string name="estado_sin_leer">sin leer</string>
+	<plurals name="documentos">
+		<item quantity="one">%1$d documento</item>
+		<item quantity="many">%1$d documentos</item>
+		<item quantity="other">%1$d documentos</item>
+	</plurals>
+	<plurals name="audiolibros">
+		<item quantity="one">%1$d audiolibro</item>
+		<item quantity="many">%1$d audiolibros</item>
+		<item quantity="other">%1$d audiolibros</item>
+	</plurals>
+	<plurals name="paginas_web">
+		<item quantity="one">%1$d página web</item>
+		<item quantity="many">%1$d páginas web</item>
+		<item quantity="other">%1$d páginas web</item>
+	</plurals>
+	<string name="vacio_tipo">No hay nada en %1$s. Lo que añadas con Añadir libros estando en esta pestaña se guarda aquí; también puedes cambiar el tipo de cualquier elemento con su acción Cambiar el tipo.</string>
+	<string name="sin_resultados_tipo">No hay nada que mostrar en %1$s.</string>
+	<string name="pestana_mas">Más</string>
+	<string name="pestana_mas_x">Más: %1$s</string>
+	<string name="pestana_mas_otras">Más pestañas</string>
+	<string name="pestana_mas_titulo">Más pestañas</string>
+
+	<!-- Pestañas y tipos de la Biblioteca (Ajustes) -->
+	<string name="aj_pestanas_biblioteca">Pestañas y tipos de la Biblioteca</string>
+	<string name="aj_pestanas_biblioteca_desc">Qué pestañas se ven arriba en la Biblioteca, en qué orden, y tus tipos propios</string>
+	<string name="pestanas_explicacion">Cada fila es una pestaña de la parte de arriba de la Biblioteca. Toca dos veces para que se vea o no. Para cambiarla de sitio, usa sus acciones Subir y Bajar o mantenla pulsada. Las que no caben en la pantalla van a la última pestaña, Más.</string>
+	<string name="pestana_detalle">Posición %1$d de %2$d, %3$s</string>
+	<string name="pestana_se_ve">se ve</string>
+	<string name="pestana_no_se_ve">no se ve</string>
+	<string name="pestana_visible">Pestaña visible</string>
+	<string name="pestana_movida">%1$s, posición %2$d de %3$d</string>
+	<string name="pestana_ahora_visible">%1$s se ve en la Biblioteca</string>
+	<string name="pestana_ahora_oculta">%1$s ya no se ve en la Biblioteca</string>
+	<string name="pestana_mostrar">Mostrar la pestaña</string>
+	<string name="pestana_ocultar">Ocultar la pestaña</string>
+	<string name="pestana_tipo_propio">tipo propio</string>
+	<string name="borrar_tipo">Borrar el tipo</string>
+	<string name="confirmar_borrar_tipo">¿Borrar el tipo «%1$s»? Lo que tenga ese tipo volverá al que le toca por su formato. No se borra ningún libro.</string>
+	<string name="tipo_borrado">Tipo «%1$s» borrado</string>
+	<string name="tipo_creado">Tipo «%1$s» creado</string>
+	<string name="aj_tipo_ambiguos">Los PDF, Word, RTF y textos son</string>
+	<string name="aj_tipo_ambiguos_desc">Al añadirlos sin elegir tipo. Lo que se añade en la pestaña de un tipo o en una de sus carpetas se guarda con ese tipo.</string>
+
+	<!-- Compartidos -->
+	<string name="compartidos">Compartidos</string>
+	<string name="zona_compartido">Compartidos: cada elemento</string>
+	<string name="comp_pestana_pendientes">Pendientes</string>
+	<string name="comp_pestana_leidos">Leídos</string>
+	<string name="comp_pestana_todo">Todo</string>
+	<string name="comp_buscar">Buscar en Compartidos</string>
+	<string name="comp_vacio">Aquí llega lo que compartes con la app desde otras apps o desde el navegador: un enlace, un texto o un archivo. Usa Compartir en cualquier app y elige Lector Universal: leer. También puedes pulsar Añadir, arriba.</string>
+	<string name="comp_vacio_corto">Compartidos está vacío.</string>
+	<string name="comp_nada_pendiente">No tienes nada pendiente de leer.</string>
+	<string name="comp_nada_leido">Todavía no has terminado de leer nada de Compartidos.</string>
+	<string name="comp_anadir">Añadir a Compartidos</string>
+	<string name="comp_escribir_texto">Escribir o pegar un texto</string>
+	<string name="comp_texto">Texto que quieres que se lea</string>
+	<string name="comp_leer">Leer</string>
+	<string name="comp_borrar_leidos">Borrar los leídos</string>
+	<string name="comp_borrar_todo">Borrar todo lo de Compartidos</string>
+	<string name="comp_sin_leidos">No hay nada leído que borrar.</string>
+	<plurals name="comp_confirmar_borrar_leidos">
+		<item quantity="one">¿Borrar %1$d elemento leído de Compartidos?</item>
+		<item quantity="many">¿Borrar %1$d elementos leídos de Compartidos?</item>
+		<item quantity="other">¿Borrar %1$d elementos leídos de Compartidos?</item>
+	</plurals>
+	<plurals name="comp_confirmar_borrar_todo">
+		<item quantity="one">¿Borrar %1$d elemento de Compartidos? Lo que pasaste a la biblioteca no se toca.</item>
+		<item quantity="many">¿Borrar los %1$d elementos de Compartidos? Lo que pasaste a la biblioteca no se toca.</item>
+		<item quantity="other">¿Borrar los %1$d elementos de Compartidos? Lo que pasaste a la biblioteca no se toca.</item>
+	</plurals>
+	<plurals name="comp_borrados">
+		<item quantity="one">%1$d elemento borrado</item>
+		<item quantity="many">%1$d elementos borrados</item>
+		<item quantity="other">%1$d elementos borrados</item>
+	</plurals>
+	<plurals name="comp_recibidos">
+		<item quantity="one">%1$d elemento guardado en Compartidos</item>
+		<item quantity="many">%1$d elementos guardados en Compartidos</item>
+		<item quantity="other">%1$d elementos guardados en Compartidos</item>
+	</plurals>
+	<plurals name="comp_pendientes">
+		<item quantity="one">%1$d pendiente</item>
+		<item quantity="many">%1$d pendientes</item>
+		<item quantity="other">%1$d pendientes</item>
+	</plurals>
+	<string name="comp_guardando">Guardando en Compartidos…</string>
+	<string name="comp_guardado_x">Guardado en Compartidos: %1$s</string>
+	<string name="comp_mover_biblioteca">Pasar a la biblioteca…</string>
+	<string name="comp_a_que_carpeta">¿En qué carpeta de la biblioteca?</string>
+	<string name="comp_movido_biblioteca">Pasado a la biblioteca: %1$s</string>
+	<string name="comp_marcar_leido">Marcar como leído</string>
+	<string name="comp_marcar_no_leido">Marcar como no leído</string>
+	<string name="comp_marcado_leido">Marcado como leído</string>
+	<string name="comp_marcado_no_leido">Marcado como no leído</string>
+	<string name="comp_copiar_enlace">Copiar el enlace</string>
+	<string name="comp_enlace_copiado">Enlace copiado</string>
+	<string name="comp_confirmar_borrar">¿Borrar «%1$s» de Compartidos?</string>
+	<string name="comp_borrado">Borrado de Compartidos</string>
+	<string name="comp_info_tipo">Tipo: %1$s</string>
+	<string name="comp_info_origen">Dirección: %1$s</string>
+	<string name="comp_info_recibido">Recibido: %1$s</string>
+	<string name="comp_leer_con_app">Lector Universal: leer</string>
+	<string name="comp_web_o_texto">Una página web o un texto (en Compartidos)</string>
+	<string name="portada_compartidos_vacio">Nada pendiente en Compartidos.</string>
+	<string name="aj_compartidos">Compartidos</string>
+	<string name="aj_comp_destino">Lo que compartes con la app va a</string>
+	<string name="aj_comp_al_recibir">Al recibir algo</string>
+	<string name="aj_comp_borrar_leidos">Borrar solos los leídos</string>
+	<string name="aj_comp_borrar_leidos_desc">Lo que terminas de leer en Compartidos se borra pasado ese tiempo (lo que pasaste a la biblioteca no se toca)</string>
+
+	<!-- Voz de un libro y de las noticias -->
+	<string name="voz_de_este_libro">Voz de este libro…</string>
+	<string name="voz_libro_titulo">Voz: %1$s</string>
+	<string name="voz_noticias_titulo">Voz de las noticias</string>
+	<string name="voz_explicacion_libro">Lo que dejes en «Como en Ajustes» usa la voz general (Ajustes, Biblioteca, Lectura en voz alta). Lo que cambies aquí vale solo para este libro.</string>
+	<string name="voz_explicacion_noticias">Lo que dejes en «Como en Ajustes» usa la voz general de lectura. Lo que cambies aquí vale para todas las noticias y artículos.</string>
+	<string name="como_en_ajustes">Como en Ajustes</string>
+	<string name="como_en_ajustes_x">Como en Ajustes (%1$s)</string>
+	<string name="vp_motor">Motor de voz</string>
+	<string name="vp_idioma_voces">Idioma de las voces de la lista</string>
+	<string name="vp_voz">Voz</string>
+	<string name="vp_velocidad">Velocidad</string>
+	<string name="vp_tono">Tono</string>
+	<string name="vp_segun_idioma">Cambiar de voz según el idioma del párrafo</string>
+	<string name="vp_pausa_parrafos">Pausa entre párrafos</string>
+	<string name="vp_probar">Probar la voz</string>
+	<string name="vp_restablecer">Usar todo como en Ajustes</string>
+	<string name="vp_restablecido">Ahora usa la voz de Ajustes</string>
+	<string name="vp_restablecer_pregunta">¿Volver a usar en todo la voz de Ajustes? Se quitan la voz, la velocidad y lo demás que pusiste aquí.</string>
+	<string name="vp_propia_velocidad">Velocidad propia</string>
+	<string name="vp_propio_tono">Tono propio</string>
+	<string name="vp_propia_pausa">Pausa propia entre párrafos</string>
+	<string name="si">Sí</string>
+	<string name="no">No</string>
+	<string name="aj_voz_noticias_desc">Voz, velocidad y tono para leer las noticias, distintos de los de los libros</string>
+	<string name="fin_articulo">Fin del artículo.</string>
+	<string name="fin_documento">Fin del documento.</string>
+
+	<!-- Ajustes con pestañas -->
+	<string name="aj_pestana_general">General</string>
+	<string name="aj_pestana_biblioteca">Biblioteca</string>
+	<string name="aj_pestana_podcasts">Podcasts</string>
+	<string name="aj_pestana_noticias">Noticias</string>
+	<string name="aj_pestana_radio">Radio</string>
+	<string name="aj_lectura_voz">Lectura en voz alta</string>
+	<string name="aj_lectura_voz_desc">Voz, velocidad y tono de los libros y documentos, pausas, idiomas y pronunciación</string>
+	<string name="aj_compartidos_desc">Adónde va lo que compartes con la app, qué hacer al recibirlo y cuándo borrar lo leído</string>
+	<string name="pestana_ultima_visible">Tiene que quedar al menos una pestaña a la vista.</string>
+	<string name="ajustes_general_titulo">Ajustes generales</string>
+	<string name="ajustes_biblioteca_titulo">Ajustes de la Biblioteca</string>
+	<string name="ajustes_podcasts_titulo">Ajustes de Podcasts</string>
+	<string name="ajustes_noticias_titulo">Ajustes de Noticias</string>
+	<string name="ajustes_radio_titulo">Ajustes de Radio</string>
+	<string-array name="comp_destino_nombres">
+		<item>Compartidos (recomendado)</item>
+		<item>La biblioteca, como antes</item>
+	</string-array>
+	<string-array name="comp_destino_valores">
+		<item>compartidos</item>
+		<item>biblioteca</item>
+	</string-array>
+	<string-array name="comp_al_recibir_nombres">
+		<item>Abrirlo</item>
+		<item>Abrirlo y leerlo en voz alta</item>
+		<item>Solo guardarlo</item>
+	</string-array>
+	<string-array name="comp_al_recibir_valores">
+		<item>abrir</item>
+		<item>leer</item>
+		<item>guardar</item>
+	</string-array>
+	<string-array name="comp_borrar_nombres">
+		<item>Nunca</item>
+		<item>Al día siguiente</item>
+		<item>A la semana</item>
+		<item>Al mes</item>
+	</string-array>
+	<string-array name="comp_borrar_valores">
+		<item>0</item>
+		<item>1</item>
+		<item>7</item>
+		<item>30</item>
+	</string-array>
+	<string-array name="tipo_ambiguos_nombres">
+		<item>Libros</item>
+		<item>Documentos</item>
+	</string-array>
+	<string-array name="tipo_ambiguos_valores">
+		<item>LIBRO</item>
+		<item>DOCUMENTO</item>
+	</string-array>
+	<!-- Radio: cualquier emisora -->
+	<string name="radio_elige_sonido">En esa página hay varios sonidos. ¿Cuál es la emisora?</string>
+	<string name="radio_no_encontrada_en_web">Es una página web, pero no se ha encontrado en ella ningún sonido de radio que funcione. Busca en la página un enlace «Escuchar» o «Directo» y copia su dirección, o busca la emisora en Buscar.</string>
+	<string name="radio_no_comprobada">No se ha podido comprobar que suene: %1$s ¿La guardas igualmente?</string>
+	<string name="radio_guardar_igualmente">Guardar igualmente</string>
+	<string name="radio_error_rechaza">La emisora no deja conectarse (error %1$d del servidor).</string>
+	<string name="radio_error_servidor">El servidor de la emisora ha dado un error (%1$d). Puede que esté caído; prueba más tarde.</string>
+	<string name="radio_formato_no_compatible">El sonido de esta emisora está en un formato que no se puede reproducir (%1$s).</string>
+	<string name="radio_motivo_ssl">el certificado de seguridad de la emisora no es válido y tampoco responde sin cifrar.</string>
+	<string name="radio_motivo_no_estandar">el servidor de la emisora no responde como un servidor web normal; suele haber otra dirección de la misma emisora que sí funciona.</string>
+	<string name="radio_motivo_formato">lo que hay en esa dirección no parece sonido.</string>
+	<string name="radio_motivo_lista">la lista de reproducción está vacía o no se entiende.</string>
+	<string name="radio_motivo_redirecciones">la dirección lleva a otra y esta a otra, sin llegar a ningún sitio.</string>
+	<string name="radio_motivo_red">no se ha podido conectar (revisa la dirección y la conexión a internet).</string>
+	<!-- País de los podcasts -->
+	<string name="pod_pais">País de los podcasts</string>
+	<string name="pod_pais_x">País: %1$s</string>
+	<string name="pod_pais_automatico">El de tu móvil (%1$s)</string>
+	<string name="rss_red_sin_rss">%1$s no publica sus novedades en RSS, así que no se puede seguir en Noticias. Se pueden seguir canales de YouTube (también compartiendo cualquier vídeo del canal), listas de YouTube, cuentas de Mastodon y Bluesky, subreddits y casi cualquier web, blog o periódico.</string>
+	<string name="comp_ahora_mismo">ahora mismo</string>
+	<string name="comp_que_es">¿Qué es? (su tipo en la biblioteca)</string>
+	<string name="pestanas_titulo">Pestañas y tipos</string>
+	<!-- Libros del dispositivo -->
+	<string name="disp_titulo">Libros del dispositivo</string>
+	<string name="disp_buscar_menu">Buscar libros en todo el dispositivo</string>
+	<string name="disp_filtrar">Filtrar por nombre o carpeta</string>
+	<string name="disp_buscando">Buscando libros en el móvil y en la tarjeta…</string>
+	<string name="disp_cancelado">Búsqueda cancelada. Usa Buscar otra vez, en Más opciones.</string>
+	<string name="disp_sin_permiso">Para buscar los libros en todo el móvil hace falta el permiso de acceso a los archivos. Si no quieres darlo, añade los libros con Añadir archivos o Añadir una carpeta.</string>
+	<string name="disp_permiso_explicacion">Para encontrar tus libros estén donde estén, Android pide que des a Lector Universal acceso a todos los archivos. Solo se usa para buscar y abrir tus libros y documentos; la app no envía nada a ningún sitio. Es opcional: sin este permiso la app funciona igual. Al pulsar Dar permiso se abren los ajustes de Android: activa «Permitir acceso para gestionar todos los archivos» y vuelve con Atrás.</string>
+	<string name="disp_dar_permiso">Dar permiso</string>
+	<string name="disp_nada">No se ha encontrado ningún archivo (%1$s). Puedes buscar otros formatos en Más opciones, Qué buscar.</string>
+	<plurals name="disp_encontrados">
+		<item quantity="one">%1$d encontrado</item>
+		<item quantity="many">%1$d encontrados</item>
+		<item quantity="other">%1$d encontrados</item>
+	</plurals>
+	<string name="disp_epub_pdf">EPUB y PDF</string>
+	<string name="disp_libros_documentos">Todos los libros y documentos</string>
+	<string name="disp_todo">Libros, documentos y audio</string>
+	<string name="disp_que_buscar">Qué buscar…</string>
+	<string name="disp_buscar_otra_vez">Buscar otra vez</string>
+	<string name="disp_anadir_todos">Añadir todos a la biblioteca</string>
+	<plurals name="disp_confirmar_todos">
+		<item quantity="one">¿Añadir %1$d archivo a la biblioteca? Los archivos se quedan donde están.</item>
+		<item quantity="many">¿Añadir %1$d archivos a la biblioteca? Los archivos se quedan donde están.</item>
+		<item quantity="other">¿Añadir %1$d archivos a la biblioteca? Los archivos se quedan donde están.</item>
+	</plurals>
+	<string name="disp_todos_ya">Todos ya están en tu biblioteca.</string>
+	<string name="disp_en_biblioteca">En tu biblioteca</string>
+	<string name="disp_ya_abrir">Ya está en tu biblioteca: abrirlo</string>
+	<string name="disp_abrir_anadir">Abrir (y añadirlo a la biblioteca)</string>
+	<string name="disp_anadir">Añadir a la biblioteca</string>
+	<string name="disp_anadir_carpeta">Añadir a una carpeta de la biblioteca…</string>
+	<string name="disp_anadido">Añadido a la biblioteca: %1$s</string>
+	<string name="disp_ruta">Carpeta del dispositivo: %1$s</string>
 </resources>

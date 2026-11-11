@@ -665,12 +665,22 @@ class RssBaseDatos private constructor(c: Context) : SQLiteOpenHelper(c, "rss.db
 	}
 
 	/** Borra los artículos leídos más antiguos que 'dias' (nunca favoritos, ni de más tarde, ni podcasts a medias). */
+	/**
+	 * Quita los leídos antiguos. No se borran del todo: si siguieran en la
+	 * fuente (un canal de YouTube que lista siempre sus 15 últimos vídeos, un
+	 * blog que publica poco), al actualizar volverían como no leídos. Se
+	 * dejan ocultos y vacíos, como lo de la papelera vaciada, y solo se borran
+	 * pasado un año más, cuando ya no estarán en ninguna fuente.
+	 */
 	fun limpiar(dias: Int) {
 		if (dias <= 0) return
 		val limite = System.currentTimeMillis() - dias * 86_400_000L
-		writableDatabase.delete(
-			"articulos", "leido = 1 AND favorito = 0 AND mas_tarde = 0 AND posicion_audio = 0 AND recibido < ? AND fecha < ?",
-			arrayOf(limite.toString(), limite.toString()),
+		val db = writableDatabase
+		db.execSQL(
+			"UPDATE articulos SET papelera = 2, contenido = '', resumen = '' WHERE papelera != 2 AND leido = 1 AND favorito = 0 AND mas_tarde = 0 AND posicion_audio = 0 AND recibido < ? AND fecha < ?",
+			arrayOf(limite, limite),
 		)
+		val muyViejo = limite - 365L * 86_400_000L
+		db.delete("articulos", "papelera = 2 AND recibido < ? AND fecha < ?", arrayOf(muyViejo.toString(), muyViejo.toString()))
 	}
 }

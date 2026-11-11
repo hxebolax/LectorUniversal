@@ -87,13 +87,14 @@ data class Emisora(
 		)
 
 		/** Una emisora añadida a mano (su id sale de la dirección, así no se repite). */
-		fun propia(nombre: String, url: String, genero: String = "", web: String = "") = Emisora(
+		/** hls: si se sabe (por su contenido); si no, por la extensión .m3u8. */
+		fun propia(nombre: String, url: String, genero: String = "", web: String = "", hls: Boolean? = null) = Emisora(
 			uuid = PROPIA + Integer.toHexString(url.trim().lowercase().hashCode()),
 			nombre = nombre.trim().ifBlank { url.trim() },
 			url = url.trim(),
 			etiquetas = genero.trim(),
 			web = web.trim(),
-			hls = url.substringBefore('?').endsWith(".m3u8", ignoreCase = true),
+			hls = hls ?: url.substringBefore('?').endsWith(".m3u8", ignoreCase = true),
 		)
 	}
 }

@@ -119,8 +119,10 @@ object LectorVoz {
 	/** La posición cambió (salto, velocidad, voz): al reanudar hay que generar desde ahí. */
 	private var rehacer = true
 	private var pronunciador: Pronunciador? = null
-	private var velocidadLibro: Int? = null
-	private var vozLibro: String? = null
+	/** Voz propia del libro o de las noticias (lo que no tenga, como en Ajustes). */
+	private var perfil = PerfilVoz()
+	/** El documento es una noticia (perfil de voz de las noticias y «Fin del artículo»). */
+	private var esNoticia = false
 	private var vozElegida: Voice? = null
 
 	/** Frase pedida al motor y aún no puesta en el reproductor. */
@@ -422,7 +424,7 @@ object LectorVoz {
 	private fun carpeta() = File(app.cacheDir, "voz").apply { mkdirs() }
 
 	private fun motor(): TextToSpeech {
-		val deseado = Preferencias(app).motorVoz.ifBlank { null }
+		val deseado = perfil.motorEfectivo(Preferencias(app)).ifBlank { null }
 		tts?.let { if (motorActual == deseado) return it }
 		tts?.shutdown()
 		listo = false
@@ -467,9 +469,9 @@ object LectorVoz {
 		val t = tts ?: return
 		if (!listo) return
 		val p = Preferencias(app)
-		t.setSpeechRate((velocidadLibro ?: p.velocidadVoz) / 100f)
-		t.setPitch(p.tonoVoz / 100f)
-		val nombre = vozLibro ?: p.voz
+		t.setSpeechRate(perfil.velocidadEfectiva(p) / 100f)
+		t.setPitch(perfil.tonoEfectivo(p) / 100f)
+		val nombre = perfil.vozEfectiva(p)
 		vozElegida = if (nombre.isNotBlank()) runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull() else null
 		if (vozElegida != null) t.voice = vozElegida
 		else {
@@ -530,25 +532,13 @@ object LectorVoz {
 		tts?.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba")
 	}
 
-	/** Prueba la voz y la velocidad propias de un libro (aunque no sea el de la lectura). */
-	fun probarConLibro(idLibro: Long, texto: String) = conMotor {
-		val t = tts ?: return@conMotor
-		val p = Preferencias(app)
-		val json = runCatching { org.json.JSONObject(BaseDatos.obtener(app).libro(idLibro)?.ajustes.orEmpty()) }.getOrNull()
-		val velocidad = json?.optInt("velocidad", 0)?.takeIf { it > 0 } ?: p.velocidadVoz
-		val nombre = json?.optString("voz", "")?.takeIf { it.isNotBlank() } ?: p.voz
-		t.setSpeechRate(velocidad / 100f)
-		t.setPitch(p.tonoVoz / 100f)
-		val voz = if (nombre.isNotBlank()) runCatching { t.voices?.firstOrNull { it.name == nombre } }.getOrNull() else null
-		if (voz != null) t.voice = voz
-		t.speak(texto, TextToSpeech.QUEUE_FLUSH, null, "prueba")
-		// La petición ya lleva su voz y velocidad: se dejan las de la lectura
-		aplicarAjustes()
-	}
+	/** Prueba la voz propia de un libro o de las noticias (con un motor aparte: no toca la lectura). */
+	fun probarPerfil(idLibro: Long, texto: String) = VocesMotor.probar(app, PerfilesVoz.de(app, idLibro), texto)
 
 	// --- Control -------------------------------------------------------------
 
-	fun cargar(doc: Documento, idLibro: Long, tituloLibro: String, desde: Int, caracter: Int = 0) {
+	/** noticia: es un artículo de Noticias (se lee con la voz de las noticias). */
+	fun cargar(doc: Documento, idLibro: Long, tituloLibro: String, desde: Int, caracter: Int = 0, noticia: Boolean = false) {
 		if (documento !== doc || libro != idLibro) {
 			if (leyendo) pausar()
 			// Quien abra la lectura dice cómo volver a ella (si no, se vuelve al libro por su id)
@@ -556,6 +546,7 @@ object LectorVoz {
 			documento = doc
 			libro = idLibro
 			titulo = tituloLibro
+			esNoticia = noticia
 			leerAjustesLibro()
 			rehacer = true
 			irA(desde, caracter)
@@ -565,9 +556,22 @@ object LectorVoz {
 		irA(desde, caracter)
 	}
 
-	/** Cambiaron la voz o la velocidad propias de un libro: si es el de la lectura, se aplican desde la frase actual. */
+	/**
+	 * Cambió la voz propia de un libro (o la de las noticias, con
+	 * PerfilesVoz.NOTICIAS): si es lo que se lee, se aplica desde la frase actual.
+	 */
 	fun ajustesLibroCambiados(idLibro: Long) {
-		if (documento == null || libro != idLibro) return
+		if (documento == null) return
+		if (if (idLibro == PerfilesVoz.NOTICIAS) !esNoticia else libro != idLibro || esNoticia) return
+		val motorAntes = perfil.motorEfectivo(Preferencias(app))
+		leerAjustesLibro()
+		// Otro motor: se arranca el nuevo y sigue leyendo desde donde iba
+		if (perfil.motorEfectivo(Preferencias(app)) != motorAntes) {
+			reiniciarMotor()
+			detectarIdiomas()
+			return
+		}
+		detectarIdiomas()
 		leerAjustesLibro()
 		aplicarAjustes()
 		rehacer = true
@@ -596,7 +600,7 @@ object LectorVoz {
 		idiomasDetectados.clear()
 		val p = Preferencias(app)
 		val doc = documento ?: return
-		if (!p.vozSegunIdioma || !p.detectarIdioma) return
+		if (!perfil.segunIdiomaEfectivo(p) || !p.detectarIdioma) return
 		val desde = bloque
 		val base = doc.idioma.ifBlank { Locale.getDefault().language }.substringBefore('-').lowercase()
 		deteccion = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
@@ -619,14 +623,13 @@ object LectorVoz {
 		}
 	}
 
+	/** La voz propia de lo que se lee: la del libro, la de las noticias o ninguna (la de Ajustes). */
 	private fun leerAjustesLibro() {
-		val json = runCatching { org.json.JSONObject(BaseDatos.obtener(app).libro(libro)?.ajustes.orEmpty()) }.getOrNull()
-		velocidadLibro = json?.optInt("velocidad", 0)?.takeIf { it > 0 }
-		vozLibro = json?.optString("voz", "")?.takeIf { it.isNotBlank() }
+		perfil = PerfilesVoz.de(app, if (esNoticia) PerfilesVoz.NOTICIAS else libro)
 	}
 
-	fun leerDesde(doc: Documento, idLibro: Long, tituloLibro: String, desde: Int, caracter: Int = 0) {
-		cargar(doc, idLibro, tituloLibro, desde, caracter)
+	fun leerDesde(doc: Documento, idLibro: Long, tituloLibro: String, desde: Int, caracter: Int = 0, noticia: Boolean = false) {
+		cargar(doc, idLibro, tituloLibro, desde, caracter, noticia)
 		reanudar()
 	}
 
@@ -769,11 +772,10 @@ object LectorVoz {
 	/** Cambia la velocidad (en %); se aplica desde la frase actual. */
 	fun cambiarVelocidad(porcentaje: Int) {
 		val v = porcentaje.coerceIn(10, 600)
-		if (velocidadLibro != null) {
-			velocidadLibro = v
-			val db = BaseDatos.obtener(app)
-			val json = runCatching { org.json.JSONObject(db.libro(libro)?.ajustes.orEmpty()) }.getOrDefault(org.json.JSONObject())
-			db.guardarAjustesLibro(libro, json.put("velocidad", v))
+		// Con velocidad propia (del libro o de las noticias) se cambia esa; si no, la de Ajustes
+		if (perfil.velocidad != null) {
+			perfil = perfil.copy(velocidad = v)
+			PerfilesVoz.guardar(app, if (esNoticia) PerfilesVoz.NOTICIAS else libro, perfil)
 		} else {
 			Preferencias(app).p.edit().putInt("velocidad_voz", v).apply()
 		}
@@ -782,7 +784,7 @@ object LectorVoz {
 		if (leyendo) hablar()
 	}
 
-	fun velocidadActual(): Int = velocidadLibro ?: Preferencias(app).velocidadVoz
+	fun velocidadActual(): Int = perfil.velocidadEfectiva(Preferencias(app))
 
 	// --- Temporizador ---------------------------------------------------------
 
@@ -914,13 +916,14 @@ object LectorVoz {
 			cola.addLast(segmento)
 			// Otro idioma en el párrafo: voz de ese idioma; encabezados algo más agudos
 			val idioma = bloqueDoc.idioma ?: idiomasDetectados[b]
-			val cambiaIdioma = idioma != null && p.vozSegunIdioma && vozElegida?.locale?.language != Locale.forLanguageTag(idioma).language
+			val cambiaIdioma = idioma != null && perfil.segunIdiomaEfectivo(p) && vozElegida?.locale?.language != Locale.forLanguageTag(idioma).language
 			if (cambiaIdioma) runCatching { t.language = Locale.forLanguageTag(idioma!!) }
 			val destacar = bloqueDoc.tipo == TipoBloque.ENCABEZADO && p.destacarEncabezados
-			if (destacar) t.setPitch(p.tonoVoz / 100f * 1.12f)
+			val tono = perfil.tonoEfectivo(p) / 100f
+			if (destacar) t.setPitch(tono * 1.12f)
 			val r = if (texto.isBlank()) TextToSpeech.ERROR else t.synthesizeToFile(texto, Bundle(), segmento.archivo, segmento.id)
 			if (r != TextToSpeech.SUCCESS) segmento.estado = FALLIDO
-			if (destacar) t.setPitch(p.tonoVoz / 100f)
+			if (destacar) t.setPitch(tono)
 			if (cambiaIdioma) {
 				vozElegida?.let { v -> runCatching { t.voice = v } } ?: runCatching {
 					t.language = doc.idioma.takeIf { it.isNotBlank() }?.let { Locale.forLanguageTag(it) } ?: Locale.getDefault()
@@ -944,7 +947,7 @@ object LectorVoz {
 		val j = jugador()
 		val antes = j.mediaItemCount
 		val p = Preferencias(app)
-		val pausa = p.pausaParrafos
+		val pausa = perfil.pausaEfectiva(p)
 		val pausaFrase = p.pausaFrases
 		while (cola.isNotEmpty() && cola.first().estado != PEDIDO) {
 			val s = cola.removeFirst()
@@ -1025,7 +1028,13 @@ object LectorVoz {
 		val doc = documento ?: return
 		BaseDatos.obtener(app).guardarPosicion(libro, Posicion.texto(bloque), 100.0)
 		avisar()
-		if (doc.bloques.isNotEmpty()) tts?.speak(app.getString(R.string.fin_del_libro), TextToSpeech.QUEUE_FLUSH, null, "fin")
+		// «Fin del artículo» en las noticias, «Fin del documento» en lo que no es de la biblioteca
+		val fin = when {
+			esNoticia -> R.string.fin_articulo
+			libro <= 0 -> R.string.fin_documento
+			else -> R.string.fin_del_libro
+		}
+		if (doc.bloques.isNotEmpty()) tts?.speak(app.getString(fin), TextToSpeech.QUEUE_FLUSH, null, "fin")
 	}
 
 	private fun borrarArchivo(id: String) {

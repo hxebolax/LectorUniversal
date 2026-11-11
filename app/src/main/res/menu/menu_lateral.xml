@@ -2,7 +2,7 @@
 <!--
 	Menú lateral. Arriba, la Portada y las secciones de la app (como apps dentro
 	de la app, todas con sus pestañas abajo): Biblioteca (con los catálogos en
-	línea en una pestaña), Podcasts, Noticias y Radio, en el orden elegido en
+	línea en una pestaña), Compartidos, Podcasts, Noticias y Radio, en el orden elegido en
 	Ajustes (Secciones.kt). Abajo, lo general.
 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
@@ -14,6 +14,7 @@
 			android:id="@+id/lateral_biblioteca"
 			android:icon="@drawable/ic_biblioteca"
 			android:title="@string/seccion_biblioteca" />
+		<item android:id="@+id/lateral_compartidos" android:icon="@drawable/ic_compartido" android:title="@string/compartidos" />
 		<item android:id="@+id/lateral_podcasts" android:icon="@drawable/ic_voz" android:title="@string/podcasts" />
 		<item android:id="@+id/lateral_noticias" android:icon="@drawable/ic_rss" android:title="@string/noticias" />
 		<item android:id="@+id/lateral_radio" android:icon="@drawable/ic_radio" android:title="@string/radio" />

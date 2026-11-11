@@ -22,6 +22,7 @@ import com.xebolax.lector.databinding.ActivityBibliotecaBinding
 import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.datos.Orden
 import com.xebolax.lector.datos.Preferencias
+import com.xebolax.lector.datos.claveTipo
 import com.xebolax.lector.formatos.ContextoLectura
 import com.xebolax.lector.formatos.Formato
 import com.xebolax.lector.formatos.Fuente
@@ -176,6 +177,7 @@ class BibliotecaActivity : AppCompatActivity() {
 	private fun anadirArchivos(uris: List<Uri>) {
 		lifecycleScope.launch {
 			val r = conEspera(getString(R.string.anadir_libros), getString(R.string.anadiendo_libros)) { Importador.anadirArchivos(this@BibliotecaActivity, uris, carpetaDestino()) }
+			aplicarTipoDestino(r.anadidos)
 			resultado(r)
 			// Uno solo: se abre directamente
 			if (uris.size == 1) {
@@ -186,7 +188,22 @@ class BibliotecaActivity : AppCompatActivity() {
 	}
 
 	/** Carpeta de la biblioteca abierta en la pestaña Carpetas (ahí van los libros nuevos). */
-	private fun carpetaDestino(): Long? = biblioteca?.takeIf { it.porCarpetas }?.carpetaActual
+	private fun carpetaDestino(): Long? = biblioteca?.takeIf { it.porCarpetas && pestana == R.id.pestana_biblioteca }?.carpetaActual
+
+	/**
+	 * Lo que se añade en la pestaña de un tipo (o en una carpeta de un tipo)
+	 * se guarda con ese tipo: un PDF añadido en Documentos es un documento.
+	 * El audio sigue siendo audio.
+	 */
+	private fun aplicarTipoDestino(ids: List<Long>) {
+		if (ids.isEmpty()) return
+		val db = BaseDatos.obtener(this)
+		val tipo = carpetaDestino()?.let { db.carpeta(it)?.tipo }?.takeIf { it.isNotEmpty() }
+			?: biblioteca?.takeIf { pestana == R.id.pestana_biblioteca }?.tipoVisto ?: return
+		if (tipo == com.xebolax.lector.datos.TipoContenido.AUDIOLIBRO.name) return
+		val cambiar = ids.filter { id -> db.libro(id)?.let { !it.audio && it.claveTipo != tipo } == true }
+		db.cambiarTipo(cambiar, tipo)
+	}
 
 	private val biblioteca: LibrosFragment?
 		get() = supportFragmentManager.findFragmentByTag(etiqueta(R.id.pestana_biblioteca)) as? LibrosFragment
@@ -215,6 +232,7 @@ class BibliotecaActivity : AppCompatActivity() {
 				mensaje(getString(R.string.anadir_carpeta), getString(R.string.error_carpeta, e.message ?: ""))
 				return@launch
 			}
+			aplicarTipoDestino(r.anadidos)
 			resultado(r)
 		}
 	}
@@ -400,9 +418,11 @@ class BibliotecaActivity : AppCompatActivity() {
 			R.id.menu_anadir -> elegir(getString(R.string.anadir_libros), listOf(
 				getString(R.string.anadir_archivos) to { elegirArchivos.launch(Formato.TIPOS_MIME) },
 				getString(R.string.anadir_carpeta) to { elegirCarpeta.launch(null) },
-				getString(R.string.abrir_pagina_web) to { abrirWeb() },
-				getString(R.string.leer_portapapeles) to { leerPortapapeles() },
+				// Opcional: todos los libros del móvil, estén donde estén (pide el permiso al usarlo)
+				getString(R.string.disp_buscar_menu) to { startActivity(Intent(this, LibrosDispositivoActivity::class.java)) },
 				getString(R.string.escanear_documento) to { elegirEscaner() },
+				// Páginas web y textos van a Compartidos (desde ahí se pueden pasar a la biblioteca)
+				getString(R.string.comp_web_o_texto) to { com.xebolax.lector.compartidos.CompartidosActivity.abrir(this) },
 			))
 			R.id.menu_orden -> {
 				val p = Preferencias(this)

@@ -91,13 +91,11 @@
 
 	<string-array name="filtros_biblioteca">
 		<item>By folder</item>
-		<item>All books</item>
+		<item>Everything, without folders</item>
 		<item>Favorites</item>
 		<item>Reading</item>
 		<item>Not started</item>
 		<item>Finished</item>
-		<item>Audiobooks</item>
-		<item>Text documents</item>
 		<item>Want to read</item>
 		<item>Abandoned</item>
 		<item>Authors</item>

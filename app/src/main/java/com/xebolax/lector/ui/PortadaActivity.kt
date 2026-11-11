@@ -27,6 +27,8 @@ import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.datos.Estado
 import com.xebolax.lector.datos.Libro
 import com.xebolax.lector.datos.Preferencias
+import com.xebolax.lector.datos.claveTipo
+import com.xebolax.lector.datos.tipoContenido
 import com.xebolax.lector.lectura.Abiertos
 import com.xebolax.lector.podcast.Episodio
 import com.xebolax.lector.podcast.Podcasts
@@ -66,6 +68,7 @@ class PortadaActivity : AppCompatActivity() {
 	/** Lo que se lee de las bases de datos (en segundo plano). */
 	private class Datos(
 		val libros: List<Libro>, val totalLibros: Int,
+		val compartidos: List<Libro>, val pendientes: Int,
 		val episodios: List<Episodio>, val totalPodcasts: Int, val novedades: Int,
 		val articulos: List<Articulo>, val sinLeer: Int,
 		val emisoras: List<Emisora>, val favoritas: Boolean,
@@ -151,6 +154,14 @@ class PortadaActivity : AppCompatActivity() {
 			libros = db.recientes(n * 2).filter { it.estado != Estado.TERMINADO }.take(n)
 			totalLibros = db.contarLibros()
 		}
+		var compartidos = emptyList<Libro>()
+		var pendientes = 0
+		if (Seccion.COMPARTIDOS in secciones) {
+			val db = BaseDatos.obtener(c)
+			compartidos = db.compartidos().filter { it.estado != Estado.TERMINADO }
+			pendientes = compartidos.size
+			compartidos = compartidos.take(n)
+		}
 		var episodios = emptyList<Episodio>()
 		var totalPodcasts = 0
 		var novedades = 0
@@ -177,7 +188,7 @@ class PortadaActivity : AppCompatActivity() {
 			// Sin favoritas, las últimas que escuchaste
 			if (!favoritas) emisoras = db.historial().map { it.emisora }.take(n)
 		}
-		return Datos(libros, totalLibros, episodios, totalPodcasts, novedades, articulos, sinLeer, emisoras, favoritas)
+		return Datos(libros, totalLibros, compartidos, pendientes, episodios, totalPodcasts, novedades, articulos, sinLeer, emisoras, favoritas)
 	}
 
 	private fun construir(secciones: List<Seccion>, d: Datos): List<Fila> {
@@ -188,6 +199,11 @@ class PortadaActivity : AppCompatActivity() {
 					else getString(R.string.portada_seguir_leyendo))
 				if (d.libros.isEmpty()) r += Fila.Vacia(s, getString(if (d.totalLibros == 0) R.string.portada_biblioteca_vacia else R.string.portada_nada_leyendo))
 				d.libros.forEach { r += filaLibro(it) }
+			}
+			Seccion.COMPARTIDOS -> {
+				r += Fila.Encabezado(s, resources.getQuantityString(R.plurals.comp_pendientes, d.pendientes, d.pendientes))
+				if (d.compartidos.isEmpty()) r += Fila.Vacia(s, getString(R.string.portada_compartidos_vacio))
+				d.compartidos.forEach { r += filaCompartido(it) }
 			}
 			Seccion.PODCASTS -> {
 				r += Fila.Encabezado(s, when {
@@ -217,8 +233,16 @@ class PortadaActivity : AppCompatActivity() {
 
 	private fun filaLibro(l: Libro): Fila {
 		val partes = listOfNotNull(l.autor.takeIf { it.isNotBlank() }, getString(R.string.porcentaje_n, l.progreso.toInt()))
-		return Fila.Elemento("libro${l.id}", if (l.audio) R.drawable.ic_voz else R.drawable.ic_libro, l.tituloVisible, partes.joinToString(" · "),
+		return Fila.Elemento("libro${l.id}", l.tipoContenido.icono, l.tituloVisible, partes.joinToString(" · "),
 			l.progreso.toInt(), { Abiertos.abrirPantalla(this, l) }, getString(R.string.abrir), { AccionesLibro.acciones(this, l) }, ZonaAcciones.LIBRO)
+	}
+
+	private fun filaCompartido(l: Libro): Fila {
+		val tipo = com.xebolax.lector.datos.Tipos.de(this, l.claveTipo)?.nombreSingular.orEmpty()
+		val sitio = l.origen.takeIf { it.startsWith("http") }?.let { runCatching { android.net.Uri.parse(it).host?.removePrefix("www.") }.getOrNull() }
+		val partes = listOfNotNull(tipo.takeIf { it.isNotBlank() }, sitio, if (l.progreso > 0) getString(R.string.porcentaje_n, l.progreso.toInt()) else null)
+		return Fila.Elemento("compartido${l.id}", R.drawable.ic_compartido, l.tituloVisible, partes.joinToString(" · "),
+			l.progreso.toInt(), { Abiertos.abrirPantalla(this, l) }, getString(R.string.abrir), { AccionesCompartido.acciones(this, l) }, ZonaAcciones.COMPARTIDO)
 	}
 
 	private fun filaEpisodio(e: Episodio, lista: List<Episodio>): Fila {

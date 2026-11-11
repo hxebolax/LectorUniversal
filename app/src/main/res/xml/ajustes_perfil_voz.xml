@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Voz propia de un libro o de las noticias: lo que se deja «Como en Ajustes» usa la voz general -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<Preference
+		android:key="vp_explicacion"
+		android:selectable="false"
+		app:iconSpaceReserved="false" />
+	<ListPreference
+		android:key="vp_motor"
+		android:title="@string/vp_motor"
+		app:iconSpaceReserved="false" />
+	<ListPreference
+		android:key="vp_idioma"
+		android:title="@string/vp_idioma_voces"
+		app:iconSpaceReserved="false" />
+	<ListPreference
+		android:key="vp_voz"
+		android:title="@string/vp_voz"
+		app:iconSpaceReserved="false" />
+	<Preference
+		android:key="vp_probar"
+		android:title="@string/vp_probar"
+		app:iconSpaceReserved="false" />
+	<SwitchPreferenceCompat
+		android:key="vp_velocidad_propia"
+		android:title="@string/vp_propia_velocidad"
+		app:iconSpaceReserved="false" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="vp_velocidad"
+		android:title="@string/vp_velocidad"
+		android:max="400"
+		app:min="10"
+		app:seekBarIncrement="5"
+		app:showSeekBarValue="true"
+		app:iconSpaceReserved="false" />
+	<SwitchPreferenceCompat
+		android:key="vp_tono_propio"
+		android:title="@string/vp_propio_tono"
+		app:iconSpaceReserved="false" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="vp_tono"
+		android:title="@string/vp_tono"
+		android:max="200"
+		app:min="25"
+		app:seekBarIncrement="5"
+		app:showSeekBarValue="true"
+		app:iconSpaceReserved="false" />
+	<ListPreference
+		android:key="vp_segun_idioma"
+		android:title="@string/vp_segun_idioma"
+		app:iconSpaceReserved="false" />
+	<SwitchPreferenceCompat
+		android:key="vp_pausa_propia"
+		android:title="@string/vp_propia_pausa"
+		app:iconSpaceReserved="false" />
+	<com.xebolax.lector.ui.DeslizadorAjuste
+		android:key="vp_pausa"
+		android:title="@string/vp_pausa_parrafos"
+		android:max="2000"
+		app:min="0"
+		app:seekBarIncrement="100"
+		app:showSeekBarValue="true"
+		app:iconSpaceReserved="false" />
+	<Preference
+		android:key="vp_restablecer"
+		android:title="@string/vp_restablecer"
+		app:iconSpaceReserved="false" />
+</PreferenceScreen>

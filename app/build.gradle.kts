@@ -26,8 +26,8 @@ android {
 		applicationId = "com.xebolax.lector"
 		minSdk = 24
 		targetSdk = 35
-		versionCode = 11
-		versionName = "1.0.10"
+		versionCode = 12
+		versionName = "1.0.11"
 
 		buildConfigField("String", "URL_ACTUALIZACIONES", "\"$urlActualizaciones\"")
 		buildConfigField("String", "REPO_GITHUB", "\"$repoGithub\"")
@@ -105,6 +105,8 @@ dependencies {
 	implementation("androidx.media3:media3-session:1.5.1")
 	// Radio (y podcasts) que emiten en HLS (.m3u8)
 	implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
+	// Decodificador FFmpeg de reserva (audio MP2 de algunas radios en HLS, AC-3, E-AC-3…): el que publica Jellyfin para Media3
+	implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
 
 	// HTML, XHTML (EPUB, MOBI, DAISY) y XML
 	implementation("org.jsoup:jsoup:1.18.3")

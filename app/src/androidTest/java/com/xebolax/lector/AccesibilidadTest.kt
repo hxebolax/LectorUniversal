@@ -209,31 +209,64 @@ class AccesibilidadTest {
 			revisar("Noticias: ${es.getString(m.nombre)}")
 		}
 
-		abrir(intent(com.xebolax.lector.ui.AjustesActivity::class.java))
-		revisar("Ajustes")
-		// Cada apartado, entrando como el usuario: tocándolo en la lista
-		val apartados = mutableListOf<String>()
-		raiz()?.let { r ->
-			val filas = mutableListOf<AccessibilityNodeInfo>()
-			fun buscar(n: AccessibilityNodeInfo) {
-				if (n.isClickable && n.className?.toString()?.endsWith("LinearLayout") == true) filas += n
-				for (k in 0 until n.childCount) n.getChild(k)?.let { buscar(it) }
-			}
-			buscar(r)
-			for (f in filas) {
-				fun primerTexto(n: AccessibilityNodeInfo): String? {
-					n.text?.toString()?.takeIf { it.isNotBlank() }?.let { return it }
-					for (k in 0 until n.childCount) n.getChild(k)?.let { h -> primerTexto(h)?.let { return it } }
-					return null
-				}
-				primerTexto(f)?.let { apartados += it }
-			}
-		}
-		for (apartado in apartados) {
+		// Ajustes, con sus pestañas abajo: cada pestaña y, en General y Biblioteca, cada apartado
+		val pestanasAjustes = listOf(R.string.aj_pestana_general, R.string.aj_pestana_biblioteca, R.string.aj_pestana_podcasts, R.string.aj_pestana_noticias, R.string.aj_pestana_radio)
+		for (p in pestanasAjustes) {
 			abrir(intent(com.xebolax.lector.ui.AjustesActivity::class.java), 2500)
-			tocar(apartado)
-			revisar("Ajustes: $apartado", 60)
+			tocar(es.getString(p), app.getString(p))
+			esperar(1500)
+			revisar("Ajustes: pestaña ${es.getString(p)}", 60)
+			if (p != R.string.aj_pestana_general && p != R.string.aj_pestana_biblioteca) continue
+			// Cada apartado, entrando como el usuario: tocándolo en la lista
+			val apartados = mutableListOf<String>()
+			raiz()?.let { r ->
+				val filas = mutableListOf<AccessibilityNodeInfo>()
+				fun buscar(n: AccessibilityNodeInfo) {
+					if (n.isClickable && n.className?.toString()?.endsWith("LinearLayout") == true) filas += n
+					for (k in 0 until n.childCount) n.getChild(k)?.let { buscar(it) }
+				}
+				buscar(r)
+				for (f in filas) {
+					fun primerTexto(n: AccessibilityNodeInfo): String? {
+						n.text?.toString()?.takeIf { it.isNotBlank() }?.let { return it }
+						for (k in 0 until n.childCount) n.getChild(k)?.let { h -> primerTexto(h)?.let { return it } }
+						return null
+					}
+					primerTexto(f)?.let { apartados += it }
+				}
+			}
+			for (apartado in apartados) {
+				abrir(intent(com.xebolax.lector.ui.AjustesActivity::class.java), 2500)
+				tocar(es.getString(p), app.getString(p))
+				esperar(1200)
+				tocar(apartado)
+				revisar("Ajustes: $apartado", 60)
+			}
 		}
+
+		// Compartidos y sus pestañas
+		abrir(intent(com.xebolax.lector.compartidos.CompartidosActivity::class.java), 3000)
+		for (m in com.xebolax.lector.compartidos.CompartidosFragment.Modo.entries) {
+			tocar(es.getString(m.nombre), app.getString(m.nombre))
+			revisar("Compartidos: ${es.getString(m.nombre)}")
+		}
+		// Pestañas y tipos de la Biblioteca, y la voz propia de un libro y de las noticias
+		abrir(intent(com.xebolax.lector.ui.PestanasBibliotecaActivity::class.java))
+		revisar("Pestañas y tipos")
+		com.xebolax.lector.voz.VozPerfilActivity.abrirLibro(app.applicationContext.let { c ->
+			object : android.content.ContextWrapper(c) {
+				override fun startActivity(i: Intent) = super.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+			}
+		}, libro, "Libro de prueba")
+		esperar(4000)
+		revisar("Voz de un libro", 30)
+		com.xebolax.lector.voz.VozPerfilActivity.abrirNoticias(app.applicationContext.let { c ->
+			object : android.content.ContextWrapper(c) {
+				override fun startActivity(i: Intent) = super.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+			}
+		})
+		esperar(4000)
+		revisar("Voz de las noticias", 30)
 
 		abrir(intent(com.xebolax.lector.ui.AccionesTalkBackActivity::class.java))
 		revisar("Acciones de TalkBack")
@@ -309,7 +342,7 @@ class AccesibilidadTest {
 		val nodos = mutableListOf<AccessibilityNodeInfo>().also { l -> raiz()?.let { recoger(it, l) } }
 		val encabezados = nodos.filter { it.isHeading }.map { nombre(it) }
 		Log.i("Portada", "Encabezados: $encabezados")
-		org.junit.Assert.assertEquals(4, encabezados.size)
+		org.junit.Assert.assertEquals(5, encabezados.size)
 		org.junit.Assert.assertTrue(encabezados[0], encabezados[0].startsWith(es.getString(R.string.seccion_biblioteca)) || encabezados[0].startsWith("Library"))
 		org.junit.Assert.assertTrue(nodos.any { nombre(it).startsWith("El vencejo") })
 		org.junit.Assert.assertTrue(nodos.any { nombre(it).startsWith("Emisora de prueba") })
@@ -336,7 +369,7 @@ class AccesibilidadTest {
 		org.junit.Assert.assertNotNull("Podcasts sin la acción Bajar", bajar)
 		podcasts!!.performAction(bajar!!.id)
 		esperar(1500)
-		org.junit.Assert.assertEquals(com.xebolax.lector.ui.Seccion.PODCASTS, com.xebolax.lector.ui.OrdenSecciones.orden(app)[2])
+		org.junit.Assert.assertEquals(com.xebolax.lector.ui.Seccion.PODCASTS, com.xebolax.lector.ui.OrdenSecciones.orden(app)[3])
 		// Doble toque: la quita de la Portada (y otra vez la vuelve a poner)
 		elemento(es.getString(R.string.podcasts))?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
 		esperar(1000)
@@ -344,7 +377,7 @@ class AccesibilidadTest {
 		abrir(intent(com.xebolax.lector.ui.PortadaActivity::class.java).setAction(Intent.ACTION_MAIN), 4000)
 		val sinPodcasts = mutableListOf<AccessibilityNodeInfo>().also { l -> raiz()?.let { recoger(it, l) } }.filter { it.isHeading }.map { nombre(it) }
 		Log.i("Portada", "Sin Podcasts: $sinPodcasts")
-		org.junit.Assert.assertEquals(3, sinPodcasts.size)
+		org.junit.Assert.assertEquals(4, sinPodcasts.size)
 		com.xebolax.lector.ui.OrdenSecciones.ponerEnPortada(app, com.xebolax.lector.ui.Seccion.PODCASTS, true)
 		com.xebolax.lector.ui.OrdenSecciones.guardar(app, com.xebolax.lector.ui.OrdenSecciones.ORDENABLES)
 

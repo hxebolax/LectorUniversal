@@ -255,6 +255,11 @@ class RssActivity : AppCompatActivity() {
 	}
 
 	private fun suscribirDireccion(direccion: String, categoria: String) {
+		// Redes que no publican RSS: se dice claramente (antes salía «no encontrada»)
+		val host = runCatching { java.net.URL(if (direccion.trim().startsWith("http")) direccion.trim() else "https://" + direccion.trim()).host.lowercase().removePrefix("www.").removePrefix("m.") }.getOrDefault("")
+		val red = listOf("facebook.com", "fb.com", "fb.watch", "instagram.com", "x.com", "twitter.com", "tiktok.com", "threads.net", "whatsapp.com", "linkedin.com")
+			.firstOrNull { host == it || host.endsWith(".$it") }
+		if (red != null) return mensaje(getString(R.string.rss_anadir_fuente), getString(R.string.rss_red_sin_rss, red))
 		lifecycleScope.launch {
 			val encontradas = runCatching { conEspera(getString(R.string.rss_anadir_fuente), getString(R.string.rss_buscando_fuente)) { Rss.descubrir(direccion) } }.getOrElse {
 				if (it is kotlinx.coroutines.CancellationException) throw it

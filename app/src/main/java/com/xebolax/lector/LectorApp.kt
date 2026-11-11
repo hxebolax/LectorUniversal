@@ -34,6 +34,9 @@ class LectorApp : Application() {
 		// Claves y contraseñas, aparte de los ajustes (copias de seguridad)
 		com.xebolax.lector.datos.Secretos.migrar(this)
 		aplicarTema(Preferencias(this).temaApp)
+		// Qué son los PDF, Word y textos que no dicen nada (Ajustes, Biblioteca)
+		com.xebolax.lector.datos.TipoContenido.ambiguosComo = com.xebolax.lector.datos.TipoContenido.de(Preferencias(this).p.getString("tipo_ambiguos", "LIBRO")) ?: com.xebolax.lector.datos.TipoContenido.LIBRO
+		com.xebolax.lector.datos.Pais.iniciar(this)
 		LectorVoz.iniciar(this)
 		ControlAudio.iniciar(this)
 		// Estadísticas: tiempo escuchando podcasts, noticias y radio

@@ -40,6 +40,8 @@ object RssLector {
 	private const val AGENTE = "Mozilla/5.0 (Android) LectorUniversal/" + BuildConfig.VERSION_NAME
 	/** Algunas webs rechazan (403) lo que no parece un navegador: se prueba una vez más como si lo fuera. */
 	private const val NAVEGADOR = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
+	/** Para YouTube: como navegador de escritorio, la página trae el id del canal sin escapar. */
+	private const val ESCRITORIO = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 
 	fun abrir(url: String, etag: String = "", modificado: String = "", usuario: String = "", clave: String = ""): HttpURLConnection {
 		var actual = url
@@ -117,6 +119,55 @@ object RssLector {
 	 * YouTube, un subreddit o usuario de Reddit, una cuenta de Mastodon
 	 * (también escrita como @usuario@servidor) o de Bluesky. null = no es de esos.
 	 */
+	/** Página de YouTube pedida como un navegador de escritorio y sin la pantalla de cookies (trae el id del canal). */
+	private fun paginaYoutube(url: String): String? = runCatching {
+		val c = URL(url).openConnection() as HttpURLConnection
+		c.connectTimeout = 15_000
+		c.readTimeout = 30_000
+		c.setRequestProperty("User-Agent", ESCRITORIO)
+		c.setRequestProperty("Accept-Language", "es,en;q=0.8")
+		c.setRequestProperty("Cookie", "CONSENT=YES+cb; SOCS=CAI")
+		try {
+			if (c.responseCode !in 200..299) null
+			else c.inputStream.use { com.xebolax.lector.modelo.Textos.decodificar(it.readBytes(), "utf-8") }
+		} finally {
+			c.disconnect()
+		}
+	}.getOrNull()
+
+	/** El id del canal (UC…) en una página de YouTube, venga como venga escrito. */
+	private fun idCanal(texto: String): String? = listOf(
+		Regex("""channel_id=(UC[\w-]{22})"""),
+		Regex(""""(?:externalId|channelId|browseId)"\s*:\s*"(UC[\w-]{22})""""),
+		Regex("""\\x22(?:externalId|channelId|browseId)\\x22:\\x22(UC[\w-]{22})"""),
+		Regex("""youtube\.com/channel/(UC[\w-]{22})"""),
+	).firstNotNullOfOrNull { it.find(texto)?.groupValues?.get(1) }
+
+	/** Id de un vídeo de YouTube en su enlace (youtu.be/ID, watch?v=ID, /shorts/ID, /live/ID). */
+	private fun idVideo(url: URL): String? {
+		val host = url.host.lowercase().removePrefix("www.").removePrefix("m.")
+		val ruta = url.path.trimEnd('/')
+		return when {
+			host == "youtu.be" -> ruta.removePrefix("/").substringBefore('/').takeIf { it.isNotBlank() }
+			host.endsWith("youtube.com") && ruta == "/watch" -> url.query?.split('&')?.firstOrNull { it.startsWith("v=") }?.removePrefix("v=")
+			host.endsWith("youtube.com") && (ruta.startsWith("/shorts/") || ruta.startsWith("/live/")) -> ruta.split('/').getOrNull(2)
+			else -> null
+		}
+	}
+
+	/**
+	 * La fuente del canal de un vídeo de YouTube (lo que comparte la app de
+	 * YouTube es casi siempre un vídeo): oEmbed da la página del canal, y de
+	 * ella se saca su id.
+	 */
+	private fun canalDeVideo(id: String): String? {
+		val video = "https://www.youtube.com/watch?v=$id"
+		val oembed = runCatching { descargarTexto("https://www.youtube.com/oembed?format=json&url=" + java.net.URLEncoder.encode(video, "UTF-8")) }.getOrNull()
+		val canal = oembed?.let { runCatching { JSONObject(it).optString("author_url") }.getOrNull() }?.takeIf { it.isNotBlank() }
+		val texto = (canal?.let { paginaYoutube(it) }) ?: paginaYoutube(video) ?: return null
+		return idCanal(texto)
+	}
+
 	fun atajo(direccion: String): String? {
 		val d = direccion.trim()
 		Regex("""^@?([\w.]+)@([\w.-]+\.[a-z]{2,})$""", RegexOption.IGNORE_CASE).matchEntire(d)?.let { m ->
@@ -128,10 +179,12 @@ object RssLector {
 		return when {
 			host.endsWith("youtube.com") && ruta.startsWith("/channel/") -> "https://www.youtube.com/feeds/videos.xml?channel_id=" + ruta.removePrefix("/channel/").substringBefore('/')
 			host.endsWith("youtube.com") && ruta == "/playlist" -> url.query?.split('&')?.firstOrNull { it.startsWith("list=") }?.let { "https://www.youtube.com/feeds/videos.xml?playlist_id=" + it.removePrefix("list=") }
+			// Un vídeo (lo que comparte la app de YouTube): la fuente de su canal
+			idVideo(url) != null -> canalDeVideo(idVideo(url)!!)?.let { "https://www.youtube.com/feeds/videos.xml?channel_id=$it" }
 			host.endsWith("youtube.com") && (ruta.startsWith("/@") || ruta.startsWith("/c/") || ruta.startsWith("/user/")) -> {
-				// La página del canal trae su identificador
-				val texto = runCatching { descargarTexto(url.toString()) }.getOrNull() ?: return null
-				Regex(""""(?:channelId|externalId)":"(UC[\w-]{20,})"""").find(texto)?.groupValues?.get(1)?.let { "https://www.youtube.com/feeds/videos.xml?channel_id=$it" }
+				// La página del canal (pedida como un navegador de escritorio) trae su identificador
+				val texto = paginaYoutube("https://www.youtube.com" + ruta.split('/').take(2).joinToString("/")) ?: return null
+				idCanal(texto)?.let { "https://www.youtube.com/feeds/videos.xml?channel_id=$it" }
 			}
 			host == "reddit.com" && (ruta.startsWith("/r/") || ruta.startsWith("/user/") || ruta.startsWith("/u/")) -> "https://www.reddit.com$ruta/.rss"
 			host == "bsky.app" && ruta.startsWith("/profile/") -> "https://bsky.app${ruta.substringBefore("/post")}/rss"
@@ -149,17 +202,36 @@ object RssLector {
 		val texto = descargarTexto(url)
 		if (esFuente(texto)) return listOf(leer(texto, url).titulo.ifBlank { url } to url)
 		val doc = Jsoup.parse(texto, url)
-		val anunciadas = doc.select("link[rel~=(?i)alternate][type~=(?i)(rss|atom|feed\\+json|json)]").map { l ->
-			l.attr("title").ifBlank { doc.title() }.ifBlank { url } to l.absUrl("href")
-		}.filter { it.second.isNotBlank() }.distinctBy { it.second }
+		val anunciadas = anunciadasEn(doc, url)
 		if (anunciadas.isNotEmpty()) return anunciadas
+		// La dirección de un artículo: las de la portada del sitio
 		val raiz = URL(URL(url), "/").toString().trimEnd('/')
-		for (ruta in listOf("/feed", "/rss", "/feed.xml", "/rss.xml", "/atom.xml", "/index.xml", "/feed/", "/rss/")) {
+		if (raiz.trimEnd('/') != url.trimEnd('/')) {
+			runCatching { descargarTexto(raiz) }.getOrNull()?.let { t -> anunciadasEn(Jsoup.parse(t, raiz), raiz).takeIf { it.isNotEmpty() }?.let { return it } }
+		}
+		for (ruta in listOf("/feed", "/rss", "/feed.xml", "/rss.xml", "/atom.xml", "/index.xml", "/index.rss", "/feeds/posts/default", "/?feed=rss2", "/feed/", "/rss/")) {
 			val prueba = raiz + ruta
 			val ok = runCatching { esFuente(descargarTexto(prueba)) }.getOrDefault(false)
 			if (ok) return listOf(doc.title().ifBlank { prueba } to prueba)
 		}
 		return emptyList()
+	}
+
+	/**
+	 * Las fuentes que anuncia una página: solo RSS, Atom, RDF y JSON Feed (no
+	 * el oEmbed ni la API JSON de WordPress, que no son fuentes), las de
+	 * comentarios al final, y comprobando que de verdad se leen como fuente.
+	 */
+	private fun anunciadasEn(doc: org.jsoup.nodes.Document, url: String): List<Pair<String, String>> {
+		val todas = doc.select("link[rel~=(?i)alternate][type]").filter { l ->
+			val tipo = l.attr("type").lowercase()
+			(tipo.contains("rss") || tipo.contains("atom") || tipo.contains("rdf") || tipo.contains("feed+json")) && !tipo.contains("oembed")
+		}.map { l -> l.attr("title").ifBlank { doc.title() }.ifBlank { url } to l.absUrl("href") }
+			.filter { it.second.isNotBlank() }.distinctBy { it.second }
+			.sortedBy { (titulo, enlace) -> titulo.contains("coment", true) || titulo.contains("comment", true) || enlace.contains("/comments/") }
+		// Se comprueban (como mucho 5): algunas webs anuncian fuentes que ya no existen
+		val buenas = todas.take(5).filter { (_, enlace) -> runCatching { esFuente(descargarTexto(enlace)) }.getOrDefault(false) }
+		return buenas.ifEmpty { if (todas.size > 5) todas.drop(5) else emptyList() }
 	}
 
 	// --- Formatos -------------------------------------------------------------------------
@@ -176,6 +248,10 @@ object RssLector {
 		// Atom type="xhtml" trae elementos; lo demás es texto (HTML escapado o en CDATA)
 		return if (e.children().isNotEmpty()) e.html().trim() else e.wholeText().trim()
 	}
+
+	/** Texto con saltos de línea (la descripción de un vídeo) como párrafos HTML. */
+	private fun textoAHtml(t: String): String = if (t.isBlank()) "" else t.split(Regex("\n\\s*\n|\n")).map { it.trim() }.filter { it.isNotEmpty() }
+		.joinToString("") { "<p>" + org.jsoup.nodes.Entities.escape(it) + "</p>" }
 
 	private fun textoPlano(s: String): String = if (s.contains('<')) Jsoup.parse(s).text().trim() else Parser.unescapeEntities(s, false).trim()
 
@@ -216,8 +292,10 @@ object RssLector {
 			val enlace = (enlaces.firstOrNull { it.attr("rel").isEmpty() || it.attr("rel") == "alternate" } ?: enlaces.firstOrNull())
 				?.attr("href")?.let { absoluta(base, it) }.orEmpty()
 			val adjunto = enlaces.firstOrNull { it.attr("rel") == "enclosure" }
-			val contenido = html(hijo(e, "content"))
-			val resumen = html(hijo(e, "summary"))
+			// YouTube (y otros) ponen la descripción en media:group/media:description: es el texto del vídeo
+			val media = hijo(e, "group")?.let { g -> hijo(g, "description") }?.wholeText()?.trim().orEmpty()
+			val contenido = html(hijo(e, "content")).ifBlank { textoAHtml(media) }
+			val resumen = html(hijo(e, "summary")).ifBlank { media.take(600) }
 			Elemento(
 				guid = hijo(e, "id")?.text()?.trim().orEmpty().ifBlank { enlace },
 				titulo = textoPlano(html(hijo(e, "title"))),

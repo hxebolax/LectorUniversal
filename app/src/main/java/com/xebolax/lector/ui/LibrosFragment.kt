@@ -21,23 +21,29 @@ import com.google.android.material.textfield.TextInputLayout
 import com.xebolax.lector.R
 import com.xebolax.lector.databinding.FragmentLibrosBinding
 import com.xebolax.lector.datos.BaseDatos
+import com.xebolax.lector.datos.Carpeta
 import com.xebolax.lector.datos.Estado
 import com.xebolax.lector.datos.Libro
 import com.xebolax.lector.datos.Preferencias
+import com.xebolax.lector.datos.TipoContenido
+import com.xebolax.lector.datos.Tipos
+import com.xebolax.lector.datos.claveTipo
 import com.xebolax.lector.lectura.Abiertos
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * Pestañas con libros:
  * - Leyendo: los abiertos recientemente (el primero, el último que se leyó).
- * - Biblioteca: las carpetas de la biblioteca y los libros de la carpeta en
- *   la que se está, como en un explorador de archivos (la primera fila sube
- *   a la carpeta anterior, y también Atrás). Al buscar o al elegir otro
- *   filtro (todos, favoritos, leyendo, sin empezar, terminados, audio,
- *   texto) se ven los libros de todas las carpetas juntos, cada uno con la
- *   carpeta en la que está.
+ * - Biblioteca: arriba, qué se quiere ver (todo, libros, documentos,
+ *   audiolibros, páginas web o los tipos propios, en el orden y con las
+ *   pestañas elegidas en Ajustes); debajo, las carpetas de ese tipo y lo que
+ *   hay en la carpeta en la que se está, como en un explorador de archivos (la primera
+ *   fila sube a la carpeta anterior, y también Atrás). Al buscar o al elegir
+ *   otro filtro (todos, favoritos, leyendo, sin empezar, terminados…) se ve
+ *   lo de todas las carpetas junto, cada uno con la carpeta en la que está.
  */
 class LibrosFragment : Fragment() {
 
@@ -45,11 +51,13 @@ class LibrosFragment : Fragment() {
 
 	companion object {
 		private const val MODO = "modo"
+		/** Pestaña de tipo elegida (se recuerda al volver a la app). */
+		private const val PREF_TIPO = "biblioteca_tipo"
 		fun nuevo(modo: Modo) = LibrosFragment().apply { arguments = bundleOf(MODO to modo.name) }
 	}
 
-	/** El primero (por carpetas) es la vista normal; los demás muestran todos los libros juntos. */
-	enum class Filtro { CARPETAS, TODOS, FAVORITOS, LEYENDO, NUEVOS, TERMINADOS, AUDIO, TEXTO, QUIERO_LEER, ABANDONADOS, AUTORES, SERIES, COLECCIONES }
+	/** El primero (por carpetas) es la vista normal; los demás muestran todo junto. */
+	enum class Filtro { CARPETAS, TODOS, FAVORITOS, LEYENDO, NUEVOS, TERMINADOS, QUIERO_LEER, ABANDONADOS, AUTORES, SERIES, COLECCIONES }
 
 	/** Vistas por grupos: se entra en un autor, una serie o una colección como en una carpeta. */
 	private val porGrupos get() = filtro in setOf(Filtro.AUTORES, Filtro.SERIES, Filtro.COLECCIONES) && busqueda.isBlank()
@@ -69,17 +77,37 @@ class LibrosFragment : Fragment() {
 	private var titulo: TextView? = null
 	private var campoBusqueda: TextInputEditText? = null
 	private var botonSeleccion: MaterialButton? = null
+	private var pestanasTipo: PestanasArriba? = null
 	/** Libros seleccionados (acciones para varios a la vez). */
 	private val seleccionados = linkedSetOf<Long>()
+	private var carga: Job? = null
 
 	/** Carpeta abierta (null = raíz de la biblioteca). Los libros que se añaden van a ella. */
 	var carpetaActual: Long? = null
 		private set
 
+	/** Clave del tipo que se está viendo (Tipos.TODO = todo). Lo que se añade aquí se guarda con ese tipo. */
+	var tipoActual: String = Tipos.TODO
+		private set
+
+	/** El tipo que se está viendo, o null en «Todo». */
+	val tipoVisto: String? get() = tipoActual.takeIf { it != Tipos.TODO }
+
 	/** ¿Se está viendo la biblioteca por carpetas (y no una búsqueda o un filtro)? */
 	val porCarpetas: Boolean get() = modo == Modo.BIBLIOTECA && filtro == Filtro.CARPETAS && busqueda.isBlank()
 
-	private val oyente = BaseDatos.Oyente { view?.post { recargar() } }
+	/**
+	 * La biblioteca cambió: se recarga una sola vez aunque lleguen muchos
+	 * avisos seguidos (al añadir una carpeta, cada libro avisa al leer sus
+	 * datos; antes la lista se rehacía con cada uno y TalkBack saltaba).
+	 */
+	private val recargaDiferida = Runnable { recargar() }
+	private val oyente = BaseDatos.Oyente {
+		view?.let { v ->
+			v.removeCallbacks(recargaDiferida)
+			v.postDelayed(recargaDiferida, 400)
+		}
+	}
 
 	override fun onCreateView(inflador: LayoutInflater, contenedor: ViewGroup?, estado: Bundle?): View {
 		_b = FragmentLibrosBinding.inflate(inflador, contenedor, false)
@@ -90,10 +118,12 @@ class LibrosFragment : Fragment() {
 		modo = runCatching { Modo.valueOf(requireArguments().getString(MODO, Modo.RECIENTES.name)) }.getOrDefault(Modo.BIBLIOTECA)
 		carpetaActual = estado?.getLong("carpeta", -1)?.takeIf { it >= 0 }
 		filtro = estado?.getString("filtro")?.let { runCatching { Filtro.valueOf(it) }.getOrNull() } ?: Filtro.CARPETAS
+		tipoActual = if (modo == Modo.BIBLIOTECA) Preferencias(requireContext()).p.getString(PREF_TIPO, null) ?: Tipos.TODO else Tipos.TODO
 		val actividad = requireActivity() as AppCompatActivity
 		adaptador = AdaptadorLibros(actividad, ::alAbrir, ::accionesDe)
 		b.recycler.layoutManager = LinearLayoutManager(requireContext())
 		b.recycler.sinFocoPropio()
+		b.recycler.sinAnimarCambios()
 		b.recycler.adapter = adaptador
 		if (modo == Modo.BIBLIOTECA) construirCabecera()
 		recargar()
@@ -108,11 +138,26 @@ class LibrosFragment : Fragment() {
 	override fun onStart() {
 		super.onStart()
 		db.suscribir(oyente)
+		// Las pestañas pueden haber cambiado en Ajustes (orden, cuáles se ven, tipos nuevos)
+		ponerPestanasTipo()
 		recargar()
+	}
+
+	/** Las pestañas de arriba: las elegidas en Ajustes, en su orden. Si la vista ya no existe, se vuelve a la primera. */
+	private fun ponerPestanasTipo() {
+		val p = pestanasTipo ?: return
+		val c = requireContext()
+		val visibles = Tipos.visibles(c)
+		if (tipoActual !in visibles) {
+			tipoActual = visibles.first()
+			carpetaActual = null
+		}
+		p.poner(visibles.map { it to Tipos.nombre(c, it) }, tipoActual) { elegirTipo(it) }
 	}
 
 	override fun onStop() {
 		db.desuscribir(oyente)
+		view?.removeCallbacks(recargaDiferida)
 		super.onStop()
 	}
 
@@ -123,7 +168,7 @@ class LibrosFragment : Fragment() {
 
 	private fun construirCabecera() {
 		val c = requireContext()
-		// Dónde se está: "Biblioteca" o "Biblioteca › Novela › Clásicos" (encabezado)
+		// Dónde se está: "Biblioteca" o "Documentos › Apuntes › Historia" (encabezado)
 		val fila = LinearLayout(c).apply {
 			orientation = LinearLayout.HORIZONTAL
 			gravity = Gravity.CENTER_VERTICAL
@@ -142,6 +187,11 @@ class LibrosFragment : Fragment() {
 		}
 		fila.addView(botonNuevaCarpeta)
 		b.cabecera.addView(fila)
+
+		// Qué se ve: todo, libros, documentos, audiolibros, páginas web o un tipo propio (pestañas de arriba)
+		pestanasTipo = PestanasArriba(c)
+		b.cabecera.addView(pestanasTipo, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+		ponerPestanasTipo()
 
 		val (contenedor, campo) = c.campoTexto(getString(R.string.buscar_en_biblioteca))
 		(contenedor as TextInputLayout).endIconMode = TextInputLayout.END_ICON_CLEAR_TEXT
@@ -173,6 +223,22 @@ class LibrosFragment : Fragment() {
 		actualizarCabecera()
 	}
 
+	/**
+	 * Cambia lo que se ve (todo, libros, documentos…). Cada tipo tiene sus
+	 * carpetas: si la carpeta abierta es de otro tipo, se vuelve a la raíz.
+	 */
+	private fun elegirTipo(tipo: String) {
+		if (tipo == tipoActual) return
+		tipoActual = tipo
+		grupo = null
+		carpetaActual?.let { id -> db.carpeta(id)?.tipo?.let { t -> if (t.isNotEmpty() && t != tipo && tipo != Tipos.TODO) carpetaActual = null } }
+		Preferencias(requireContext()).p.edit().putString(PREF_TIPO, tipo).apply()
+		recargar()
+	}
+
+	/** Nombre de lo que se ve: «Biblioteca» (todo) o «Documentos». */
+	private fun nombreVista(): String = tipoVisto?.let { Tipos.nombre(requireContext(), it) } ?: getString(R.string.pestana_biblioteca)
+
 	private fun actualizarCabecera() {
 		val nombres = resources.getStringArray(R.array.filtros_biblioteca)
 		botonFiltro?.text = getString(R.string.mostrar_x, nombres[filtro.ordinal])
@@ -183,8 +249,8 @@ class LibrosFragment : Fragment() {
 		titulo?.text = when {
 			busqueda.isNotBlank() -> getString(R.string.resultados_busqueda_biblioteca)
 			porGrupos && grupo != null -> nombres[filtro.ordinal] + " › " + nombreGrupo(grupo!!)
-			filtro != Filtro.CARPETAS -> nombres[filtro.ordinal]
-			else -> listOf(getString(R.string.pestana_biblioteca)).plus(
+			filtro != Filtro.CARPETAS -> listOf(nombreVista(), nombres[filtro.ordinal]).joinToString(" › ")
+			else -> listOf(nombreVista()).plus(
 				carpetaActual?.let { db.rutaCarpeta(it) }?.takeIf { it.isNotBlank() }?.let { listOf(it) }.orEmpty()
 			).joinToString(" › ")
 		}
@@ -215,7 +281,8 @@ class LibrosFragment : Fragment() {
 		if (filtro == Filtro.COLECCIONES) return nuevaColeccion()
 		requireContext().pedirTexto(getString(R.string.nueva_carpeta), getString(R.string.nombre)) { nombre ->
 			if (nombre.isNotBlank()) {
-				db.crearCarpeta(nombre, carpetaActual)
+				// En la pestaña de un tipo, la carpeta es de ese tipo (solo se ve ahí y en Todo)
+				db.crearCarpeta(nombre, carpetaActual, tipoVisto.orEmpty())
 				(activity as? AppCompatActivity)?.avisar(getString(R.string.carpeta_creada, nombre))
 			}
 		}
@@ -237,104 +304,184 @@ class LibrosFragment : Fragment() {
 	}
 
 	private fun anunciarCarpeta() {
-		val nombre = carpetaActual?.let { db.carpeta(it)?.nombre } ?: getString(R.string.pestana_biblioteca)
+		val nombre = carpetaActual?.let { db.carpeta(it)?.nombre } ?: nombreVista()
 		(activity as? AppCompatActivity)?.avisar(getString(R.string.carpeta_x, nombre), mostrar = false)
 	}
 
+	/** Lo que se ve, ya calculado fuera del hilo principal. */
+	private class Vista(val filas: List<Fila>, val estado: String)
+
 	fun recargar() {
 		if (_b == null) return
-		val orden = Preferencias(requireContext()).ordenBiblioteca
+		val c = requireContext()
+		val orden = Preferencias(c).ordenBiblioteca
 		val carpeta = carpetaActual
 		val vistaCarpetas = porCarpetas
-		val texto = busqueda
+		val texto = busqueda.trim()
 		val filtroActual = filtro
 		val grupos = porGrupos
 		val grupoActual = grupo
-		viewLifecycleOwner.lifecycleScope.launch {
-			val filas = withContext(Dispatchers.IO) {
-				when {
-					modo == Modo.RECIENTES -> db.recientes().map { Fila.DeLibro(it, db.rutaCarpeta(it.carpeta)) }
-					grupos && grupoActual == null -> when (filtroActual) {
-						Filtro.AUTORES -> db.autores().map { (n, c) -> Fila.Grupo(n, n, c) }
-						Filtro.SERIES -> db.series().map { (n, c) -> Fila.Grupo(n, n, c) }
-						else -> db.colecciones().map { c -> Fila.Grupo(c.id.toString(), c.nombre, c.libros) }
-					}
-					grupos -> listOf<Fila>(Fila.Subir(resources.getStringArray(R.array.filtros_biblioteca)[filtroActual.ordinal])) + when (filtroActual) {
-						Filtro.AUTORES -> db.deAutor(grupoActual!!, orden)
-						Filtro.SERIES -> db.deSerie(grupoActual!!)
-						else -> db.deColeccion(grupoActual!!.toLongOrNull() ?: -1, orden)
-					}.map { Fila.DeLibro(it, db.rutaCarpeta(it.carpeta)) }
-					vistaCarpetas -> {
-						val lista = mutableListOf<Fila>()
-						if (carpeta != null) {
-							val padre = db.carpeta(carpeta)?.padre
-							lista += Fila.Subir(padre?.let { db.carpeta(it)?.nombre } ?: getString(R.string.pestana_biblioteca))
+		val tipo = tipoVisto
+		val subirA = nombreVista()
+		val res = c.resources
+		val vistaNombre = nombreVista()
+		carga?.cancel()
+		carga = viewLifecycleOwner.lifecycleScope.launch {
+			val vista = withContext(Dispatchers.IO) {
+				// Todo de una vez y en memoria: con muchas carpetas y libros, una consulta por fila era muy lenta
+				val carpetas = db.todasLasCarpetas()
+				val porId = carpetas.associateBy { it.id }
+				val hijas = carpetas.groupBy { it.padre }
+				val rutas = HashMap<Long, String>()
+				fun ruta(id: Long?): String {
+					if (id == null) return ""
+					return rutas.getOrPut(id) {
+						val nombres = ArrayList<String>()
+						var actual = porId[id]
+						var vueltas = 0
+						while (actual != null && vueltas++ < 30) {
+							nombres.add(0, actual.nombre)
+							actual = actual.padre?.let { porId[it] }
 						}
-						db.carpetas(carpeta).forEach { c -> lista += Fila.DeCarpeta(c, db.contarEnCarpeta(c.id), db.carpetas(c.id).size) }
-						db.deCarpeta(carpeta, orden).forEach { lista += Fila.DeLibro(it) }
-						lista
+						nombres.joinToString(" › ")
+					}
+				}
+				val conTipo = tipo == null
+				val nombresTipos = Tipos.todos(c).associate { it.clave to it.nombreSingular }
+				fun deLibro(l: Libro, conRuta: Boolean = true) = Fila.DeLibro(l, if (conRuta) ruta(l.carpeta) else "", conTipo, nombresTipos[l.claveTipo].orEmpty())
+
+				if (modo == Modo.RECIENTES) {
+					val filas = db.recientes().map { Fila.DeLibro(it, ruta(it.carpeta), conTipo = true, nombreTipo = nombresTipos[it.claveTipo].orEmpty()) }
+					return@withContext Vista(filas, if (filas.isEmpty()) res.getString(R.string.vacio_recientes) else contar(res, filas.size, null))
+				}
+
+				val todos = db.todos(orden)
+				val delTipo = if (tipo == null) todos else todos.filter { it.claveTipo == tipo }
+
+				when {
+					grupos && grupoActual == null -> {
+						val filas = when (filtroActual) {
+							Filtro.AUTORES -> delTipo.filter { it.autor.isNotBlank() }.groupBy { it.autor.trim().lowercase() }.values
+								.map { l -> Fila.Grupo(l.first().autor.trim(), l.first().autor.trim(), l.size) }.sortedBy { it.nombre.lowercase() }
+							Filtro.SERIES -> delTipo.filter { it.serie.isNotBlank() }.groupBy { it.serie.trim().lowercase() }.values
+								.map { l -> Fila.Grupo(l.first().serie.trim(), l.first().serie.trim(), l.size) }.sortedBy { it.nombre.lowercase() }
+							else -> db.colecciones().map { col ->
+								val n = if (tipo == null) col.libros else db.deColeccion(col.id, orden).count { it.claveTipo == tipo }
+								Fila.Grupo(col.id.toString(), col.nombre, n)
+							}
+						}
+						val estado = if (filas.isEmpty()) res.getString(when (filtroActual) {
+							Filtro.COLECCIONES -> R.string.sin_colecciones
+							Filtro.SERIES -> R.string.sin_series
+							else -> R.string.sin_libros
+						}) else contar(res, filas.sumOf { it.libros }, tipo)
+						Vista(filas, estado)
+					}
+					grupos -> {
+						val lista = when (filtroActual) {
+							Filtro.AUTORES -> delTipo.filter { it.autor.trim().equals(grupoActual, ignoreCase = true) }
+							Filtro.SERIES -> delTipo.filter { it.serie.trim().equals(grupoActual, ignoreCase = true) }.sortedWith(compareBy({ it.numeroSerie }, { it.tituloVisible.lowercase() }))
+							else -> db.deColeccion(grupoActual!!.toLongOrNull() ?: -1, orden).filter { tipo == null || it.claveTipo == tipo }
+						}
+						val nombre = res.getStringArray(R.array.filtros_biblioteca)[filtroActual.ordinal]
+						Vista(listOf<Fila>(Fila.Subir(nombre)) + lista.map { deLibro(it) }, if (lista.isEmpty()) res.getString(R.string.sin_libros) else contar(res, lista.size, tipo))
+					}
+					vistaCarpetas -> {
+						// Cuántos hay de este tipo en cada carpeta, contando sus subcarpetas
+						val directos = delTipo.groupingBy { it.carpeta }.eachCount()
+						val cualquiera = todos.groupingBy { it.carpeta }.eachCount()
+						val total = HashMap<Long, Pair<Int, Int>>()
+						fun cuenta(id: Long): Pair<Int, Int> = total.getOrPut(id) {
+							var deTipo = directos[id] ?: 0
+							var todo = cualquiera[id] ?: 0
+							hijas[id].orEmpty().forEach { h -> cuenta(h.id).let { deTipo += it.first; todo += it.second } }
+							deTipo to todo
+						}
+						val filas = mutableListOf<Fila>()
+						if (carpeta != null) filas += Fila.Subir(porId[carpeta]?.padre?.let { porId[it]?.nombre } ?: subirA)
+						// Cada tipo, sus carpetas: las creadas en su pestaña y las de cualquier tipo que tienen algo de este
+						// (o están vacías, para poder llenarlas). En «Todo», todas.
+						fun seVe(h: Carpeta): Boolean {
+							if (tipo == null || h.tipo == tipo) return true
+							if (h.tipo.isNotEmpty()) return false
+							val (deTipo, todo) = cuenta(h.id)
+							return deTipo > 0 || todo == 0
+						}
+						hijas[carpeta].orEmpty().sortedWith(compareBy<Carpeta>({ it.orden }, { it.nombre.lowercase() })).forEach { h ->
+							if (seVe(h)) filas += Fila.DeCarpeta(h, cuenta(h.id).first, hijas[h.id].orEmpty().count { seVe(it) }, if (tipo == null) nombresTipos[h.tipo].orEmpty() else "")
+						}
+						val libros = delTipo.filter { it.carpeta == carpeta }
+						libros.forEach { filas += deLibro(it, conRuta = false) }
+						val nCarpetas = filas.count { it is Fila.DeCarpeta }
+						val estado = when {
+							filas.isEmpty() && carpeta == null && tipo == null -> res.getString(R.string.vacio_biblioteca)
+							filas.isEmpty() && carpeta == null -> res.getString(R.string.vacio_tipo, vistaNombre.lowercase())
+							nCarpetas == 0 && libros.isEmpty() -> res.getString(R.string.carpeta_vacia)
+							else -> listOfNotNull(
+								nCarpetas.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.carpetas, it, it) },
+								contar(res, libros.size, tipo),
+							).joinToString(", ")
+						}
+						Vista(filas, estado)
 					}
 					else -> {
-						val base: List<Libro> = if (texto.isNotBlank()) db.buscarLibros(texto, orden) else db.todos(orden)
+						val base = if (texto.isBlank()) delTipo else delTipo.filter { l ->
+							l.titulo.contains(texto, true) || l.autor.contains(texto, true) || l.nombre.contains(texto, true)
+						}
 						val filas = mutableListOf<Fila>()
 						// Al buscar también salen las carpetas cuyo nombre coincide
-						if (texto.isNotBlank()) db.todasLasCarpetas().filter { it.nombre.contains(texto.trim(), ignoreCase = true) }
-							.forEach { c -> filas += Fila.DeCarpeta(c, db.contarEnCarpeta(c.id), db.carpetas(c.id).size) }
-						base.filter { l ->
+						if (texto.isNotBlank()) carpetas.filter { it.nombre.contains(texto, ignoreCase = true) }
+							.forEach { h -> filas += Fila.DeCarpeta(h, todos.count { it.carpeta == h.id }, hijas[h.id].orEmpty().size) }
+						val libros = base.filter { l ->
 							when (filtroActual) {
-								Filtro.CARPETAS, Filtro.TODOS -> true
 								Filtro.FAVORITOS -> l.favorito
 								Filtro.LEYENDO -> l.estado == Estado.LEYENDO
 								Filtro.NUEVOS -> l.estado == Estado.NUEVO
 								Filtro.TERMINADOS -> l.estado == Estado.TERMINADO
-								Filtro.AUDIO -> l.audio
-								Filtro.TEXTO -> !l.audio
 								Filtro.QUIERO_LEER -> l.estado == Estado.QUIERO_LEER
 								Filtro.ABANDONADOS -> l.estado == Estado.ABANDONADO
-								// Buscando en una vista por grupos: todos los que coinciden
-								Filtro.AUTORES, Filtro.SERIES, Filtro.COLECCIONES -> true
+								// Todos, o buscando en una vista por grupos: todos los que coinciden
+								else -> true
 							}
-						}.forEach { filas += Fila.DeLibro(it, db.rutaCarpeta(it.carpeta)) }
-						filas
+						}
+						libros.forEach { filas += deLibro(it) }
+						Vista(filas, if (filas.isEmpty()) res.getString(R.string.sin_resultados_tipo, vistaNombre.lowercase()) else listOfNotNull(
+							filas.count { it is Fila.DeCarpeta }.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.carpetas, it, it) },
+							contar(res, libros.size, tipo),
+						).joinToString(", "))
 					}
 				}
 			}
 			if (_b == null) return@launch
 			// Los libros quitados de la biblioteca dejan de estar seleccionados
 			if (seleccionados.isNotEmpty()) {
-				val existen = withContext(Dispatchers.IO) { seleccionados.filter { db.libro(it) != null } }
-				seleccionados.retainAll(existen.toSet())
+				val existen = vista.filas.mapNotNull { (it as? Fila.DeLibro)?.libro?.id }.toSet()
+				val quitados = withContext(Dispatchers.IO) { seleccionados.filter { it !in existen && db.libro(it)?.takeIf { l -> !l.compartido } == null } }
+				seleccionados.removeAll(quitados.toSet())
 			}
 			adaptador.seleccionados = seleccionados.toSet()
-			adaptador.reemplazar(filas)
+			adaptador.reemplazar(vista.filas)
 			actualizarCabecera()
-			b.estado.text = when {
-				filas.isEmpty() && modo == Modo.RECIENTES -> getString(R.string.vacio_recientes)
-				filas.isEmpty() && vistaCarpetas && carpeta == null -> getString(R.string.vacio_biblioteca)
-				filas.none { it !is Fila.Subir } && vistaCarpetas -> getString(R.string.carpeta_vacia)
-				filas.isEmpty() && grupos && grupoActual == null -> getString(when (filtroActual) {
-					Filtro.COLECCIONES -> R.string.sin_colecciones
-					Filtro.SERIES -> R.string.sin_series
-					else -> R.string.sin_libros
-				})
-				filas.isEmpty() -> getString(R.string.sin_libros)
-				else -> {
-					val libros = filas.count { it is Fila.DeLibro } + filas.filterIsInstance<Fila.Grupo>().sumOf { it.libros }
-					val carpetas = filas.count { it is Fila.DeCarpeta }
-					listOfNotNull(
-						carpetas.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.carpetas, it, it) },
-						resources.getQuantityString(R.plurals.libros, libros, libros),
-					).joinToString(", ")
-				}
-			}
+			// Solo si cambia: la línea de estado es una región viva y TalkBack la leería en cada recarga
+			if (b.estado.text.toString() != vista.estado) b.estado.text = vista.estado
 		}
 	}
+
+	/** «3 libros», «1 documento», «5 elementos» (todo y tipos propios). */
+	private fun contar(res: android.content.res.Resources, n: Int, tipo: String?): String = res.getQuantityString(when (TipoContenido.de(tipo)) {
+		null -> R.plurals.elementos
+		TipoContenido.LIBRO -> R.plurals.libros
+		TipoContenido.DOCUMENTO -> R.plurals.documentos
+		TipoContenido.AUDIOLIBRO -> R.plurals.audiolibros
+		TipoContenido.WEB -> R.plurals.paginas_web
+	}, n, n)
 
 	private fun alAbrir(fila: Fila) {
 		val a = activity as? AppCompatActivity ?: return
 		when (fila) {
 			// Con libros seleccionados, tocar otro lo selecciona (o lo quita)
 			is Fila.DeLibro -> if (seleccionados.isNotEmpty()) alternarSeleccion(fila.libro) else Abiertos.abrirPantalla(a, fila.libro)
+			is Fila.DeCompartido -> Abiertos.abrirPantalla(a, fila.libro)
 			is Fila.DeCarpeta -> {
 				// Desde una búsqueda o un filtro, abrir una carpeta vuelve a la vista por carpetas
 				filtro = Filtro.CARPETAS
@@ -363,7 +510,6 @@ class LibrosFragment : Fragment() {
 			else getString(R.string.deseleccionado_n, l.tituloVisible, seleccionados.size)
 		)
 		adaptador.seleccionados = seleccionados.toSet()
-		adaptador.notifyDataSetChanged()
 		actualizarCabecera()
 	}
 
@@ -383,6 +529,12 @@ class LibrosFragment : Fragment() {
 				AccionesLibro.elegirCarpeta(a, getString(R.string.mover_a_carpeta), null) { destino ->
 					ids.forEach { db.moverLibro(it, destino) }
 					hecho(getString(R.string.movido_a, if (destino == null) getString(R.string.biblioteca_raiz) else db.rutaCarpeta(destino)))
+				}
+			},
+			getString(R.string.cambiar_tipo) to {
+				AccionesLibro.elegirTipo(a, null) { tipo ->
+					db.cambiarTipo(ids, tipo)
+					hecho(getString(R.string.tipo_cambiado, AccionesLibro.nombreTipo(a, tipo)))
 				}
 			},
 			getString(R.string.anadir_favoritos) to { ids.forEach { db.cambiarFavorito(it, true) }; hecho(getString(R.string.anadido_favoritos)) },
@@ -415,7 +567,6 @@ class LibrosFragment : Fragment() {
 				adaptador.filas.forEach { if (it is Fila.DeLibro) seleccionados += it.libro.id }
 				a.avisar(resources.getQuantityString(R.plurals.seleccionados_acciones, seleccionados.size, seleccionados.size))
 				adaptador.seleccionados = seleccionados.toSet()
-				adaptador.notifyDataSetChanged()
 				actualizarCabecera()
 			},
 			getString(R.string.quitar_toda_seleccion) to { hecho(getString(R.string.seleccion_vacia)) },
@@ -430,6 +581,7 @@ class LibrosFragment : Fragment() {
 				val seleccion = (if (l.id in seleccionados) getString(R.string.quitar_seleccion) else getString(R.string.seleccionar)) to { alternarSeleccion(l) }
 				listOf(seleccion) + AccionesLibro.acciones(a, l)
 			}
+			is Fila.DeCompartido -> AccionesCompartido.acciones(a, fila.libro)
 			is Fila.DeCarpeta -> AccionesLibro.accionesCarpeta(a, fila.carpeta) { alAbrir(fila) }
 			is Fila.Subir -> emptyList()
 			is Fila.Grupo -> if (filtro != Filtro.COLECCIONES) listOf(getString(R.string.abrir) to { alAbrir(fila) }) else {

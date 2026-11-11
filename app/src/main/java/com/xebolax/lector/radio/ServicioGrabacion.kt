@@ -171,16 +171,8 @@ class ServicioGrabacion : Service() {
 			var fallos = 0
 			try {
 				while (isActive && SystemClock.elapsedRealtime() < fin && fallos < 10) {
-					val c = runCatching {
-						(URL(e.url).openConnection() as HttpURLConnection).apply {
-							connectTimeout = 10_000
-							readTimeout = 20_000
-							setRequestProperty("User-Agent", "LectorUniversal/" + com.xebolax.lector.BuildConfig.VERSION_NAME)
-							// Sin metadatos ICY mezclados con el sonido
-							setRequestProperty("Icy-MetaData", "0")
-							connect()
-						}
-					}.getOrNull()
+					// Como el reproductor: agente propio, redirecciones http↔https y reserva a http (sin metadatos ICY mezclados)
+					val c = runCatching { Flujos.abrir(e.url, icy = false, conectar = 10_000, leer = 20_000).conexion }.getOrNull()
 					if (c == null || c.responseCode !in 200..299) {
 						c?.disconnect()
 						fallos++

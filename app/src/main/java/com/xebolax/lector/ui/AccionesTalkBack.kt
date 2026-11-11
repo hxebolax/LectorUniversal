@@ -34,6 +34,7 @@ enum class ZonaAcciones(val titulo: Int) {
 	CANCION(R.string.zona_cancion),
 	GRABACION(R.string.zona_grabacion),
 	PROGRAMACION(R.string.zona_programacion),
+	COMPARTIDO(R.string.zona_compartido),
 }
 
 /** Una acción del catálogo: clave guardada, textos con los que aparece, si sale sin tocar nada y su nombre en Ajustes. */
@@ -60,10 +61,17 @@ object AccionesTalkBack {
 			e("no_leido", R.string.marcar_no_leido), e("quitar_leyendo", R.string.quitar_de_leyendo), e("editar", R.string.editar_titulo),
 			e("compartir", R.string.compartir_archivo), e("quitar", R.string.quitar_de_biblioteca),
 			o("estado", R.string.estado_de_lectura), o("colecciones", R.string.colecciones_puntos), o("serie", R.string.serie_puntos),
+			o("tipo", R.string.cambiar_tipo), o("voz_libro", R.string.voz_de_este_libro),
 		)
 		ZonaAcciones.CARPETA -> listOf(
 			e("abrir", R.string.abrir), e("renombrar", R.string.renombrar), e("subcarpeta", R.string.nueva_subcarpeta),
-			e("mover", R.string.mover_carpeta), e("borrar", R.string.borrar_carpeta),
+			e("mover", R.string.mover_carpeta), e("borrar", R.string.borrar_carpeta), o("tipo", R.string.cambiar_tipo_carpeta),
+		)
+		ZonaAcciones.COMPARTIDO -> listOf(
+			e("abrir", R.string.abrir), e("voz", R.string.leer_en_voz_alta), e("biblioteca", R.string.comp_mover_biblioteca),
+			e("leido", R.string.comp_marcar_leido, R.string.comp_marcar_no_leido), e("navegador", R.string.abrir_navegador),
+			e("compartir", R.string.compartir), e("borrar", R.string.borrar), o("renombrar", R.string.renombrar),
+			o("copiar", R.string.comp_copiar_enlace), o("info", R.string.informacion),
 		)
 		ZonaAcciones.PARRAFO -> {
 			val nombres = c.resources.getStringArray(R.array.acciones_nombres)

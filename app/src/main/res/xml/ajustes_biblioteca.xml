@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto">
+	<ListPreference
+		android:key="tipo_ambiguos"
+		android:title="@string/aj_tipo_ambiguos"
+		android:entries="@array/tipo_ambiguos_nombres"
+		android:entryValues="@array/tipo_ambiguos_valores"
+		android:defaultValue="LIBRO"
+		app:useSimpleSummaryProvider="true" />
+	<Preference
+		android:key="tipo_ambiguos_explicacion"
+		android:selectable="false"
+		android:summary="@string/aj_tipo_ambiguos_desc" />
 	<Preference
 		android:key="carpetas_vigiladas"
 		android:title="@string/carpetas_vigiladas"

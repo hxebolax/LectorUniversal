@@ -48,7 +48,8 @@ class EstadisticasActivity : AppCompatActivity() {
 						Seccion.PODCASTS -> podcasts()
 						Seccion.NOTICIAS -> noticias()
 						Seccion.RADIO -> radio()
-						Seccion.PORTADA -> emptyList()
+						// Lo leído en Compartidos cuenta como lectura (en Biblioteca)
+						Seccion.PORTADA, Seccion.COMPARTIDOS -> emptyList()
 					}
 				}
 			}

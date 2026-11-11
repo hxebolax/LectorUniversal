@@ -27,10 +27,10 @@ class DeslizadorAjuste @JvmOverloads constructor(contexto: Context, atributos: A
 	fun texto(v: Int): String {
 		val c = context
 		return when (key) {
-			"velocidad_audio", "velocidad_voz", "tono_voz", "interlineado" -> c.getString(R.string.valor_por_ciento, v)
+			"velocidad_audio", "velocidad_voz", "tono_voz", "interlineado", "vp_velocidad", "vp_tono" -> c.getString(R.string.valor_por_ciento, v)
 			"salto_atras", "salto_adelante", "retroceso_reanudar" -> c.resources.getQuantityString(R.plurals.valor_segundos, v, v)
 			"tamano_letra" -> c.resources.getQuantityString(R.plurals.valor_puntos, v, v)
-			"pausa_parrafos", "pausa_frases" -> c.getString(R.string.valor_milisegundos, v)
+			"pausa_parrafos", "pausa_frases", "vp_pausa" -> c.getString(R.string.valor_milisegundos, v)
 			else -> v.toString()
 		}
 	}

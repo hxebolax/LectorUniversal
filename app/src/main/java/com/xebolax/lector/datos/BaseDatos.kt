@@ -46,11 +46,18 @@ data class Libro(
 	/** Serie a la que pertenece y su número en ella (de los datos del libro o puesta a mano). */
 	val serie: String = "",
 	val numeroSerie: Double = 0.0,
+	/** Tipo elegido a mano (TipoContenido); vacío = el que le toca por su formato. */
+	val tipo: String = "",
+	/** Está en Compartidos (llegó de otra app o de internet) y no en la biblioteca. */
+	val compartido: Boolean = false,
+	/** De dónde vino: la dirección de la página web o el texto compartido. */
+	val origen: String = "",
 ) {
 	val tituloVisible: String get() = titulo.ifBlank { nombre.substringBeforeLast('.') }
 }
 
-data class Carpeta(val id: Long, val nombre: String, val padre: Long?, val orden: Int)
+/** Carpeta de la biblioteca. tipo: si se creó en la pestaña de un tipo, solo se ve en ella (y en Todo). */
+data class Carpeta(val id: Long, val nombre: String, val padre: Long?, val orden: Int, val tipo: String = "")
 
 /** Subrayado: un fragmento (de inicio a fin) de un párrafo, con su categoría. */
 data class Subrayado(val id: Long, val libro: Long, val bloque: Int, val inicio: Int, val fin: Int, val texto: String, val categoria: String, val creado: Long)
@@ -99,7 +106,7 @@ enum class Orden(val sql: String) {
 class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contexto, "biblioteca.db", null, VERSION) {
 
 	companion object {
-		private const val VERSION = 2
+		private const val VERSION = 3
 
 		@Volatile
 		private var instancia: BaseDatos? = null
@@ -186,6 +193,7 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 				libro INTEGER REFERENCES libros(id) ON DELETE CASCADE)"""
 		)
 		crearSeriesYColecciones(db)
+		crearTiposYCompartidos(db)
 	}
 
 	private fun tieneColumna(db: SQLiteDatabase, tabla: String, columna: String): Boolean =
@@ -215,12 +223,25 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 		)
 	}
 
+	/**
+	 * Versión 3: el tipo de cada libro elegido a mano (libro, documento,
+	 * audiolibro o página web), si está en Compartidos y de dónde vino.
+	 */
+	private fun crearTiposYCompartidos(db: SQLiteDatabase) {
+		if (!tieneColumna(db, "libros", "tipo")) db.execSQL("ALTER TABLE libros ADD COLUMN tipo TEXT NOT NULL DEFAULT ''")
+		if (!tieneColumna(db, "libros", "compartido")) db.execSQL("ALTER TABLE libros ADD COLUMN compartido INTEGER NOT NULL DEFAULT 0")
+		if (!tieneColumna(db, "libros", "origen")) db.execSQL("ALTER TABLE libros ADD COLUMN origen TEXT NOT NULL DEFAULT ''")
+		db.execSQL("CREATE INDEX IF NOT EXISTS libros_compartido ON libros(compartido)")
+		if (!tieneColumna(db, "carpetas", "tipo")) db.execSQL("ALTER TABLE carpetas ADD COLUMN tipo TEXT NOT NULL DEFAULT ''")
+	}
+
 	/** Si se instala una versión anterior de la app, la base de datos (más nueva) se deja como está, sin cerrar la app. */
 	override fun onDowngrade(db: SQLiteDatabase, antes: Int, ahora: Int) = Unit
 
 	override fun onUpgrade(db: SQLiteDatabase, anterior: Int, nueva: Int) {
 		// Una migración por versión
 		if (anterior < 2) crearSeriesYColecciones(db)
+		if (anterior < 3) crearTiposYCompartidos(db)
 	}
 
 	// --- Libros ------------------------------------------------------------------
@@ -246,25 +267,40 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 		ajustes = getString(getColumnIndexOrThrow("ajustes")),
 		serie = getString(getColumnIndexOrThrow("serie")),
 		numeroSerie = getDouble(getColumnIndexOrThrow("numero_serie")),
+		tipo = getString(getColumnIndexOrThrow("tipo")),
+		compartido = getInt(getColumnIndexOrThrow("compartido")) != 0,
+		origen = getString(getColumnIndexOrThrow("origen")),
 	)
 
-	private fun libros(donde: String?, argumentos: Array<String>?, orden: String, limite: String? = null): List<Libro> =
-		readableDatabase.query("libros", null, donde, argumentos, null, null, orden, limite).use { c ->
+	/**
+	 * Libros que cumplen la condición. compartidos: false = solo los de la
+	 * biblioteca, true = solo los de Compartidos, null = todos.
+	 */
+	private fun libros(donde: String?, argumentos: Array<String>?, orden: String, limite: String? = null, compartidos: Boolean? = false): List<Libro> {
+		val condicion = when (compartidos) {
+			null -> donde
+			else -> "compartido = ${if (compartidos) 1 else 0}" + (donde?.let { " AND ($it)" } ?: "")
+		}
+		return readableDatabase.query("libros", null, condicion, argumentos, null, null, orden, limite).use { c ->
 			val lista = ArrayList<Libro>(c.count)
 			while (c.moveToNext()) lista += c.libro()
 			lista
 		}
+	}
 
-	fun libro(id: Long): Libro? = libros("id = ?", arrayOf(id.toString()), "id").firstOrNull()
+	fun libro(id: Long): Libro? = libros("id = ?", arrayOf(id.toString()), "id", compartidos = null).firstOrNull()
 
-	fun libroPorUri(uri: String): Libro? = libros("uri = ?", arrayOf(uri), "id").firstOrNull()
+	fun libroPorUri(uri: String): Libro? = libros("uri = ?", arrayOf(uri), "id", compartidos = null).firstOrNull()
+
+	/** Todos, también los de Compartidos (estadísticas). */
+	fun todosConCompartidos(): List<Libro> = libros(null, null, "id", compartidos = null)
 
 	fun todos(orden: Orden = Orden.TITULO): List<Libro> = libros(null, null, orden.sql)
 
 	fun recientes(limite: Int = 50): List<Libro> = libros("abierto > 0", null, Orden.RECIENTES.sql, limite.toString())
 
 	fun ultimoAbierto(): Libro? = recientes(1).firstOrNull()
-	fun contarLibros(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM libros", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+	fun contarLibros(): Int = readableDatabase.rawQuery("SELECT COUNT(*) FROM libros WHERE compartido = 0", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
 
 	/** Libros de una carpeta (null = raíz de la biblioteca, sin carpeta). */
 	fun deCarpeta(carpeta: Long?, orden: Orden = Orden.TITULO): List<Libro> =
@@ -405,13 +441,13 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 
 	/** Autores con cuántos libros tiene cada uno (por nombre). */
 	fun autores(): List<Pair<String, Int>> = readableDatabase.rawQuery(
-		"SELECT autor, COUNT(*) FROM libros WHERE autor != '' GROUP BY autor COLLATE NOCASE ORDER BY autor COLLATE NOCASE", null,
+		"SELECT autor, COUNT(*) FROM libros WHERE compartido = 0 AND autor != '' GROUP BY autor COLLATE NOCASE ORDER BY autor COLLATE NOCASE", null,
 	).use { c -> generateSequence { if (c.moveToNext()) c.getString(0) to c.getInt(1) else null }.toList() }
 
 	fun deAutor(autor: String, orden: Orden = Orden.TITULO): List<Libro> = libros("autor = ? COLLATE NOCASE", arrayOf(autor), orden.sql)
 
 	fun series(): List<Pair<String, Int>> = readableDatabase.rawQuery(
-		"SELECT serie, COUNT(*) FROM libros WHERE serie != '' GROUP BY serie COLLATE NOCASE ORDER BY serie COLLATE NOCASE", null,
+		"SELECT serie, COUNT(*) FROM libros WHERE compartido = 0 AND serie != '' GROUP BY serie COLLATE NOCASE ORDER BY serie COLLATE NOCASE", null,
 	).use { c -> generateSequence { if (c.moveToNext()) c.getString(0) to c.getInt(1) else null }.toList() }
 
 	/** Los libros de una serie, por su número. */
@@ -472,14 +508,101 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 		put("autor", autor)
 	})
 
-	fun moverLibro(id: Long, carpeta: Long?) = actualizar(id, ContentValues().apply {
-		if (carpeta != null) put("carpeta", carpeta) else putNull("carpeta")
-	})
+	/** Mueve un libro a una carpeta. Si la carpeta es de un tipo (Documentos, Apuntes…), el libro pasa a ser de ese tipo. */
+	fun moverLibro(id: Long, carpeta: Long?) {
+		val tipoCarpeta = carpeta?.let { carpeta(it)?.tipo }.orEmpty()
+		val libro = if (tipoCarpeta.isNotEmpty()) libro(id) else null
+		actualizar(id, ContentValues().apply {
+			if (carpeta != null) put("carpeta", carpeta) else putNull("carpeta")
+			if (libro != null && libro.claveTipo != tipoCarpeta) put("tipo", tipoCarpeta)
+		})
+	}
 
 	fun guardarAjustesLibro(id: Long, ajustes: JSONObject) =
 		actualizar(id, ContentValues().apply { put("ajustes", ajustes.toString()) }, avisando = false)
 
 	fun cambiarUri(id: Long, uri: String) = actualizar(id, ContentValues().apply { put("uri", uri) })
+
+	/** Tipo elegido a mano (clave de Tipos; vacía = el que le toca por su formato). */
+	fun cambiarTipo(id: Long, tipo: String) = actualizar(id, ContentValues().apply { put("tipo", tipo) })
+
+	/** Cambia el tipo de varios a la vez (un solo aviso a las pantallas). */
+	fun cambiarTipo(ids: Collection<Long>, tipo: String) {
+		if (ids.isEmpty()) return
+		val db = writableDatabase
+		db.beginTransaction()
+		try {
+			val v = ContentValues().apply { put("tipo", tipo) }
+			for (id in ids) db.update("libros", v, "id = ?", arrayOf(id.toString()))
+			db.setTransactionSuccessful()
+		} finally {
+			db.endTransaction()
+		}
+		avisar()
+	}
+
+	/** Tipo de una carpeta (vacío = de cualquier tipo). */
+	fun cambiarTipoCarpeta(id: Long, tipo: String) {
+		writableDatabase.update("carpetas", ContentValues().apply { put("tipo", tipo) }, "id = ?", arrayOf(id.toString()))
+		avisar()
+	}
+
+	/** Se borró un tipo propio: sus libros y carpetas vuelven a ser de cualquier tipo. */
+	fun olvidarTipo(clave: String) {
+		writableDatabase.update("libros", ContentValues().apply { put("tipo", "") }, "tipo = ?", arrayOf(clave))
+		writableDatabase.update("carpetas", ContentValues().apply { put("tipo", "") }, "tipo = ?", arrayOf(clave))
+		avisar()
+	}
+
+	// --- Compartidos -----------------------------------------------------------------
+
+	/** Lo que hay en Compartidos, lo último primero. */
+	fun compartidos(): List<Libro> = libros(null, null, "anadido DESC", compartidos = true)
+
+	fun contarCompartidos(soloPendientes: Boolean = false): Int = readableDatabase.rawQuery(
+		"SELECT COUNT(*) FROM libros WHERE compartido = 1" + if (soloPendientes) " AND estado != ${Estado.TERMINADO}" else "", null,
+	).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+
+	/** Guarda en Compartidos algo que llegó de otra app o de internet (o devuelve lo que ya había con esa dirección). */
+	fun anadirCompartido(uri: String, nombre: String, titulo: String, formato: String, audio: Boolean, tamano: Long, origen: String, tipo: String = ""): Long {
+		libroPorUri(uri)?.let { return it.id }
+		val v = ContentValues().apply {
+			put("uri", uri)
+			put("nombre", nombre)
+			put("titulo", titulo)
+			put("autor", "")
+			put("formato", formato)
+			put("audio", if (audio) 1 else 0)
+			put("tamano", tamano)
+			putNull("carpeta")
+			put("anadido", System.currentTimeMillis())
+			put("compartido", 1)
+			put("origen", origen)
+			put("tipo", tipo)
+		}
+		val id = writableDatabase.insert("libros", null, v)
+		avisar()
+		return id
+	}
+
+	/** Lo pasa de Compartidos a la biblioteca, con su tipo y en esa carpeta. */
+	fun moverABiblioteca(id: Long, tipo: String, carpeta: Long?) = actualizar(id, ContentValues().apply {
+		put("compartido", 0)
+		put("tipo", tipo)
+		if (carpeta != null) put("carpeta", carpeta) else putNull("carpeta")
+		put("anadido", System.currentTimeMillis())
+	})
+
+	/** Lo pasa a Compartidos (desde la biblioteca o recién añadido), con la dirección de la que vino si se sabe. */
+	fun moverACompartidos(id: Long, origen: String? = null) = actualizar(id, ContentValues().apply {
+		put("compartido", 1)
+		putNull("carpeta")
+		if (origen != null) put("origen", origen)
+	})
+
+	/** Compartidos terminados hace más de esos días (para borrarlos solos). */
+	fun compartidosLeidosAntesDe(limite: Long): List<Libro> =
+		libros("estado = ${Estado.TERMINADO} AND (CASE WHEN abierto > 0 THEN abierto ELSE anadido END) < ?", arrayOf(limite.toString()), "id", compartidos = true)
 
 	fun quitarLibro(id: Long) {
 		writableDatabase.delete("libros", "id = ?", arrayOf(id.toString()))
@@ -489,17 +612,17 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 	// --- Carpetas ----------------------------------------------------------------
 
 	private fun Cursor.carpeta() = Carpeta(
-		getLong(0), getString(1), if (isNull(2)) null else getLong(2), getInt(3),
+		getLong(0), getString(1), if (isNull(2)) null else getLong(2), getInt(3), getString(4) ?: "",
 	)
 
 	fun carpetas(padre: Long?): List<Carpeta> {
 		val (donde, args) = if (padre == null) "padre IS NULL" to null else "padre = ?" to arrayOf(padre.toString())
-		return readableDatabase.query("carpetas", arrayOf("id", "nombre", "padre", "orden"), donde, args, null, null, "orden, nombre COLLATE NOCASE")
+		return readableDatabase.query("carpetas", arrayOf("id", "nombre", "padre", "orden", "tipo"), donde, args, null, null, "orden, nombre COLLATE NOCASE")
 			.use { c -> generateSequence { if (c.moveToNext()) c.carpeta() else null }.toList() }
 	}
 
 	fun todasLasCarpetas(): List<Carpeta> =
-		readableDatabase.query("carpetas", arrayOf("id", "nombre", "padre", "orden"), null, null, null, null, "nombre COLLATE NOCASE")
+		readableDatabase.query("carpetas", arrayOf("id", "nombre", "padre", "orden", "tipo"), null, null, null, null, "nombre COLLATE NOCASE")
 			.use { c -> generateSequence { if (c.moveToNext()) c.carpeta() else null }.toList() }
 
 	fun carpeta(id: Long): Carpeta? = todasLasCarpetas().firstOrNull { it.id == id }
@@ -518,9 +641,10 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 		return nombres.joinToString(" › ")
 	}
 
-	fun crearCarpeta(nombre: String, padre: Long?): Long {
+	fun crearCarpeta(nombre: String, padre: Long?, tipo: String = ""): Long {
 		val id = writableDatabase.insert("carpetas", null, ContentValues().apply {
 			put("nombre", nombre.trim())
+			put("tipo", tipo)
 			if (padre != null) put("padre", padre) else putNull("padre")
 			put("creada", System.currentTimeMillis())
 		})
@@ -572,7 +696,7 @@ class BaseDatos private constructor(contexto: Context) : SQLiteOpenHelper(contex
 	fun contarEnCarpeta(id: Long): Int {
 		fun ids(c: Long): List<Long> = listOf(c) + carpetas(c).flatMap { ids(it.id) }
 		val lista = ids(id).joinToString(",")
-		return readableDatabase.rawQuery("SELECT COUNT(*) FROM libros WHERE carpeta IN ($lista)", null).use { c ->
+		return readableDatabase.rawQuery("SELECT COUNT(*) FROM libros WHERE compartido = 0 AND carpeta IN ($lista)", null).use { c ->
 			if (c.moveToFirst()) c.getInt(0) else 0
 		}
 	}

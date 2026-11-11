@@ -323,8 +323,9 @@ class RadioListaFragment : Fragment() {
 
 	// --- País, filtros y búsqueda ------------------------------------------------------------------
 
+	/** El país de «Las de tu país»: el elegido o el del móvil (SIM, red o idioma; antes solo el idioma, y «Español (Estados Unidos)» daba Estados Unidos). */
 	private fun paisElegido(): String = Radio.prefs(requireContext()).getString("radio_pais", null)?.takeIf { it.length == 2 }
-		?: Locale.getDefault().country.takeIf { it.length == 2 } ?: "ES"
+		?: com.xebolax.lector.datos.Pais.detectado(requireContext())
 
 	private fun nombrePais(codigo: String) = Locale("", codigo).displayCountry.ifBlank { codigo }
 

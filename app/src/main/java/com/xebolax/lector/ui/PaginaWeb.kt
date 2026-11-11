@@ -15,14 +15,17 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Descarga una página web, guarda su contenido principal y la añade a la biblioteca (devuelve el id del libro). */
+/**
+ * Descarga una página web, guarda su contenido principal y la añade a la
+ * biblioteca o, si compartido, a Compartidos (devuelve el id del libro).
+ */
 object PaginaWeb {
 
 	private fun normal(s: String) = java.text.Normalizer.normalize(s.lowercase(), java.text.Normalizer.Form.NFD)
 		.replace(Regex("\\p{Mn}+"), "").replace(Regex("[^a-z0-9 ]"), " ").replace(Regex(" +"), " ").trim()
 
 	/** titulo: el titular esperado (noticias), para guardar solo el artículo. */
-	suspend fun guardar(c: Context, direccion: String, titulo: String? = null): Long {
+	suspend fun guardar(c: Context, direccion: String, titulo: String? = null, compartido: Boolean = false): Long {
 		val url = if (direccion.startsWith("http")) direccion else "https://$direccion"
 		val (titulo, archivo) = withContext(Dispatchers.IO) {
 			val conexion = URL(url).openConnection() as HttpURLConnection
@@ -76,11 +79,13 @@ object PaginaWeb {
 		db.libroPorUri(Uri.fromFile(archivo).toString())?.let { return it.id }
 		// Un documento descargado: se añade con su formato real y se leen su título y autor por detrás
 		if (titulo == null) {
-			val id = com.xebolax.lector.biblioteca.Importador.anadirArchivos(c, listOf(Uri.fromFile(archivo)), null).anadidos.firstOrNull()
-				?: db.libroPorUri(Uri.fromFile(archivo).toString())?.id ?: error("No se pudo añadir")
+			val nuevo = com.xebolax.lector.biblioteca.Importador.anadirArchivos(c, listOf(Uri.fromFile(archivo)), null).anadidos.firstOrNull()
+			val id = nuevo ?: db.libroPorUri(Uri.fromFile(archivo).toString())?.id ?: error("No se pudo añadir")
+			if (compartido && nuevo != null) db.moverACompartidos(id, url)
 			com.xebolax.lector.LectorApp.ambito.launch { com.xebolax.lector.biblioteca.Importador.completarDatos(c.applicationContext, listOf(id)) }
 			return id
 		}
+		if (compartido) return db.anadirCompartido(Uri.fromFile(archivo).toString(), archivo.name, titulo.ifBlank { url }, Formato.HTML.name, false, archivo.length(), url)
 		return db.anadirLibro(Uri.fromFile(archivo).toString(), archivo.name, titulo, "", Formato.HTML.name, false, archivo.length(), null)
 	}
 }

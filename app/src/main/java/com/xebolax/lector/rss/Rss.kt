@@ -207,6 +207,8 @@ object Rss {
 	/** ¿Hay que descargar el artículo completo? (el RSS solo trae un resumen corto) */
 	fun hayQueCompletar(c: Context, a: Articulo, f: Fuente?): Boolean {
 		if (a.completo || a.enlace.isBlank() || a.esPodcast && a.contenido.length > 100) return false
+		// Un vídeo de YouTube no tiene más texto en su página que la descripción que ya trae la fuente
+		if (Regex("""(?i)^https?://(www\.|m\.)?(youtube\.com/(watch|shorts|live)|youtu\.be/)""").containsMatchIn(a.enlace)) return false
 		val siempre = f?.textoCompleto == true || prefs(c).getBoolean("rss_texto_completo", false)
 		return siempre || Jsoup.parse(a.contenido).text().length < 500
 	}

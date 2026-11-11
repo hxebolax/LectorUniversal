@@ -31,6 +31,7 @@ import com.xebolax.lector.actualizaciones.GestorActualizaciones
 enum class Seccion(val menu: Int, val nombre: Int, val icono: Int) {
 	PORTADA(R.id.lateral_portada, R.string.portada, R.drawable.ic_portada),
 	BIBLIOTECA(R.id.lateral_biblioteca, R.string.seccion_biblioteca, R.drawable.ic_biblioteca),
+	COMPARTIDOS(R.id.lateral_compartidos, R.string.compartidos, R.drawable.ic_compartido),
 	PODCASTS(R.id.lateral_podcasts, R.string.podcasts, R.drawable.ic_voz),
 	NOTICIAS(R.id.lateral_noticias, R.string.noticias, R.drawable.ic_rss),
 	RADIO(R.id.lateral_radio, R.string.radio, R.drawable.ic_radio),
@@ -50,8 +51,14 @@ object OrdenSecciones {
 
 	fun orden(c: android.content.Context): List<Seccion> {
 		val guardado = prefs(c).getString(CLAVE_ORDEN, "").orEmpty().split(',').mapNotNull { n -> ORDENABLES.firstOrNull { it.name == n } }.distinct()
-		// Las que falten (una sección nueva) van al final
-		return guardado + (ORDENABLES - guardado.toSet())
+		// Una sección nueva (que no estaba en el orden guardado) va detrás de la que la precede en la lista de secciones
+		val orden = guardado.toMutableList()
+		for (s in ORDENABLES) if (s !in orden) {
+			val anterior = ORDENABLES.getOrNull(ORDENABLES.indexOf(s) - 1)
+			val donde = orden.indexOf(anterior)
+			if (donde >= 0) orden.add(donde + 1, s) else orden.add(s)
+		}
+		return orden
 	}
 
 	fun guardar(c: android.content.Context, orden: List<Seccion>) = prefs(c).edit().putString(CLAVE_ORDEN, orden.joinToString(",") { it.name }).apply()
@@ -235,6 +242,7 @@ fun android.content.Context.abrirSeccion(destino: Seccion) {
 	when (destino) {
 		Seccion.PORTADA -> startActivity(Intent(this, PortadaActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
 		Seccion.BIBLIOTECA -> startActivity(Intent(this, BibliotecaActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP))
+		Seccion.COMPARTIDOS -> com.xebolax.lector.compartidos.CompartidosActivity.abrir(this)
 		Seccion.PODCASTS -> com.xebolax.lector.podcast.PodcastActivity.abrir(this)
 		Seccion.NOTICIAS -> com.xebolax.lector.rss.RssActivity.abrir(this)
 		Seccion.RADIO -> com.xebolax.lector.radio.RadioActivity.abrir(this)

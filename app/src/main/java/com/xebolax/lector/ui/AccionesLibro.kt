@@ -77,6 +77,27 @@ object AccionesLibro {
 			.show()
 	}
 
+	/**
+	 * Elegir el tipo (libro, documento, audiolibro, página web) o dejar el
+	 * que le toca por su formato (null).
+	 */
+	fun elegirTipo(a: AppCompatActivity, actual: String?, titulo: String = a.getString(R.string.cambiar_tipo), alElegir: (String) -> Unit) {
+		val tipos = com.xebolax.lector.datos.Tipos.todos(a)
+		// Automático (según el formato), cada tipo y, al final, crear uno nuevo
+		val claves = listOf("") + tipos.map { it.clave }
+		val nombres = listOf(a.getString(R.string.tipo_automatico)) + tipos.map { it.nombre } + a.getString(R.string.tipo_nuevo_puntos)
+		a.elegirUno(titulo, nombres, if (actual == null) -1 else claves.indexOf(actual)) { i ->
+			if (i < claves.size) alElegir(claves[i])
+			else a.pedirTexto(a.getString(R.string.tipo_nuevo), a.getString(R.string.nombre)) { n ->
+				if (n.isNotBlank()) alElegir(com.xebolax.lector.datos.Tipos.crearPropio(a, n).clave)
+			}
+		}
+	}
+
+	/** «Documentos», «Apuntes» o «automático, según el formato». */
+	fun nombreTipo(a: android.content.Context, clave: String): String =
+		if (clave.isBlank()) a.getString(R.string.tipo_automatico) else com.xebolax.lector.datos.Tipos.nombre(a, clave)
+
 	/** La serie y el número de un libro (se rellenan solos si el libro los trae). */
 	private fun editarSerie(a: AppCompatActivity, l: Libro) {
 		a.pedirTexto(a.getString(R.string.serie), a.getString(R.string.serie_ayuda), if (l.serie.isBlank()) "" else
@@ -109,6 +130,13 @@ object AccionesLibro {
 		lista += a.getString(R.string.estado_de_lectura) to { elegirEstado(a, listOf(l.id), l.estado) }
 		lista += a.getString(R.string.colecciones_puntos) to { elegirColecciones(a, l) }
 		lista += a.getString(R.string.serie_puntos) to { editarSerie(a, l) }
+		lista += a.getString(R.string.cambiar_tipo) to {
+			elegirTipo(a, l.tipo) { tipo ->
+				db.cambiarTipo(l.id, tipo)
+				a.avisar(a.getString(R.string.tipo_cambiado, nombreTipo(a, tipo)))
+			}
+		}
+		if (!l.audio) lista += a.getString(R.string.voz_de_este_libro) to { com.xebolax.lector.voz.VozPerfilActivity.abrirLibro(a, l.id, l.tituloVisible) }
 		if (l.abierto > 0) lista += a.getString(R.string.quitar_de_leyendo) to {
 			db.quitarDeRecientes(l.id)
 			a.avisar(a.getString(R.string.quitado_de_leyendo))
@@ -128,7 +156,7 @@ object AccionesLibro {
 	}
 
 	/** Empieza a leer en voz alta desde donde se quedó, sin abrir la pantalla de lectura. */
-	private fun leerEnVozAlta(a: AppCompatActivity, l: Libro) {
+	fun leerEnVozAlta(a: AppCompatActivity, l: Libro) {
 		a.lifecycleScope.launch {
 			val contenido = runCatching { withContext(Dispatchers.IO) { Abiertos.abrir(a, l, Abiertos.opciones(a)) } }.getOrNull()
 			val doc = (contenido as? Contenido.Texto)?.documento ?: return@launch a.avisar(a.getString(R.string.error_abrir, ""))
@@ -159,7 +187,7 @@ object AccionesLibro {
 		a.mensaje(a.getString(R.string.informacion), texto.trim())
 	}
 
-	private fun editar(a: AppCompatActivity, l: Libro) {
+	fun editar(a: AppCompatActivity, l: Libro) {
 		val (contTitulo, campoTitulo) = a.campoTexto(a.getString(R.string.titulo), l.tituloVisible)
 		val (contAutor, campoAutor) = a.campoTexto(a.getString(R.string.autor), l.autor)
 		val formulario = android.widget.LinearLayout(a).apply {
@@ -180,7 +208,7 @@ object AccionesLibro {
 			.show()
 	}
 
-	private fun compartir(a: AppCompatActivity, l: Libro) {
+	fun compartir(a: AppCompatActivity, l: Libro) {
 		val uri = Uri.parse(l.uri)
 		val compartible = when (uri.scheme) {
 			"file" -> runCatching { FileProvider.getUriForFile(a, a.packageName + ".archivos", File(uri.path!!)) }.getOrNull()
@@ -194,7 +222,7 @@ object AccionesLibro {
 	}
 
 	/** Elegir carpeta de destino (o crear una nueva). excluir: carpeta que no se puede elegir (al mover carpetas). */
-	fun elegirCarpeta(a: AppCompatActivity, titulo: String, excluir: Long?, alElegir: (Long?) -> Unit) {
+	fun elegirCarpeta(a: AppCompatActivity, titulo: String, excluir: Long?, tipoNueva: String = "", alElegir: (Long?) -> Unit) {
 		val db = BaseDatos.obtener(a)
 		val todas = db.todasLasCarpetas().filter { it.id != excluir }
 			.map { it to db.rutaCarpeta(it.id) }
@@ -203,7 +231,8 @@ object AccionesLibro {
 			a.getString(R.string.biblioteca_raiz) to { alElegir(null) },
 			a.getString(R.string.nueva_carpeta) to {
 				a.pedirTexto(a.getString(R.string.nueva_carpeta), a.getString(R.string.nombre)) { nombre ->
-					if (nombre.isNotBlank()) alElegir(db.crearCarpeta(nombre, null))
+					// Una carpeta nueva al pasar algo a un tipo (Documentos, Apuntes…) es de ese tipo
+					if (nombre.isNotBlank()) alElegir(db.crearCarpeta(nombre, null, tipoNueva))
 				}
 			},
 		)
@@ -229,6 +258,21 @@ object AccionesLibro {
 						db.crearCarpeta(nombre, c.id)
 						a.avisar(a.getString(R.string.carpeta_creada, nombre.trim()))
 					}
+				}
+			},
+			a.getString(R.string.cambiar_tipo_carpeta) to {
+				elegirTipo(a, c.tipo) { tipo ->
+					// La carpeta pasa a ser de ese tipo (o de cualquiera) y todo lo que tiene, también
+					db.cambiarTipoCarpeta(c.id, tipo)
+					// Lo de la carpeta y de sus subcarpetas
+					val ids = mutableListOf<Long>()
+					fun recoger(id: Long) {
+						ids += db.deCarpeta(id).map { it.id }
+						db.carpetas(id).forEach { recoger(it.id) }
+					}
+					recoger(c.id)
+					db.cambiarTipo(ids, tipo)
+					a.avisar(a.resources.getQuantityString(R.plurals.tipo_cambiado_n, ids.size, ids.size, nombreTipo(a, tipo)))
 				}
 			},
 			a.getString(R.string.mover_carpeta) to {

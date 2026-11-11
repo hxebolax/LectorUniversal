@@ -134,6 +134,48 @@ class RadioActivity : AppCompatActivity() {
 		i.action = null
 	}
 
+	/** Lo que se encontró en una dirección escrita a mano. */
+	private sealed class Analisis {
+		class Encontrada(val sonda: Flujos.Sonda, val desdeWeb: Boolean) : Analisis()
+		class Varias(val candidatos: List<Flujos.Candidato>) : Analisis()
+		object NadaEnWeb : Analisis()
+		class Fallo(val motivo: String) : Analisis()
+	}
+
+	/** Comprueba la dirección: sonido, lista o página web (y, en ese caso, busca el sonido en ella). */
+	private suspend fun analizar(direccion: String): Analisis {
+		val s = try {
+			Flujos.sondear(direccion)
+		} catch (e: kotlinx.coroutines.CancellationException) {
+			throw e
+		} catch (e: Flujos.ErrorFlujo) {
+			return Analisis.Fallo(e.motivo)
+		} catch (e: Exception) {
+			return Analisis.Fallo("red")
+		}
+		if (!s.web) return Analisis.Encontrada(s, desdeWeb = false)
+		val candidatos = Flujos.buscarEnWeb(direccion)
+		return when (candidatos.size) {
+			0 -> Analisis.NadaEnWeb
+			1 -> Analisis.Encontrada(candidatos[0].sonda, desdeWeb = true)
+			else -> Analisis.Varias(candidatos)
+		}
+	}
+
+	/** El motivo de un fallo dicho con palabras. */
+	private fun motivo(m: String): String = when {
+		m.startsWith("http:") -> {
+			val codigo = m.removePrefix("http:").toIntOrNull() ?: 0
+			getString(if (codigo in 400..499) R.string.radio_error_rechaza else R.string.radio_error_servidor, codigo)
+		}
+		m == "ssl" -> getString(R.string.radio_motivo_ssl)
+		m == "no_estandar" -> getString(R.string.radio_motivo_no_estandar)
+		m == "formato" -> getString(R.string.radio_motivo_formato)
+		m == "lista" -> getString(R.string.radio_motivo_lista)
+		m == "redirecciones" -> getString(R.string.radio_motivo_redirecciones)
+		else -> getString(R.string.radio_motivo_red)
+	}
+
 	/** Pasa a una pestaña y hace algo en ella. */
 	fun irA(modo: RadioListaFragment.Modo, hacer: (RadioListaFragment) -> Unit) {
 		val i = pestanas.indexOf(modo)
@@ -191,17 +233,50 @@ class RadioActivity : AppCompatActivity() {
 			.setTitle(if (editar != null) R.string.radio_editar else R.string.radio_anadir_a_mano)
 			.setView(android.widget.ScrollView(this).apply { addView(formulario) })
 			.setPositiveButton(R.string.guardar) { _, _ ->
-				val direccion = campoUrl.text.toString().trim()
+				var direccion = campoUrl.text.toString().trim()
+				if (direccion.isBlank() || direccion.contains(' ')) return@setPositiveButton mensaje(getString(R.string.radio_anadir_a_mano), getString(R.string.radio_direccion_mal))
+				// «radioarrecife.com» o «icy://…» también valen
+				direccion = direccion.replaceFirst(Regex("(?i)^(icy|mms|mmsh)://"), "http://")
+				if (!direccion.contains("://")) direccion = "https://$direccion"
 				if (!direccion.startsWith("http", ignoreCase = true)) return@setPositiveButton mensaje(getString(R.string.radio_anadir_a_mano), getString(R.string.radio_direccion_mal))
 				lifecycleScope.launch {
-					val sonido = runCatching { conEspera(getString(R.string.radio_anadir_a_mano), getString(R.string.radio_comprobando)) { Radio.resolver(direccion) } }
-						.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrDefault(direccion)
-					val db = RadioBaseDatos.obtener(this@RadioActivity)
-					val nueva = Emisora.propia(campoNombre.text.toString(), sonido, campoGenero.text.toString(), campoWeb.text.toString())
-					val carpeta = editar?.let { db.favorita(it.uuid)?.carpeta }.orEmpty()
-					if (editar != null && editar.uuid != nueva.uuid) db.quitarFavorita(editar.uuid)
-					db.anadirFavorita(nueva, carpeta)
-					avisar(getString(R.string.radio_guardada_favoritas, nueva.nombre))
+					val r = try {
+						conEspera(getString(R.string.radio_anadir_a_mano), getString(R.string.radio_comprobando)) { analizar(direccion) }
+					} catch (e: kotlinx.coroutines.CancellationException) {
+						throw e
+					}
+					fun guardar(s: Flujos.Sonda?, desdeWeb: Boolean) {
+						val db = RadioBaseDatos.obtener(this@RadioActivity)
+						val nueva = Emisora.propia(
+							// El escrito, el que da el servidor o, si no, el nombre del servidor (mejor que la dirección entera)
+							nombre = campoNombre.text.toString().ifBlank { s?.nombre.orEmpty() }.ifBlank {
+								runCatching { java.net.URL(s?.url ?: direccion).host.removePrefix("www.") }.getOrDefault("")
+							},
+							url = s?.url ?: direccion,
+							genero = campoGenero.text.toString().ifBlank { s?.generos.orEmpty() },
+							web = campoWeb.text.toString().ifBlank { if (desdeWeb) direccion else s?.webEmisora.orEmpty() },
+							hls = s?.hls,
+						)
+						val carpeta = editar?.let { db.favorita(it.uuid)?.carpeta }.orEmpty()
+						if (editar != null && editar.uuid != nueva.uuid) db.quitarFavorita(editar.uuid)
+						db.anadirFavorita(nueva, carpeta)
+						avisar(getString(R.string.radio_guardada_favoritas, nueva.nombre))
+					}
+					when (r) {
+						is Analisis.Encontrada -> guardar(r.sonda, r.desdeWeb)
+						is Analisis.Varias -> com.google.android.material.dialog.MaterialAlertDialogBuilder(this@RadioActivity)
+							.setTitle(R.string.radio_elige_sonido)
+							.setItems(r.candidatos.map { it.etiqueta }.toTypedArray()) { _, i -> guardar(r.candidatos[i].sonda, true) }
+							.setNegativeButton(R.string.cancelar, null)
+							.show()
+						is Analisis.NadaEnWeb -> mensaje(getString(R.string.radio_anadir_a_mano), getString(R.string.radio_no_encontrada_en_web))
+						is Analisis.Fallo -> com.google.android.material.dialog.MaterialAlertDialogBuilder(this@RadioActivity)
+							.setTitle(R.string.radio_anadir_a_mano)
+							.setMessage(getString(R.string.radio_no_comprobada, motivo(r.motivo)))
+							.setPositiveButton(R.string.radio_guardar_igualmente) { _, _ -> guardar(null, false) }
+							.setNegativeButton(R.string.cancelar, null)
+							.show()
+					}
 				}
 			}
 			.setNegativeButton(R.string.cancelar, null)
