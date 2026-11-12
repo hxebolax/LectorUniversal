@@ -77,6 +77,7 @@ class ActualizacionesTest {
 		val error = runCatching { runBlocking { Actualizador.descargar(app, v) { leidos, _ -> ultimo = leidos } } }.exceptionOrNull()
 		Log.i("Actualizaciones", "Descargados $ultimo de ${v.tamano} bytes; resultado: $error")
 		assertEquals(v.tamano, ultimo)
-		assertEquals("El archivo descargado no es Lector Universal.", error?.message)
+		// En el idioma de la app (el del emulador puede ser otro)
+		assertEquals(com.xebolax.lector.LectorApp.texto(R.string.cj_act_no_lector), error?.message)
 	}
 }

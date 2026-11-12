@@ -873,6 +873,7 @@ object ControlAudio {
 			else -> 0
 		}
 		paradoPorTemporizador = 0
+		paradoTrasEpisodio = false
 		principal.removeCallbacks(dejarDeAgitar)
 		if (minutos != 0) agitar.empezar { alAgitar() } else agitar.parar()
 		finTemporizador = 0
@@ -955,7 +956,11 @@ object ControlAudio {
 			val ms = posicion().second
 			e.alGuardar(ms, dur)
 			// Ha vuelto atrás tras terminar: puede volver a terminar
-			if (terminadoId == e.id && dur > 0 && ms < dur - e.saltarFinal * 1000L - 10_000) terminadoId = 0
+			// Se ha retrocedido: el episodio ya no está terminado (agitar o Reproducir lo siguen, no pasan al siguiente)
+			if (terminadoId == e.id && dur > 0 && ms < dur - e.saltarFinal * 1000L - 10_000) {
+				terminadoId = 0
+				paradoTrasEpisodio = false
+			}
 			// Saltar el final (por ejemplo, la despedida del podcast), una sola vez: si se reanuda, sigue sonando
 			if (e.saltarFinal > 0 && dur > 0 && reproduciendo && terminadoId != e.id && ms >= dur - e.saltarFinal * 1000L) {
 				jugador?.pause()
