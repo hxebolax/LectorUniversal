@@ -23,6 +23,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.xebolax.lector.R
+import com.xebolax.lector.ui.conTeclado
 import com.xebolax.lector.audio.ReproductorActivity
 import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.datos.Libro
@@ -418,8 +419,17 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 			actualizarVelocidad()
 			repartirBotonera()
 		}
+		val volviendo = ajustesAlSalir.isNotEmpty()
 		ajustesAlSalir = ""
 		ultimoLatido = System.currentTimeMillis()
+		// Se vuelve con la voz en pausa o detenida (desde la notificación, los auriculares...) y la
+		// pantalla se quedó atrás: se lleva al párrafo donde paró la voz, con el foco de TalkBack en
+		// él, para seguir leyendo desde ahí con gestos o con la voz (sin TalkBack la pantalla ya
+		// sigue a la voz y se respeta lo que se haya desplazado)
+		if (volviendo && vozCambioFuera && lectorActivo() && posicionDeLaVoz && bloqueEnfocado != actual && !(esMiLectura() && LectorVoz.leyendo)) {
+			llevarALaVoz()
+		}
+		vozCambioFuera = false
 		// Los errores de la voz se dicen aquí con TalkBack (y en pantalla), no solo en un Toast
 		LectorVoz.alError = alErrorVoz
 	}
@@ -453,9 +463,36 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 	/** El bloque más avanzado al que se ha llegado (para marcar los artículos escuchados). */
 	private var masLejos = 0
 
+	/**
+	 * La posición es la de la voz (la puso al leer, pausar o detener) y nadie se ha
+	 * movido después: la guarda la voz, con su frase, y no la pisa la pantalla.
+	 */
+	private var posicionDeLaVoz = false
+
+	/** El párrafo que tenía el foco antes de llevarlo a la voz: si TalkBack lo devuelve enseguida, no cuenta. */
+	private var focoViejo = -1
+	private var focoViejoHasta = 0L
+
+	/** ¿El foco de TalkBack está en un párrafo de la lista? */
+	private fun focoEnLaLista(): Boolean = (0 until b.lista.childCount).any { i ->
+		b.lista.getChildAt(i).createAccessibilityNodeInfo().isAccessibilityFocused
+	}
+
+	/** Pantalla y foco de TalkBack al párrafo donde va la voz. */
+	private fun llevarALaVoz() {
+		val n = doc?.bloques?.size ?: return
+		if (n == 0) return
+		focoViejo = bloqueEnfocado
+		focoViejoHasta = android.os.SystemClock.elapsedRealtime() + 2000
+		actual = actual.coerceIn(0, n - 1)
+		(b.lista.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(actual, 0)
+		enfocar(actual)
+	}
+
 	private fun moverActual(bloque: Int) {
 		if (bloque == actual) return
 		actual = bloque
+		posicionDeLaVoz = false
 		if (bloque > masLejos) masLejos = bloque
 		latido()
 		val marcas = marcadoresPorBloque[bloque]
@@ -469,8 +506,15 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		if (idLibro <= 0 || d.bloques.isEmpty()) return
 		// El texto de un DAISY con audio no cambia la posición del audio
 		if (intent.getBooleanExtra(EXTRA_TEXTO_DE_AUDIO, false)) return
-		// Si la voz está leyendo este libro, ella guarda su posición
-		if (esMiLectura() && LectorVoz.leyendo) return
+		// Si la voz lee este libro (o está en pausa en él y la posición es la suya), ella guarda la
+		// suya, con la frase. Antes, en pausa, se guardaba el párrafo de la pantalla: con TalkBack
+		// era el del día anterior (el foco no sigue a la voz) y se perdía lo escuchado
+		if (esMiLectura() && (LectorVoz.leyendo || actual == LectorVoz.bloque)) {
+			if (!LectorVoz.leyendo) LectorVoz.guardarPosicion()
+			return
+		}
+		// La voz ya se detuvo y guardó dónde se quedó (con la frase): no se pisa
+		if (posicionDeLaVoz && !esMiLectura()) return
 		db.guardarPosicion(idLibro, Posicion.texto(actual), d.porcentaje(actual))
 	}
 
@@ -512,7 +556,9 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		moverActual(destino)
 		(b.lista.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(destino, 0)
 		enfocar(destino)
-		if (esMiLectura() && LectorVoz.leyendo) LectorVoz.irA(destino, caracter)
+		// La voz de este libro (leyendo o en pausa) va a donde se salta: al reanudar sigue desde ahí.
+		// Ir al párrafo que ya suena no lo empieza otra vez
+		if (esMiLectura() && (destino != LectorVoz.bloque || caracter > 0)) LectorVoz.irA(destino, caracter)
 	}
 
 	/** Pone el foco de accesibilidad en un bloque cuando ya está en pantalla. */
@@ -599,7 +645,23 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 
 	// --- Oyente del adaptador ------------------------------------------------------------
 
-	override fun alEnfocar(bloque: Int) = moverActual(bloque)
+	/** Último párrafo que recibió el foco de TalkBack. */
+	private var bloqueEnfocado = -1
+
+	override fun alEnfocar(bloque: Int) {
+		val repetido = bloque == bloqueEnfocado
+		bloqueEnfocado = bloque
+		// Al volver a la app, TalkBack devuelve el foco al párrafo que tenía (el de antes de leer
+		// en voz alta): eso no es moverse y no quita la posición a la voz
+		if (repetido && posicionDeLaVoz) return
+		if (bloque == focoViejo && posicionDeLaVoz && android.os.SystemClock.elapsedRealtime() < focoViejoHasta) {
+			// TalkBack devolvió el foco al párrafo viejo justo después de llevarlo a la voz: otra vez allí (una vez)
+			focoViejo = -1
+			enfocar(actual)
+			return
+		}
+		moverActual(bloque)
+	}
 
 	override fun alTocar(bloque: Int) {
 		moverActual(bloque)
@@ -963,7 +1025,27 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 	private fun dondeEstoy() {
 		val d = doc ?: return
 		val partes = mutableListOf<String>()
-		d.capituloDe(actual)?.let { partes += it.titulo }
+		d.capituloDe(actual)?.let { cap ->
+			partes += cap.titulo
+			// Cuánto llevas del capítulo y cuántas palabras le quedan (como Paperback)
+			val fin = d.indice.firstOrNull { it.bloque > cap.bloque && it.nivel <= cap.nivel }?.bloque ?: d.bloques.size
+			val desde = d.inicioBloque[cap.bloque.coerceIn(0, d.bloques.size)]
+			val hasta = d.inicioBloque[fin.coerceIn(0, d.bloques.size)]
+			if (hasta > desde) {
+				val hecho = ((d.inicioBloque[actual] - desde) * 100 / (hasta - desde)).toInt().coerceIn(0, 100)
+				var palabras = 0
+				for (i in actual until fin.coerceAtMost(d.bloques.size)) {
+					var enPalabra = false
+					for (ch in d.bloques[i].texto) {
+						val letra = !ch.isWhitespace()
+						if (letra && !enPalabra) palabras++
+						enPalabra = letra
+					}
+				}
+				partes += getString(R.string.capitulo_hecho, hecho) + ", " +
+					resources.getQuantityString(R.plurals.palabras_capitulo, palabras, palabras)
+			}
+		}
 		d.paginaDe(actual)?.let { partes += getString(R.string.pagina_de, it.etiqueta, d.paginas.last().etiqueta) }
 		partes += getString(R.string.porcentaje_n, d.porcentaje(actual).toInt())
 		partes += getString(R.string.parrafo_de, actual + 1, d.bloques.size)
@@ -1008,9 +1090,9 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		dialogo.setOnShowListener {
 			dialogo.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener { lanzar(false) }
 			dialogo.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener { lanzar(true) }
-			campo.requestFocus()
 		}
 		dialogo.show()
+		dialogo.conTeclado(campo)
 	}
 
 	private fun ejecutarBusqueda(d: Documento, texto: String, mayusculas: Boolean, palabra: Boolean, regex: Boolean, todos: Boolean) {
@@ -1263,11 +1345,11 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 
 	// --- Voz -----------------------------------------------------------------------------
 
-	private fun leerDesde(bloque: Int) {
+	private fun leerDesde(bloque: Int, caracter: Int = 0) {
 		val d = doc ?: return
 		val l = libro ?: return
 		moverActual(bloque)
-		LectorVoz.leerDesde(d, l.id, d.titulo.ifBlank { l.tituloVisible }, bloque, noticia = esNoticia)
+		LectorVoz.leerDesde(d, l.id, d.titulo.ifBlank { l.tituloVisible }, bloque, caracter, noticia = esNoticia)
 		// El mini reproductor y la notificación vuelven aquí (una noticia no tiene id de libro)
 		LectorVoz.volver = Intent(this, LectorActivity::class.java).putExtras(intent).apply { removeExtra(EXTRA_LEER_AL_ABRIR) }
 		// La primera vez que se lee en voz alta (sigue con la pantalla apagada): permiso de avisos, explicado
@@ -1275,10 +1357,24 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 	}
 
 	private fun alternarVoz() {
-		if (LectorVoz.esActual(idLibro) && LectorVoz.documento === doc) LectorVoz.alternar() else leerDesde(actual)
+		if (LectorVoz.esActual(idLibro) && LectorVoz.documento === doc) LectorVoz.alternar()
+		else leerDesde(actual, caracterGuardado(actual))
+	}
+
+	/** Si se empieza en el párrafo guardado, la frase donde se quedó (la voz la guarda al pausar). */
+	private fun caracterGuardado(bloque: Int): Int {
+		if (idLibro <= 0) return 0
+		val pos = db.libro(idLibro)?.posicion ?: return 0
+		return if (!pos.audio && pos.bloque == bloque) pos.caracter.coerceAtLeast(0) else 0
 	}
 
 	private var ultimoBloqueVoz = -1
+
+	/** La voz estaba con este libro (para saber cuándo se detiene). */
+	private var vozPropia = false
+
+	/** La voz cambió mientras la pantalla no se veía (solo entonces se lleva allí al volver). */
+	private var vozCambioFuera = false
 
 	private fun alCambiarVoz(e: LectorVoz.Estado) {
 		val propio = e.activo && LectorVoz.documento === doc
@@ -1290,15 +1386,26 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 		b.botonVoz.setIconResource(if (leyendo) R.drawable.ic_pausa else R.drawable.ic_voz)
 		actualizarVelocidad()
 		val a = adaptador ?: return
+		// La voz cambió con la pantalla sin ver: al volver se lleva a donde va la voz
+		if ((propio || vozPropia) && !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) vozCambioFuera = true
 		if (!propio) {
 			a.resaltado = null
+			// Se detuvo la voz de este libro: con TalkBack, la pantalla y el foco van a donde paró
+			// (el párrafo que se veía era el de antes de leer)
+			if (vozPropia) {
+				vozPropia = false
+				ultimoBloqueVoz = -1
+				if (posicionDeLaVoz && lectorActivo() && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) llevarALaVoz()
+			}
 			return
 		}
+		vozPropia = true
 		// Con TalkBack no se resalta: cambiar el texto del párrafo enfocado hace que TalkBack lo vuelva a leer
 		a.resaltado = if (p.resaltarFrase && !lectorActivo() && e.fin > e.inicio) Resaltado(e.bloque, e.inicio, e.fin) else null
 		if (leyendo && e.bloque != ultimoBloqueVoz) {
 			ultimoBloqueVoz = e.bloque
 			actual = e.bloque
+			posicionDeLaVoz = true
 			// La lista sigue a la voz, sin mover el foco de TalkBack (no se oyen dos voces).
 			// Con TalkBack no se desplaza: el foco podría saltar a otro párrafo y leerse encima de la voz
 			if (p.seguirLectura && !lectorActivo()) {
@@ -1309,10 +1416,18 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 			}
 		} else if (!leyendo && ultimoBloqueVoz >= 0) {
 			// Al pausar, la posición se queda donde iba la voz. Con TalkBack no se mueve el foco
-			// (TalkBack leería el párrafo entero al pausar); sin TalkBack se muestra ese párrafo
+			// (TalkBack leería el párrafo entero al pausar), pero la lista sí va a ese párrafo:
+			// si no, al deslizar desde el panel el foco caería en un párrafo viejo y se guardaría
+			// ese. Sin TalkBack se muestra ese párrafo
 			ultimoBloqueVoz = -1
 			actual = e.bloque
+			posicionDeLaVoz = true
 			if (!lectorActivo()) enfocar(e.bloque)
+			// Solo si el foco no está en la lista: si estás leyendo con gestos, no se te mueve
+			else if (!focoEnLaLista()) (b.lista.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(e.bloque, 0)
+		} else if (!leyendo && posicionDeLaVoz && e.bloque != actual) {
+			// En pausa, Párrafo o Frase anterior y siguiente del panel mueven la voz: la posición va con ella
+			actual = e.bloque
 		}
 	}
 
@@ -1354,7 +1469,7 @@ class LectorActivity : AppCompatActivity(), AdaptadorBloques.Oyente {
 	private fun leerConTemporizador() {
 		elegirTemporizador(getString(R.string.reproducir_con_temporizador), conQuitar = false) { minutos ->
 			if (!(LectorVoz.esActual(idLibro) && LectorVoz.documento === doc && LectorVoz.leyendo)) {
-				if (LectorVoz.esActual(idLibro) && LectorVoz.documento === doc) LectorVoz.reanudar() else leerDesde(actual)
+				if (LectorVoz.esActual(idLibro) && LectorVoz.documento === doc) LectorVoz.reanudar() else leerDesde(actual, caracterGuardado(actual))
 			}
 			LectorVoz.temporizador(minutos)
 			avisar(getString(R.string.temporizador_puesto, nombreTemporizador(minutos)))

@@ -229,8 +229,31 @@ fun Context.pedirTexto(
 		dialogo.dismiss()
 		true
 	}
-	dialogo.setOnShowListener { campo.requestFocus() }
 	dialogo.show()
+	dialogo.conTeclado(campo)
+}
+
+/**
+ * Pone el foco en el campo y abre el teclado, sin tener que tocarlo otra vez
+ * (pedido en el foro: al pulsar Buscar o Añadir había que dar dos toques en el
+ * cuadro). Espera a que la ventana tenga el foco: antes, el teclado no sale.
+ */
+fun EditText.abrirTeclado(intentos: Int = 0) {
+	requestFocus()
+	post {
+		if (!hasWindowFocus() && intentos < 15) {
+			postDelayed({ abrirTeclado(intentos + 1) }, 60)
+			return@post
+		}
+		val gestor = context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+		gestor.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+	}
+}
+
+/** Diálogo para escribir (ya mostrado): el teclado sale en su campo. */
+fun android.app.Dialog.conTeclado(campo: EditText) {
+	window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE or android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+	campo.abrirTeclado()
 }
 
 /** Pregunta de confirmación (Sí / Cancelar). */

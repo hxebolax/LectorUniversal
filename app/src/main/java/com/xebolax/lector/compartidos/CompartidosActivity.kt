@@ -14,6 +14,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.xebolax.lector.LectorApp
 import com.xebolax.lector.R
+import com.xebolax.lector.ui.conTeclado
 import com.xebolax.lector.databinding.ActivityRssBinding
 import com.xebolax.lector.datos.BaseDatos
 import com.xebolax.lector.datos.Estado
@@ -412,6 +413,6 @@ class CompartidosActivity : AppCompatActivity() {
 			}
 			.setNegativeButton(R.string.cancelar, null)
 			.show()
-		campo.requestFocus()
+			.conTeclado(campo)
 	}
 }

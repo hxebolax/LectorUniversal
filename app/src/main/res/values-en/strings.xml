@@ -180,6 +180,11 @@
 	<string name="vuelta_al_final">Wrapped to end</string>
 	<string name="pagina_n">Page %1$s</string>
 	<string name="pagina_de">Page %1$s of %2$s</string>
+	<string name="capitulo_hecho">%1$d %% of the chapter</string>
+	<plurals name="palabras_capitulo">
+		<item quantity="one">%1$d word left in the chapter</item>
+		<item quantity="other">%1$d words left in the chapter</item>
+	</plurals>
 	<string name="porcentaje_n">%1$d %%</string>
 	<string name="parrafo_de">Paragraph %1$d of %2$d</string>
 	<string name="resultado_n_de">Result %1$d of %2$d</string>

@@ -32,6 +32,7 @@ import com.xebolax.lector.ui.accionesAccesibles
 import com.xebolax.lector.ui.avisar
 import com.xebolax.lector.ui.conEspera
 import com.xebolax.lector.ui.campoTexto
+import com.xebolax.lector.ui.abrirTeclado
 import com.xebolax.lector.ui.confirmar
 import com.xebolax.lector.ui.dp
 import com.xebolax.lector.ui.sinFocoPropio
@@ -89,6 +90,9 @@ class RssListaFragment : Fragment() {
 	// Sin leer: filtro por categoría
 	private var filtroCategoria: String? = null
 	private var busqueda = ""
+
+	/** El cuadro de la pestaña Buscar (para abrir el teclado al entrar en ella). */
+	private var campoBuscar: android.widget.EditText? = null
 	// Calculado al cargar: las carpetas en su orden y el nombre de la fuente abierta
 	private var carpetas: List<String> = emptyList()
 	private var nombreFuente: String? = null
@@ -123,6 +127,8 @@ class RssListaFragment : Fragment() {
 		db.suscribir(oyente)
 		recargar()
 		atras.isEnabled = modo == Modo.FUENTES && (categoria != null || fuente != null)
+		// En Buscar, sin nada escrito, el teclado sale ya en el cuadro (sin tocarlo dos veces)
+		if (modo == Modo.BUSCAR && busqueda.isBlank()) campoBuscar?.abrirTeclado()
 	}
 
 	override fun onPause() {
@@ -169,6 +175,7 @@ class RssListaFragment : Fragment() {
 		when (modo) {
 			Modo.BUSCAR -> {
 				val (contenedor, campo) = requireContext().campoTexto(getString(R.string.rss_buscar_articulos))
+				campoBuscar = campo
 				(contenedor as TextInputLayout).endIconMode = TextInputLayout.END_ICON_CLEAR_TEXT
 				campo.setText(busqueda)
 				campo.addTextChangedListener(object : TextWatcher {

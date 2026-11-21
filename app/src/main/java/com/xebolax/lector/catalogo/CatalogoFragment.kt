@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.xebolax.lector.R
+import com.xebolax.lector.ui.conTeclado
 import com.xebolax.lector.databinding.FragmentLibrosBinding
 import com.xebolax.lector.databinding.ItemListaBinding
 import com.xebolax.lector.datos.BaseDatos
@@ -278,6 +279,7 @@ class CatalogoFragment : Fragment() {
 			.setPositiveButton(R.string.guardar, null)
 			.setNegativeButton(R.string.cancelar, null)
 			.show()
+		if (original == null) dialogo.conTeclado(nombre)
 		// Guardar: si la dirección no vale, se dice en el campo (TalkBack lo lee) y la ventana sigue abierta con lo escrito
 		dialogo.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
 			val u = url.text.toString().trim().let { if (it.isNotEmpty() && !it.contains("://")) "https://$it" else it }

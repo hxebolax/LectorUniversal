@@ -3,6 +3,16 @@ El texto de la versión que se publica se muestra en la app al ofrecer la actual
 Para una versión nueva: sube versionCode y versionName en app\build.gradle.kts,
 añade aquí su sección y usa la opción 8 de compilar.bat.
 
+== 1.0.13
+- La lectura en voz alta ya no pierde por dónde ibas: al volver al día siguiente (con la app ya cerrada por Android), el libro se abre donde paró la voz y Leer en voz alta sigue desde esa misma frase. Antes, con TalkBack, al volver al libro se guardaba el párrafo donde habías empezado a leer.
+- Al volver al libro con la voz en pausa, la pantalla y el foco de TalkBack van al párrafo donde paró la voz, para seguir con gestos o con la voz desde ahí.
+- Con la voz en pausa, ir a un capítulo desde el índice, por encabezados o con la búsqueda hace que la voz siga desde allí al reanudar.
+- El teclado se abre solo al buscar y al escribir: Buscar podcasts, Añadir fuente, buscar en el libro, en los catálogos, en Noticias y en Radio, sin tener que tocar dos veces el cuadro.
+- Noticias: los artículos completos de medios que no usan párrafos normales, como Sputnik Mundo (noticiaslatam.lat), ya se leen enteros, sin datos ocultos repetidos ni tarjetas de otras noticias.
+- Dónde estoy dice también cuánto llevas del capítulo y cuántas palabras le quedan.
+- Libros en braille: los puntos guía de los índices se leen como un espacio.
+- Índice de los EPUB: si el libro trae etiquetas escritas como texto en los títulos (la i de cursiva entre signos de menor y mayor), ya no se leen.
+
 == 1.0.12
 - Voz general para toda la app (Ajustes, General, Lectura en voz alta) y voz propia de la Biblioteca, de Compartidos y de las noticias: lo que no cambies sigue a la voz general, y cada libro o elemento compartido puede tener la suya con Su voz. Con Quitar todo lo propio vuelve a la voz que hereda.
 - Voces de ElevenLabs, opcionales, con tu propia clave de API (Ajustes, General): voces muy naturales, con velocidad y tono, y lo ya leído se guarda para no gastar créditos otra vez. Si falla (sin créditos o sin conexión), lo dice y sigue con la voz del móvil.

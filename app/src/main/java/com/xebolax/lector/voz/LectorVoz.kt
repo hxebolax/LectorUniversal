@@ -825,6 +825,7 @@ object LectorVoz {
 
 	fun reanudar() {
 		if (documento == null) return
+		terminado = false
 		Log.d(ETIQUETA, "Reanudar")
 		// Solo suena una cosa: si sonaba un audiolibro, un episodio o la radio, se pausa
 		if (com.xebolax.lector.audio.ControlAudio.reproduciendo) com.xebolax.lector.audio.ControlAudio.pausar()
@@ -911,6 +912,7 @@ object LectorVoz {
 	/** Coloca la lectura en un bloque (y carácter) sin cambiar si lee o no. */
 	fun irA(nuevoBloque: Int, caracter: Int = 0) {
 		val doc = documento ?: return
+		terminado = false
 		bloque = nuevoBloque.coerceIn(0, (doc.bloques.size - 1).coerceAtLeast(0))
 		frases = frasesDe(bloque)
 		frase = frases.indexOfLast { it.first <= caracter }.coerceAtLeast(0)
@@ -920,6 +922,7 @@ object LectorVoz {
 
 	fun siguienteFrase() {
 		val doc = documento ?: return
+		terminado = false
 		// Si la siguiente ya está generada, se salta a ella sin esperar
 		val j = jugador
 		if (leyendo && j != null && !rehacer) {
@@ -944,6 +947,7 @@ object LectorVoz {
 	}
 
 	fun anteriorFrase() {
+		terminado = false
 		// Si lleva más de 2 segundos en la frase, vuelve a su principio
 		val j = jugador
 		if (leyendo && j != null && !rehacer && j.currentPosition > 2000) {
@@ -965,11 +969,13 @@ object LectorVoz {
 
 	fun siguienteParrafo() {
 		val doc = documento ?: return
+		terminado = false
 		val s = siguienteBloqueLegible(bloque + 1)
 		if (s < doc.bloques.size) irA(s)
 	}
 
 	fun anteriorParrafo() {
+		terminado = false
 		if (frase > 0) return irA(bloque)
 		// El anterior que tenga algo que leer (no un separador ni una nota saltada)
 		var b = bloque - 1
@@ -1337,8 +1343,12 @@ object LectorVoz {
 		else tts?.let { t -> if (listo) pedir(t, POR_DELANTE) }
 	}
 
+	/** La voz llegó al final del libro y guardó el 100 %: no se guarda otra cosa encima. */
+	private var terminado = false
+
 	private fun terminarLibro() {
 		pausar()
+		terminado = true
 		rehacer = true
 		val doc = documento ?: return
 		BaseDatos.obtener(app).guardarPosicion(libro, Posicion.texto(bloque), 100.0)
@@ -1364,10 +1374,14 @@ object LectorVoz {
 		carpeta().listFiles()?.forEach { it.delete() }
 	}
 
+	/** Guarda ya la posición de la voz (el lector la pide al salir con la voz en pausa). */
+	fun guardarPosicion() = guardar(forzar = true)
+
 	/** Guarda posición y tiempo leído (como mucho cada 10 segundos salvo si se fuerza). */
 	private fun guardar(forzar: Boolean = false) {
 		val doc = documento ?: return
 		if (libro <= 0) return
+		if (terminado) return
 		val ahora = SystemClock.elapsedRealtime()
 		if (!forzar && ahora - ultimoGuardado < 10_000) return
 		ultimoGuardado = ahora

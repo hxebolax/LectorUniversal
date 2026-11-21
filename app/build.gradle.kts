@@ -26,8 +26,8 @@ android {
 		applicationId = "com.xebolax.lector"
 		minSdk = 24
 		targetSdk = 35
-		versionCode = 13
-		versionName = "1.0.12"
+		versionCode = 14
+		versionName = "1.0.13"
 
 		buildConfigField("String", "URL_ACTUALIZACIONES", "\"$urlActualizaciones\"")
 		buildConfigField("String", "REPO_GITHUB", "\"$repoGithub\"")

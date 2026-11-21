@@ -222,7 +222,7 @@ object LectorEpub : LectorFormato {
 	private fun indiceNav(c: ConstructorDocumento, ol: Element, base: String, nivel: Int, entradas: MutableList<Triple<String, Int, String>>) {
 		for (li in hijosLocales(ol, "li")) {
 			val enlace = li.children().firstOrNull { local(it) == "a" || local(it) == "span" }
-			val titulo = enlace?.text().orEmpty().trim()
+			val titulo = sinEtiquetas(enlace?.text().orEmpty())
 			val href = enlace?.attr("href").orEmpty()
 			if (titulo.isNotEmpty() && href.isNotEmpty()) {
 				c.indiceAncla(titulo, nivel, destino(base, href))
@@ -233,7 +233,7 @@ object LectorEpub : LectorFormato {
 	}
 
 	private fun indiceNcx(c: ConstructorDocumento, punto: Element, base: String, nivel: Int, entradas: MutableList<Triple<String, Int, String>>) {
-		val etiqueta = punto.children().firstOrNull { local(it) == "navLabel" }?.let { buscarTodos(it, "text").firstOrNull()?.text() }.orEmpty().trim()
+		val etiqueta = punto.children().firstOrNull { local(it) == "navLabel" }?.let { buscarTodos(it, "text").firstOrNull()?.text() }.orEmpty().let { sinEtiquetas(it) }
 		val src = punto.children().firstOrNull { local(it) == "content" }?.attr("src").orEmpty()
 		if (etiqueta.isNotEmpty() && src.isNotEmpty()) {
 			c.indiceAncla(etiqueta, nivel, destino(base, src))
@@ -241,6 +241,14 @@ object LectorEpub : LectorFormato {
 		}
 		hijosLocales(punto, "navPoint").forEach { indiceNcx(c, it, base, nivel + 1, entradas) }
 	}
+
+	/**
+	 * Títulos del índice con etiquetas escritas como texto («<i>Tel'aran'rhiod</i>»: el libro
+	 * las escapó dos veces). TalkBack leería «menor que i mayor que»; se quitan.
+	 */
+	private val ETIQUETAS_ESCRITAS = Regex("</?(i|b|em|strong|u|span|small|sup|sub)(\\s[^<>]*)?>", RegexOption.IGNORE_CASE)
+
+	internal fun sinEtiquetas(titulo: String): String = titulo.replace(ETIQUETAS_ESCRITAS, "").trim()
 
 	/** Libro sin h1-h6: el bloque al que apunta cada entrada del índice pasa a ser encabezado si su texto coincide. */
 	private fun encabezadosDesdeIndice(c: ConstructorDocumento, entradas: List<Triple<String, Int, String>>) {

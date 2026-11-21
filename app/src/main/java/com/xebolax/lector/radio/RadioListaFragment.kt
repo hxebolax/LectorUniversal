@@ -28,6 +28,7 @@ import com.xebolax.lector.ui.accionesAccesibles
 import com.xebolax.lector.ui.accionesOrden
 import com.xebolax.lector.ui.avisar
 import com.xebolax.lector.ui.campoTexto
+import com.xebolax.lector.ui.abrirTeclado
 import com.xebolax.lector.ui.conEspera
 import com.xebolax.lector.ui.confirmar
 import com.xebolax.lector.ui.dp
@@ -137,6 +138,9 @@ class RadioListaFragment : Fragment() {
 
 	// Buscar
 	private var filtro = RadioBrowser.Filtro()
+
+	/** El cuadro de la pestaña Buscar (para abrir el teclado al entrar en ella). */
+	private var campoBuscar: android.widget.EditText? = null
 	private var buscado = false
 
 	// Historial
@@ -199,6 +203,10 @@ class RadioListaFragment : Fragment() {
 		ControlAudio.registrar(oyenteAudio)
 		recargar()
 		atras.isEnabled = puedeSubir()
+		// En Buscar, sin nada escrito ni emisoras encontradas, el teclado sale ya en el cuadro
+		if (modo == Modo.BUSCAR && filtro.nombre.isBlank() && emisoras.isEmpty()) {
+			campoBuscar?.abrirTeclado()
+		}
 	}
 
 	override fun onPause() {
@@ -284,6 +292,7 @@ class RadioListaFragment : Fragment() {
 			}
 			Modo.BUSCAR -> {
 				val (contenedor, campo) = requireContext().campoTexto(getString(R.string.radio_nombre_buscar), filtro.nombre)
+				campoBuscar = campo
 				campo.imeOptions = EditorInfo.IME_ACTION_SEARCH
 				campo.isSingleLine = true
 				campo.minHeight = dp(requireContext(), 48)

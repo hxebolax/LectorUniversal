@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.xebolax.lector.R
+import com.xebolax.lector.ui.conTeclado
 import com.xebolax.lector.databinding.ActivityRssBinding
 import com.xebolax.lector.ui.Seccion
 import com.xebolax.lector.ui.avisar
@@ -257,6 +258,7 @@ class RadioActivity : AppCompatActivity() {
 			.setPositiveButton(R.string.guardar, null)
 			.setNegativeButton(R.string.cancelar, null)
 			.show()
+		if (editar == null) dialogo.conTeclado(if (nombre.isBlank()) campoNombre else campoUrl)
 		dialogo.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
 				var direccion = campoUrl.text.toString().trim()
 				val mal = getString(R.string.radio_direccion_mal)

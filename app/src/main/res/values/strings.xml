@@ -180,6 +180,12 @@
 	<string name="vuelta_al_final">Vuelta al final</string>
 	<string name="pagina_n">Página %1$s</string>
 	<string name="pagina_de">Página %1$s de %2$s</string>
+	<string name="capitulo_hecho">%1$d %% del capítulo</string>
+	<plurals name="palabras_capitulo">
+		<item quantity="one">queda %1$d palabra del capítulo</item>
+		<item quantity="many">quedan %1$d palabras del capítulo</item>
+		<item quantity="other">quedan %1$d palabras del capítulo</item>
+	</plurals>
 	<string name="porcentaje_n">%1$d %%</string>
 	<string name="parrafo_de">Párrafo %1$d de %2$d</string>
 	<string name="resultado_n_de">Resultado %1$d de %2$d</string>

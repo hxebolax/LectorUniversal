@@ -72,6 +72,9 @@ object ArticuloCompleto {
 	/** Clases e ids de bloques que no son el texto (compartir, comentarios, relacionadas...). */
 	private val BLOQUES_RUIDO = Regex("(^|[-_ ])(share|sharing|social|comments?|related|relacionad|newsletter|promo|banner|cookies?|publicidad|advert|ads?|sidebar|breadcrumbs?|tags|labels|etiquetas|recomendad|outbrain|taboola|menu|footer|pager|paginacion|byline-share)([-_ ]|$)", RegexOption.IGNORE_CASE)
 
+	/** Recuadros de promoción (suscribirse, boletines, canales): fuera aunque tengan varios párrafos. */
+	private val BLOQUES_PROMO = Regex("(^|[-_ ])(subscribe|suscribete|suscripcion-boletin|newsletter|incision)([-_ ]|$)", RegexOption.IGNORE_CASE)
+
 	// --- Lo principal -----------------------------------------------------------------------
 
 	/**
@@ -200,6 +203,8 @@ object ArticuloCompleto {
 		val doc = original.clone()
 		doc.select(RUIDO).remove()
 		doc.select("[style~=(?i)display:\\s*none]").remove()
+		quitarMicrodatos(doc)
+		divsComoParrafos(doc)
 		val clave = normal(titulo).take(40)
 		val titulares = doc.select("h1, h2").filter { clave.isNotEmpty() && normal(it.text()).contains(clave) }
 		val delTitular = com.xebolax.lector.formatos.LectorHtml.bloqueDelTitulo(doc, titulares)
@@ -212,6 +217,40 @@ object ArticuloCompleto {
 		}
 		if (jsonld != null && jsonld.text().length >= MINIMO && (elegido == null || jsonld.text().length > elegido.text().length * 1.3)) elegido = jsonld
 		return elegido?.takeIf { it.text().length >= MINIMO }
+	}
+
+	/** Propiedades de microdatos que solo son datos de la página (no se ven). */
+	private val MICRODATOS = setOf("mainentityofpage", "url", "headline", "name", "alternatename", "description", "datepublished",
+		"datecreated", "datemodified", "articlesection", "associatedmedia", "articlebody", "author", "publisher", "image", "keywords", "inlanguage")
+
+	/**
+	 * Bloques de microdatos ocultos: un elemento itemscope cuyos hijos son todos
+	 * itemprop de datos (fecha, titular, dirección...). Sputnik copia ahí el artículo
+	 * entero y, sin quitarlo, el texto salía dos veces y con las fechas delante.
+	 */
+	private fun quitarMicrodatos(doc: Document) {
+		doc.select("[itemscope]").filter { e ->
+			val hijos = e.children()
+			// Con párrafos dentro es el artículo visible (articleBody con sus <p>): se queda
+			e.select("p").isEmpty() && hijos.size >= 3 && hijos.all { it.hasAttr("itemprop") } &&
+				hijos.count { it.attr("itemprop").lowercase() in MICRODATOS } >= 3
+		}.forEach { it.remove() }
+	}
+
+	/** Lo que hace que un div no sea solo un párrafo. */
+	private const val BLOQUES = "div,p,section,article,main,table,ul,ol,dl,h1,h2,h3,h4,h5,h6,blockquote,pre,figure,header,footer,aside,nav,form"
+
+	/**
+	 * Un div con solo texto (sin bloques dentro) es un párrafo, como hace Readability.
+	 * Hay medios que no usan <p>: Sputnik (noticiaslatam.lat) pone cada párrafo en
+	 * un «div.article__text» y sin esto no se encontraba el texto del artículo.
+	 */
+	private fun divsComoParrafos(doc: Document) {
+		for (d in doc.select("div").reversed()) {
+			if (d.select(BLOQUES).size > 1) continue
+			if (d.text().trim().length < 25) continue
+			d.tagName("p").attr("data-lu-div", "1")
+		}
 	}
 
 	/** El contenedor con más texto en párrafos (la idea de Readability). */
@@ -255,6 +294,11 @@ object ArticuloCompleto {
 
 	/** Quita del bloque lo que no es texto del artículo. */
 	private fun limpiar(bloque: Element, titulo: String): Element {
+		val total = bloque.text().length
+		// Sin quitar un contenedor del cuerpo con una clase así («article-body has-newsletter»)
+		bloque.select("div, section, aside").filter { e ->
+			e !== bloque && BLOQUES_PROMO.containsMatchIn(e.className() + " " + e.id()) && e.text().length < total / 2
+		}.forEach { it.remove() }
 		bloque.select("*").filter { e ->
 			val nombre = e.className() + " " + e.id()
 			e.tagName() in setOf("div", "section", "ul", "ol", "span", "p") && BLOQUES_RUIDO.containsMatchIn(nombre) && e.select("p").size < 3
@@ -269,6 +313,16 @@ object ArticuloCompleto {
 			val a = p.select("a")
 			a.size == 1 && a.text().trim() == p.text().trim() && a.attr("href").let { it.startsWith("#") || it == "/" || it.isBlank() }
 		}.forEach { it.remove() }
+		// Divs hechos párrafo que casi solo son enlaces: tarjetas de «Lee también» y de otras noticias
+		bloque.select("p[data-lu-div]").filter { p ->
+			val largo = p.text().length
+			p.parents().any { it.tagName() == "a" } || (largo < 300 && p.select("a").sumOf { it.text().length } >= largo * 0.8)
+		}.forEach { it.remove() }
+		// Tarjetas de otras noticias (fecha y titular enlazado): bloques cortos que casi solo son enlaces
+		bloque.select("div").filter { d ->
+			d !== bloque && d.select("img, figure").isEmpty() && d.text().length in 1 until 300 && d.select("a").sumOf { it.text().length } >= d.text().length * 0.5
+		}.forEach { it.remove() }
+		bloque.select("[data-lu-div]").removeAttr("data-lu-div")
 		// El titular ya va arriba
 		val t = normal(titulo)
 		bloque.select("h1, h2, h3, p").firstOrNull()?.let { if (t.isNotEmpty() && normal(it.text()) == t) it.remove() }

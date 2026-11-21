@@ -168,6 +168,7 @@ class GestorCopias(private val fragmento: Fragment) {
 			.setNegativeButton(R.string.cancelar, null)
 		if (!obligatoria) constructor.setNeutralButton(R.string.copia_sin_contrasena) { _, _ -> alTerminar(null) }
 		val dialogo = constructor.show()
+		dialogo.conTeclado(una)
 		// Guardar comprueba antes de cerrar: si algo no vale, el error se dice en su campo
 		dialogo.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
 			val clave = una.text.toString()
@@ -258,7 +259,7 @@ class GestorCopias(private val fragmento: Fragment) {
 			.setPositiveButton(R.string.abrir) { _, _ -> alEscribir(campo.text.toString()) }
 			.setNegativeButton(R.string.cancelar, null)
 			.show()
-		campo.requestFocus()
+			.conTeclado(campo)
 	}
 
 	/** Abre una copia: la antigua en JSON, o la nueva (pidiendo la contraseña si la tiene). */

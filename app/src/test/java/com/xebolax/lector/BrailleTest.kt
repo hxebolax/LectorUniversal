@@ -62,4 +62,14 @@ class BrailleTest {
 		assertEquals(Braille.Trozo.Tipo.TITULO, trozos[1].tipo)
 		assertEquals("9 (tinta 5)", trozos[0].pagina)
 	}
+
+	@Test
+	fun puntosGuiaDeUnIndice() {
+		// «a» (punto 1), seis puntos 3 de guía y «b»: queda «a b»
+		assertEquals(listOf(0x01, 0, 0x03), Braille.sinPuntosGuia(intArrayOf(0x01, 0, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0, 0x03)).toList())
+		// Tres puntos 3 seguidos son puntos suspensivos: se quedan
+		assertEquals(listOf(0x01, 0x04, 0x04, 0x04), Braille.sinPuntosGuia(intArrayOf(0x01, 0x04, 0x04, 0x04)).toList())
+		// Guía hasta el final de la línea: sin espacio colgando
+		assertEquals(listOf(0x01), Braille.sinPuntosGuia(intArrayOf(0x01, 0x10, 0x10, 0x10, 0x10, 0x10)).toList())
+	}
 }

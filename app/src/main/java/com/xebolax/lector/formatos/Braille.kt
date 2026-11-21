@@ -198,6 +198,33 @@ object Braille {
 		}
 	}
 
+	/**
+	 * Puntos guía de un índice (una fila de puntos 3, 5 o 2 entre el título y su
+	 * página): un solo espacio, como los de tinta (idea de Paperback). Cuatro o más
+	 * seguidos; tres puntos 3 son puntos suspensivos y se quedan.
+	 */
+	fun sinPuntosGuia(l: IntArray): IntArray {
+		val r = ArrayList<Int>(l.size)
+		var i = 0
+		while (i < l.size) {
+			val c = l[i]
+			if (c == 0x04 || c == 0x10 || c == 0x02) {
+				var j = i
+				while (j < l.size && l[j] == c) j++
+				if (j - i >= 4) {
+					if (r.isNotEmpty() && r.last() != 0) r.add(0)
+					i = j
+					while (i < l.size && l[i] == 0) i++
+					continue
+				}
+			}
+			r.add(c)
+			i++
+		}
+		while (r.isNotEmpty() && r.last() == 0) r.removeAt(r.size - 1)
+		return r.toIntArray()
+	}
+
 	private fun sangria(l: IntArray): Int = l.indexOfFirst { it != 0 }.let { if (it < 0) l.size else it }
 	private fun recortar(l: IntArray): IntArray {
 		var fin = l.size
@@ -308,14 +335,19 @@ object Braille {
 					continue
 				}
 				val s = sangria(l)
-				val contenido = l.copyOfRange(s, l.size)
+				val bruto = l.copyOfRange(s, l.size)
 				// Línea de una sola celda repetida: separador (guiones, dos puntos) o subrayado de un título (puntos 1-4)
-				if (contenido.size >= 6 && contenido.all { it == contenido[0] } && contenido[0] in setOf(0x24, 0x12, 0x09)) {
+				if (bruto.size >= 6 && bruto.all { it == bruto[0] } && bruto[0] in setOf(0x24, 0x12, 0x09)) {
 					cerrar()
-					if (contenido[0] != 0x09) {
-						trozos += Trozo(Trozo.Tipo.SEPARADOR, contenido, paginaPendiente)
+					if (bruto[0] != 0x09) {
+						trozos += Trozo(Trozo.Tipo.SEPARADOR, bruto, paginaPendiente)
 						paginaPendiente = null
 					}
+					continue
+				}
+				val contenido = sinPuntosGuia(bruto)
+				if (contenido.isEmpty()) {
+					cerrar()
 					continue
 				}
 				when {
